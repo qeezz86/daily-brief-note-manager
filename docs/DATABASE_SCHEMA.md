@@ -16,12 +16,41 @@
 ## 2. 공통 보안 및 무결성 원칙
 
 - 사용자 소유 데이터는 `owner_id`를 `auth.users`와 연결한다.
+- `categories`는 애플리케이션이 제공하는 공용 설정·참조 데이터이며 사용자 소유 데이터가 아니다. 초기값은 별도 category seed로 관리한다.
+- `categories`를 제외한 이 문서의 데이터 테이블은 사용자 소유 테이블이며 각 행에 `owner_id`를 직접 둔다.
 - 사용자 소유 테이블에는 RLS를 활성화하고 `auth.uid()`에 해당하는 데이터만 조회·생성·수정·삭제할 수 있게 한다.
 - 브라우저에는 Supabase anon key만 사용하며 service role key를 노출하지 않는다.
 - 외래 키, unique, check constraint, index, 삭제 동작은 migration에서 명시한다.
 - 이미 발행된 `display_id`와 `slug`는 카테고리 설정 변경 시 자동으로 다시 쓰지 않는다.
 - 이미지 파일, URL, 바이너리, 크기, 해상도, 스토리지 정보는 저장하지 않는다.
 - 출처 기사 전문, CCTV 원문 전문, 전체 자막, 전체 번역은 저장하지 않는다.
+
+### 2.1 부모·자식 소유권 일치
+
+하위 테이블의 `owner_id`는 부모 행의 `owner_id`와 반드시 같아야 한다. 애플리케이션 검증만 사용하지 않고 PostgreSQL 복합 외래 키로 강제한다.
+
+- 복합 외래 키의 부모 테이블에는 `UNIQUE (id, owner_id)`를 둔다.
+- 하위 테이블은 `(parent_id, owner_id)`로 부모의 `(id, owner_id)`를 참조한다.
+- 두 부모를 연결하는 `post_tags`와 `news_updates`는 양쪽 부모 모두에 복합 외래 키를 둔다.
+- nullable 부모 참조도 값이 있을 때는 같은 `owner_id`를 참조해야 한다.
+- 아래 테이블 표에서 `references <parent>`로 축약한 사용자 데이터 관계도 실제 migration에서는 해당 부모의 `(id, owner_id)`를 참조하는 복합 외래 키로 구현한다.
+
+적용 관계:
+
+- `seo_data`, `sources`, `ai_metadata`, `info_db_metadata`, `chinese_metadata` → `posts`
+- `post_tags` → `posts`, `tags`
+- `news_updates` → `posts`, `news_topics`
+- `news_updates.previous_update_id` → `news_updates`
+- `sources.news_update_id` → `news_updates`
+- `news_followups`, `news_status_history` → `news_topics`
+
+### 2.2 RLS
+
+`posts`, `seo_data`, `tags`, `post_tags`, `sources`, `ai_metadata`, `info_db_metadata`, `chinese_metadata`, `news_topics`, `news_updates`, `news_followups`, `news_status_history`, `generated_prompts`에 RLS를 활성화한다.
+
+- 조회·수정·삭제 정책은 `owner_id = auth.uid()`를 조건으로 한다.
+- 생성과 수정의 `WITH CHECK`도 `owner_id = auth.uid()`를 조건으로 한다.
+- 복합 외래 키가 부모·자식 소유권 일치를 보장하고, RLS가 현재 인증 사용자와 행의 소유권을 보장한다.
 
 ## 3. 관계 개요
 
@@ -102,6 +131,7 @@ categories
 | `image_prompt` | text | nullable |
 | `image_alt` | text | nullable |
 | `image_prompt_version` | integer | 기본값 `1` |
+| `image_prompt_updated_at` | timestamptz | nullable |
 | `created_at` | timestamptz | 필수 |
 | `updated_at` | timestamptz | 필수 |
 
@@ -119,11 +149,18 @@ categories
 - 중국어 학습: `display_id`를 사용하지 않음
 - `html_body`: 사용자가 작성·발행한 자체 콘텐츠만 저장
 
+unique 조건:
+
+- 뉴스: `UNIQUE (owner_id, category_id, briefing_date)`
+- AI·정보DB·중국어 학습: `UNIQUE (owner_id, category_id, series_no)`
+- nullable 열을 사용하는 단일 `posts` 테이블 구조이므로 각 조건은 해당 콘텐츠 그룹의 필수 필드 검증과 함께 적용한다.
+
 ### 5.2 `seo_data`
 
 | 열 | 형식 | 조건 |
 |---|---|---|
 | `post_id` | uuid | primary key, references `posts` on delete cascade |
+| `owner_id` | uuid | references `auth.users` |
 | `representative_title` | text | 필수 |
 | `alternative_titles` | jsonb | 대안 제목 정확히 4개 권장 |
 | `meta_description` | text | 120~160자 경고 |
@@ -148,16 +185,20 @@ categories
 |---|---|---|
 | `post_id` | uuid | references `posts` on delete cascade |
 | `tag_id` | uuid | references `tags` on delete cascade |
+| `owner_id` | uuid | references `auth.users` |
 
 복합 primary key는 (`post_id`, `tag_id`)이다.
+
+`(post_id, owner_id)`는 `posts(id, owner_id)`를, `(tag_id, owner_id)`는 `tags(id, owner_id)`를 참조하며 두 관계 모두 `ON DELETE CASCADE`다.
 
 ### 5.5 `sources`
 
 | 열 | 형식 | 조건 |
 |---|---|---|
 | `id` | uuid | primary key |
+| `owner_id` | uuid | references `auth.users` |
 | `post_id` | uuid | references `posts` on delete cascade |
-| `news_update_id` | uuid | nullable |
+| `news_update_id` | uuid | nullable, references `news_updates` |
 | `source_name` | text | 필수 |
 | `source_title` | text | 필수 |
 | `source_url` | text | 필수 |
@@ -170,6 +211,8 @@ categories
 
 개별 원문 URL을 권장하고 홈페이지, 검색, 목록 URL 가능성은 경고한다. 전문 대신 확인한 핵심 내용만 저장한다.
 
+`(post_id, owner_id)`는 `posts(id, owner_id)`를 `ON DELETE CASCADE`로 참조한다. `news_update_id`가 있으면 `(news_update_id, owner_id)`가 `news_updates(id, owner_id)`를 참조한다.
+
 ## 6. 카테고리별 메타데이터
 
 ### 6.1 `ai_metadata`
@@ -177,6 +220,7 @@ categories
 | 열 | 형식 | 조건 |
 |---|---|---|
 | `post_id` | uuid | primary key, references `posts` on delete cascade |
+| `owner_id` | uuid | references `auth.users` |
 | `field_name` | text | nullable |
 | `difficulty` | text | nullable |
 | `estimated_read_min` | integer | nullable |
@@ -186,6 +230,7 @@ categories
 | 열 | 형식 | 조건 |
 |---|---|---|
 | `post_id` | uuid | primary key, references `posts` on delete cascade |
+| `owner_id` | uuid | references `auth.users` |
 | `field_name` | text | nullable |
 | `difficulty` | text | nullable |
 | `estimated_read_min` | integer | nullable |
@@ -196,6 +241,7 @@ categories
 | 열 | 형식 | 조건 |
 |---|---|---|
 | `post_id` | uuid | primary key, references `posts` on delete cascade |
+| `owner_id` | uuid | references `auth.users` |
 | `learning_topic` | text | 필수 |
 | `program_name` | text | 필수 |
 | `original_title` | text | 필수 |
@@ -208,6 +254,8 @@ categories
 
 중국어 학습은 `posts.series_no`를 식별자로 사용하고 브리핑 ID를 생성하지 않는다. 핵심 문장 3~5개는 자체 작성 HTML에 포함할 수 있지만 원문 전체를 별도 복제하지 않는다.
 
+중국어 학습의 동일 원문 중복 저장은 `UNIQUE (owner_id, original_url)`로 차단한다.
+
 ## 7. 뉴스 추적
 
 ### 7.1 `news_topics`
@@ -217,7 +265,7 @@ categories
 | `id` | uuid | primary key |
 | `owner_id` | uuid | references `auth.users` |
 | `category_id` | text | references `categories` |
-| `topic_key` | text | 카테고리 내 unique 권장 |
+| `topic_key` | text | `UNIQUE (owner_id, category_id, topic_key)` |
 | `canonical_title` | text | 필수 |
 | `topic_summary` | text | nullable |
 | `status` | text | `active`, `monitoring`, `closed`, `reopened` |
@@ -234,8 +282,9 @@ categories
 | 열 | 형식 | 조건 |
 |---|---|---|
 | `id` | uuid | primary key |
-| `post_id` | uuid | references `posts` on delete cascade |
-| `topic_id` | uuid | references `news_topics` |
+| `owner_id` | uuid | references `auth.users` |
+| `post_id` | uuid | `(post_id, owner_id)` references `posts(id, owner_id)` on delete cascade |
+| `topic_id` | uuid | `(topic_id, owner_id)` references `news_topics(id, owner_id)` on delete restrict |
 | `item_order` | integer | 필수 |
 | `update_type` | text | `new`, `follow_up`, `correction`, `closure_note` |
 | `headline` | text | 필수 |
@@ -249,12 +298,15 @@ categories
 
 공식 발표, 새 수치, 정책 확정, 법적 결정, 기업 후속 조치, 중대한 변화, 오류 수정, 실제 영향처럼 의미 있는 변화만 업데이트로 저장한다. 표현만 바뀐 반복 보도는 새 업데이트로 저장하지 않는다.
 
+`previous_update_id`가 있으면 `(previous_update_id, owner_id)`가 `news_updates(id, owner_id)`를 참조한다.
+
 ### 7.3 `news_followups`
 
 | 열 | 형식 | 조건 |
 |---|---|---|
 | `id` | uuid | primary key |
-| `topic_id` | uuid | references `news_topics` on delete cascade |
+| `owner_id` | uuid | references `auth.users` |
+| `topic_id` | uuid | `(topic_id, owner_id)` references `news_topics(id, owner_id)` on delete cascade |
 | `check_text` | text | 필수 |
 | `status` | text | `pending`, `done`, `cancelled` |
 | `due_date` | date | nullable |
@@ -269,7 +321,8 @@ categories
 | 열 | 형식 | 조건 |
 |---|---|---|
 | `id` | uuid | primary key |
-| `topic_id` | uuid | references `news_topics` on delete cascade |
+| `owner_id` | uuid | references `auth.users` |
+| `topic_id` | uuid | `(topic_id, owner_id)` references `news_topics(id, owner_id)` on delete cascade |
 | `from_status` | text | nullable |
 | `to_status` | text | 필수 |
 | `reason` | text | nullable |
@@ -277,25 +330,50 @@ categories
 
 주제를 `closed`로 바꿀 때 `closed_reason`과 상태 이력을 함께 저장한다. 종료 후 의미 있는 진전이 생기면 `reopened` 상태와 재개 사유를 기록한다.
 
-## 8. 프롬프트 생성 기록
+## 8. 삭제 정책
 
-### 8.1 `generated_prompts`
+- `posts` 삭제 시 `seo_data`, `post_tags`, `sources`, `ai_metadata`, `info_db_metadata`, `chinese_metadata`, `news_updates`를 `ON DELETE CASCADE`로 삭제한다.
+- `news_topics` 삭제 시 `news_followups`, `news_status_history`를 `ON DELETE CASCADE`로 삭제한다.
+- `news_updates.topic_id`는 `ON DELETE RESTRICT`로 두어 업데이트가 연결된 뉴스 주제의 물리 삭제를 막는다.
+- 발행된 `posts`는 물리 삭제보다 `content_status = archived` 전환을 우선한다.
+- `news_topics`는 물리 삭제보다 `closed` 등 상태 변경과 상태 이력 보존을 우선한다.
+- UI의 물리 삭제 작업은 파급 범위를 확인하고 명시적 확인을 거쳐야 한다.
 
-PRODUCT_SPEC에서 선택적 저장 대상으로 정의한다.
+## 9. 날짜와 시간대
+
+- 날짜-only 값은 PostgreSQL `date`에 저장한다.
+- 실제 시각을 나타내는 값은 `timestamptz`에 저장한다.
+- 앱의 기본 시간대는 `Asia/Seoul`이다.
+- 시간대 정보가 없는 일반 시각 입력은 `Asia/Seoul` 기준으로 해석한 뒤 `timestamptz`에 저장한다.
+- CCTV 원문의 게시·업데이트 시각은 `Asia/Shanghai` 기준으로 해석한 뒤 `timestamptz`에 저장한다.
+- 날짜-only 값을 임의로 UTC 자정 시각으로 변환하지 않는다.
+
+대표적인 날짜-only 필드는 `posts.briefing_date`, `news_topics.first_seen_at`, `news_topics.last_seen_at`, `news_followups.due_date`, `info_db_metadata.reference_date`다. `published_at`, `original_published_at`, `source_published_at`, `checked_at`, 생성·수정 시각은 `timestamptz`다.
+
+## 10. 프롬프트 생성 기록
+
+### 10.1 `generated_prompts`
+
+프롬프트 생성 기록을 저장한다.
 
 | 열 | 형식 | 조건 |
 |---|---|---|
 | `id` | uuid | primary key |
-| `owner_id` | uuid | 사용자 식별자 |
-| `category_id` | text | 카테고리 식별자 |
-| `recent_post_count` | integer | 실제 사용한 최근 글 수 |
+| `owner_id` | uuid | references `auth.users` |
+| `category_id` | text | references `categories` |
+| `actual_post_count` | integer | 실제 사용한 최근 글 수 |
 | `prompt_mode` | text | 프롬프트 모드 |
 | `prompt_text` | text | 생성한 프롬프트 |
+| `is_pinned` | boolean | 기본값 `false` |
 | `generated_at` | timestamptz | 생성 시각 |
 
-최근 30개만 유지하거나 사용자가 직접 삭제하는 방식이 제안되어 있으나 확정 규칙은 아니다.
+- 각 `(owner_id, category_id)`별로 `generated_at DESC` 기준 최근 30개의 고정되지 않은 기록을 보존한다.
+- `is_pinned = true`인 기록은 30개 계산과 자동 삭제 대상에서 제외한다.
+- 새 기록 저장 후 해당 카테고리의 30개를 초과한 고정되지 않은 오래된 기록을 정리한다.
+- `actual_post_count`에는 요청 개수가 아니라 실제 프롬프트 컨텍스트에 사용한 발행 글 수를 저장한다.
+- `prompt_text`에는 WordPress HTML 전문, 뉴스 기사 원문, CCTV 원문·전체 자막·전체 번역을 포함하지 않는다.
 
-## 9. 인덱스와 중복 검사 기준
+## 11. 인덱스와 중복 검사 기준
 
 저장 전 중복 검사는 다음 순서를 따른다.
 
@@ -306,11 +384,43 @@ PRODUCT_SPEC에서 선택적 저장 대상으로 정의한다.
 5. 정규화한 제목의 완전 일치
 6. 뉴스의 같은 `topic_key`
 
-필수 unique 조건은 `posts(owner_id, slug)`, 값이 있는 `posts(owner_id, wordpress_url)`, `tags(owner_id, name)`이다. 그 밖의 중복 기준은 PRODUCT_SPEC에서 경고·권장 수준인지 DB unique 수준인지 확정되지 않았다.
+필수 unique 조건:
 
-## 10. 백업 및 복구 대상
+- `posts(owner_id, slug)`
+- 값이 있는 `posts(owner_id, wordpress_url)`
+- 뉴스의 `posts(owner_id, category_id, briefing_date)`
+- AI·정보DB·중국어 학습의 `posts(owner_id, category_id, series_no)`
+- `tags(owner_id, name)`
+- `news_topics(owner_id, category_id, topic_key)`
+- `chinese_metadata(owner_id, original_url)`
 
-MVP 다운로드 대상:
+같은 표시 ID와 정규화 제목은 저장 전 중복 검사 대상으로 처리하며 현재 확정 설계에서는 DB unique 조건으로 추가하지 않는다.
+
+AI·정보DB·중국어 학습 컨텍스트의 exact title, slug, focus keyword 중복 검사는 최근 컨텍스트 범위가 아니라 해당 사용자의 전체 데이터에서 수행한다. 중국어 학습의 `original_url`도 전체 데이터에서 검사하며 DB unique 조건으로 저장을 차단한다.
+
+## 12. 백업 및 복구
+
+### 12.1 JSON
+
+JSON은 관계 데이터를 포함한 전체 복원용 형식이다.
+
+- 최상위 `schemaVersion`의 초기값은 정수 `1`이다.
+- 모든 사용자 데이터 테이블과 관계 복원에 필요한 식별자를 포함한다.
+- 인증 정보와 비밀 키는 포함하지 않는다.
+- 가져오기는 실제 반영 전 dry-run과 중복 검사를 수행한다.
+- 중복 항목별 처리 방식은 `insert`, `skip`, `update` 중에서 선택한다.
+- dry-run 결과에는 예정된 insert·skip·update와 오류를 구분해 표시한다.
+
+### 12.2 CSV
+
+CSV는 검토와 내보내기 전용이며 전체 관계 복원 형식으로 사용하지 않는다.
+
+- posts CSV
+- news topics CSV
+- followups CSV
+- sources CSV
+
+### 12.3 내보내기 대상
 
 - 전체 JSON
 - posts CSV
@@ -318,18 +428,10 @@ MVP 다운로드 대상:
 - followups CSV
 - sources CSV
 
-JSON 복구는 저장 전에 중복 검사하고 신규 추가 또는 기존 덮어쓰기를 선택하며 결과 로그를 표시한다. 인증 정보는 내보내기에 포함하지 않는다.
+## 13. 확인 필요 사항
 
-## 11. 확인 필요 사항
-
-1. `categories`가 전 사용자 공용 seed인지, 관리자별 설정인지 확정이 필요하다. PRODUCT_SPEC는 설정 변경을 요구하지만 `owner_id`는 정의하지 않는다.
-2. AGENTS.md는 모든 사용자 소유 테이블에 `owner_id`를 요구하지만 PRODUCT_SPEC의 `seo_data`, `post_tags`, `sources`, 세 메타데이터 테이블, `news_updates`, `news_followups`, `news_status_history`에는 `owner_id`가 없다. 부모 관계로 소유권을 판정할지 각 테이블에 열을 추가할지 결정이 필요하다.
-3. `sources.news_update_id`의 외래 키 대상과 삭제 동작이 명시되지 않았다.
-4. `news_updates.topic_id`, `previous_update_id`의 삭제 동작이 명시되지 않았다.
-5. `display_id`의 사용자별 unique 여부와 nullable unique 처리 방식이 명시되지 않았다.
-6. 같은 카테고리·발행일, 정규화 제목, 카테고리 내 `topic_key`를 DB unique로 강제할지 저장 전 경고로만 처리할지 확정이 필요하다.
-7. 뉴스가 아닌 AI·정보DB에도 `series_no`가 필수지만 번호의 사용자별·카테고리별 unique 범위와 생성 방식이 명시되지 않았다.
-8. `image_prompt_updated_at`은 AGENTS.md에서 선택 저장 가능하다고 하지만 PRODUCT_SPEC의 `posts` 열 목록에는 없다. 포함 여부를 결정해야 한다.
-9. `generated_prompts` 저장 자체, `category_id` 외래 키, `prompt_mode` 허용값, 최근 30개 보존 방식은 확정되지 않았다.
-10. 백업 JSON/CSV의 버전, 정확한 필드 구조, 관계 복원 순서, 덮어쓰기 의미가 명시되지 않았다.
-
+1. `news_updates.previous_update_id`와 nullable `sources.news_update_id`의 삭제 동작이 아직 정해지지 않았다.
+2. `prompt_mode`의 DB 허용값을 check constraint로 강제할지 확정이 필요하다.
+3. 프롬프트 기록의 최근 30개 정리를 insert transaction, database function, trigger 중 어떤 방식으로 실행할지 구현 단계에서 결정해야 한다.
+4. 백업 JSON의 정확한 필드 배치, 테이블별 배열 구조, 관계 복원 순서, `update` 시 하위 관계의 교체·병합 범위가 아직 정해지지 않았다.
+5. AI·정보DB·중국어 학습 `series_no`의 자동 생성 여부와 동시 등록 시 번호 할당 방식은 아직 정해지지 않았다.
