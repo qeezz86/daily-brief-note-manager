@@ -36,7 +36,7 @@
 
 - 선택한 동일 뉴스 카테고리
 - `content_status = published`
-- `published_at DESC`
+- `published_on DESC NULLS LAST, updated_at DESC`
 - 요청 개수는 5, 10, 15 중 하나
 - 저장된 글이 부족하면 가능한 글 전부
 - 저장된 요약과 구조화된 뉴스 추적 데이터만 사용
@@ -174,6 +174,20 @@
 | 출처 URL 전문 목록 | 기본 미포함 |
 | HTML 본문 | 미포함 |
 
+길이 제한으로 내용을 줄일 때도 다음 항목은 생략하지 않는다.
+
+- 사용자 요청
+- 필수 프로젝트 규칙
+- 생성할 ID·slug·wrapper
+- `active`, `reopened` 주제의 고우선 후속 항목
+- 반복 금지 지시
+
+다음 순서로 먼저 줄인다.
+
+1. 상세 이력
+2. 오래된 종료 뉴스
+3. 저우선 `monitoring` 항목
+
 프롬프트 모드:
 
 - 간단: 최근 글 핵심만
@@ -260,7 +274,18 @@ ChatGPT 최종 결과는 기존 프로젝트의 다음 10개 순서를 지원해
 9. 이미지 ALT 문구
 10. 발행 전 체크리스트
 
-구조화 저장 블록을 사용하는 경우 `[CONTENT_META]`, `[SEO]`, `[IMAGE_PROMPT]`, `[WORDPRESS_HTML]` section을 사용한다. 대표 이미지 프롬프트와 ALT는 WordPress HTML에 넣지 않는다.
+구조화 저장 블록을 사용하는 경우 다음 시작·종료 태그를 사용한다.
+
+- `[CONTENT_META_JSON] ... [/CONTENT_META_JSON]`
+- `[SEO_JSON] ... [/SEO_JSON]`
+- `[IMAGE_PROMPT_JSON] ... [/IMAGE_PROMPT_JSON]`
+- `[SOURCES_JSON] ... [/SOURCES_JSON]`
+- `[NEWS_TRACKING_JSON] ... [/NEWS_TRACKING_JSON]`
+- `[WORDPRESS_HTML] ... [/WORDPRESS_HTML]`
+
+JSON 블록의 입력 키는 camelCase를 사용한다. DB 컬럼은 snake_case를 유지하며 파서가 `displayId` → `posts.display_id`, `publishedOn` → `posts.published_on`, `publishedAt` → `posts.published_at`, `representativeTitle` → `seo_data.representative_title`, `alternativeTitles` → `seo_data.alternative_titles`, `metaDescription` → `seo_data.meta_description`, `focusKeyword` → `seo_data.focus_keyword`, `sourceName` → `sources.source_name`, `sourceTitle` → `sources.source_title`, `sourceUrl` → `sources.source_url`, `sourcePublishedAt` → `sources.source_published_at`, `checkedPoint` → `sources.checked_point`처럼 매핑한다.
+
+대표 이미지 프롬프트와 ALT는 WordPress HTML에 넣지 않는다.
 
 기본 출력은 위 10개 항목 순서를 따른다. 구조화 저장 블록은 필요한 경우 응답 마지막에 추가할 수 있는 선택 형식이며, 파서는 10개 항목 형식과 구조화 section 형식을 모두 지원한다.
 
@@ -270,7 +295,7 @@ ChatGPT 최종 결과는 기존 프로젝트의 다음 10개 순서를 지원해
 
 ### 9.1 AI 칼럼
 
-- 최근 글 20개를 컨텍스트로 사용
+- `ready`, `published` 상태의 최근 20개를 컨텍스트로 사용
 - AI ID
 - 제목
 - 핵심 개념
@@ -282,7 +307,7 @@ ChatGPT 최종 결과는 기존 프로젝트의 다음 10개 순서를 지원해
 
 ### 9.2 정보DB
 
-- 최근 글 30개를 컨텍스트로 사용
+- `ready`, `published` 상태의 최근 30개를 컨텍스트로 사용
 - 정보DB ID
 - 제목
 - 정의 대상
@@ -293,7 +318,7 @@ ChatGPT 최종 결과는 기존 프로젝트의 다음 10개 순서를 지원해
 
 ### 9.3 중국어 학습
 
-- 최근 글 20개를 컨텍스트로 사용
+- `ready`, `published` 상태의 최근 20개를 컨텍스트로 사용
 - 시리즈 번호
 - 제목
 - CCTV 프로그램명
@@ -305,7 +330,7 @@ ChatGPT 최종 결과는 기존 프로젝트의 다음 10개 순서를 지원해
 
 중국어 학습 컨텍스트에는 브리핑 ID를 생성하지 않는다.
 
-최근 컨텍스트 범위와 별도로 해당 사용자의 전체 데이터에서 exact title, slug, focus keyword 중복을 검사한다. 중국어 학습은 전체 데이터에서 `original_url`도 검사하며 동일 URL이면 저장을 차단한다.
+비뉴스 recent context는 `published_on DESC NULLS LAST, updated_at DESC`로 정렬한다. 최근 컨텍스트 범위와 별도로 해당 사용자의 `draft`, `ready`, `published`, `archived` 전체 데이터에서 exact title, slug, focus keyword 중복을 검사한다. 중국어 학습은 전체 데이터에서 `original_url`도 검사하며 동일 URL이면 저장을 차단한다.
 
 ## 10. 생성 기록
 
@@ -313,6 +338,7 @@ ChatGPT 최종 결과는 기존 프로젝트의 다음 10개 순서를 지원해
 
 - `owner_id`
 - `category_id`
+- 요청한 `requested_post_count`
 - 실제 사용한 `actual_post_count`
 - `prompt_mode`
 - `prompt_text`
@@ -321,7 +347,9 @@ ChatGPT 최종 결과는 기존 프로젝트의 다음 10개 순서를 지원해
 
 - 사용자·카테고리별 최근 30개의 고정되지 않은 기록을 보존한다.
 - `is_pinned = true`인 기록은 자동 삭제하지 않으며 30개 계산에서 제외한다.
-- `actual_post_count`에는 요청한 수가 아니라 실제 프롬프트에 사용한 발행 글 수를 기록한다.
+- 기록 저장과 오래된 미고정 기록 정리는 PostgreSQL DB 함수가 하나의 트랜잭션에서 처리한다.
+- `requested_post_count`에는 사용자가 요청한 최근 글 수를 기록한다.
+- `actual_post_count`에는 실제 프롬프트에 사용한 발행 글 수를 기록한다.
 - `prompt_text`에는 WordPress HTML 전문, 뉴스 기사 원문, CCTV 원문·전체 자막·전체 번역을 포함하지 않는다.
 
 ## 11. 추가 지시사항 우선순위
@@ -331,6 +359,6 @@ ChatGPT 최종 결과는 기존 프로젝트의 다음 10개 순서를 지원해
 ## 12. 확인 필요 사항
 
 1. “후속 작성 인정 조건”을 저장하는 전용 DB 필드가 PRODUCT_SPEC 데이터 모델에 없다. 어떤 필드나 계산 규칙에서 가져올지 결정이 필요하다.
-2. 간단·표준·상세 모드별 개별 길이 제한과 생략 우선순위는 정의되지 않았다.
+2. 간단·표준·상세 모드별 개별 길이 제한은 정의되지 않았다.
 3. 길이 제한 시 문자열 자르기 기준과 생략 표시 형식이 정의되지 않았다.
-4. AI·정보DB·중국어 학습 컨텍스트에 포함할 콘텐츠 상태, 정렬의 동률 처리, 모드, 최종 템플릿은 정의되지 않았다.
+4. AI·정보DB·중국어 학습 컨텍스트의 모드와 최종 템플릿은 정의되지 않았다.

@@ -35,6 +35,13 @@
 - nullable 부모 참조도 값이 있을 때는 같은 `owner_id`를 참조해야 한다.
 - 아래 테이블 표에서 `references <parent>`로 축약한 사용자 데이터 관계도 실제 migration에서는 해당 부모의 `(id, owner_id)`를 참조하는 복합 외래 키로 구현한다.
 
+복합 외래 키의 부모가 되는 다음 테이블에는 primary key와 별도로 `UNIQUE (id, owner_id)`를 명시한다.
+
+- `posts`
+- `tags`
+- `news_topics`
+- `news_updates`
+
 적용 관계:
 
 - `seo_data`, `sources`, `ai_metadata`, `info_db_metadata`, `chinese_metadata` → `posts`
@@ -46,11 +53,33 @@
 
 ### 2.2 RLS
 
-`posts`, `seo_data`, `tags`, `post_tags`, `sources`, `ai_metadata`, `info_db_metadata`, `chinese_metadata`, `news_topics`, `news_updates`, `news_followups`, `news_status_history`, `generated_prompts`에 RLS를 활성화한다.
+`posts`, `seo_data`, `tags`, `post_tags`, `sources`, `ai_metadata`, `info_db_metadata`, `chinese_metadata`, `series_counters`, `news_topics`, `news_updates`, `news_followups`, `news_status_history`, `generated_prompts`에 RLS를 활성화한다.
 
 - 조회·수정·삭제 정책은 `owner_id = auth.uid()`를 조건으로 한다.
 - 생성과 수정의 `WITH CHECK`도 `owner_id = auth.uid()`를 조건으로 한다.
 - 복합 외래 키가 부모·자식 소유권 일치를 보장하고, RLS가 현재 인증 사용자와 행의 소유권을 보장한다.
+
+### 2.3 JSON 입력 키와 DB 컬럼명
+
+ChatGPT 구조화 입력과 백업 외부 형식의 JSON 입력 키는 camelCase를 사용한다. PostgreSQL 테이블과 컬럼은 snake_case를 유지한다. 저장 계층은 camelCase 입력 키를 snake_case DB 컬럼으로 명시적으로 매핑한다.
+
+대표 매핑:
+
+| JSON 키 | DB 컬럼 |
+|---|---|
+| `contentGroup` | `categories.content_group` 또는 감지용 입력 |
+| `displayId` | `posts.display_id` |
+| `publishedOn` | `posts.published_on` |
+| `publishedAt` | `posts.published_at` |
+| `representativeTitle` | `seo_data.representative_title` |
+| `alternativeTitles` | `seo_data.alternative_titles` |
+| `metaDescription` | `seo_data.meta_description` |
+| `focusKeyword` | `seo_data.focus_keyword` |
+| `sourceName` | `sources.source_name` |
+| `sourceTitle` | `sources.source_title` |
+| `sourceUrl` | `sources.source_url` |
+| `sourcePublishedAt` | `sources.source_published_at` |
+| `checkedPoint` | `sources.checked_point` |
 
 ## 3. 관계 개요
 
@@ -65,10 +94,12 @@ auth.users
   │    └─ news_updates ── news_topics
   │                         ├─ news_followups
   │                         └─ news_status_history
+  ├─ series_counters
   └─ generated_prompts
 
 categories
   ├─ posts
+  ├─ series_counters
   ├─ news_topics
   └─ generated_prompts
 ```
@@ -119,6 +150,7 @@ categories
 | `category_id` | text | references `categories` |
 | `series_no` | integer | nullable |
 | `briefing_date` | date | nullable |
+| `published_on` | date | nullable |
 | `display_id` | text | nullable |
 | `title` | text | 필수 |
 | `summary` | text | 필수 |
@@ -148,9 +180,11 @@ categories
 - AI·정보DB·중국어 학습: `series_no` 필수
 - 중국어 학습: `display_id`를 사용하지 않음
 - `html_body`: 사용자가 작성·발행한 자체 콘텐츠만 저장
+- 날짜만 확인된 발행 정보는 `published_on`에 저장하고 `published_at`에 임의 시각을 만들지 않음
 
 unique 조건:
 
+- 복합 외래 키 부모용 `UNIQUE (id, owner_id)`
 - 뉴스: `UNIQUE (owner_id, category_id, briefing_date)`
 - AI·정보DB·중국어 학습: `UNIQUE (owner_id, category_id, series_no)`
 - nullable 열을 사용하는 단일 `posts` 테이블 구조이므로 각 조건은 해당 콘텐츠 그룹의 필수 필드 검증과 함께 적용한다.
@@ -179,6 +213,8 @@ unique 조건:
 | `name` | text | 사용자별 unique |
 | `created_at` | timestamptz | 필수 |
 
+복합 외래 키 부모용 `UNIQUE (id, owner_id)`를 둔다.
+
 ### 5.4 `post_tags`
 
 | 열 | 형식 | 조건 |
@@ -198,7 +234,7 @@ unique 조건:
 | `id` | uuid | primary key |
 | `owner_id` | uuid | references `auth.users` |
 | `post_id` | uuid | references `posts` on delete cascade |
-| `news_update_id` | uuid | nullable, references `news_updates` |
+| `news_update_id` | uuid | nullable, references `news_updates` on delete set null |
 | `source_name` | text | 필수 |
 | `source_title` | text | 필수 |
 | `source_url` | text | 필수 |
@@ -211,7 +247,7 @@ unique 조건:
 
 개별 원문 URL을 권장하고 홈페이지, 검색, 목록 URL 가능성은 경고한다. 전문 대신 확인한 핵심 내용만 저장한다.
 
-`(post_id, owner_id)`는 `posts(id, owner_id)`를 `ON DELETE CASCADE`로 참조한다. `news_update_id`가 있으면 `(news_update_id, owner_id)`가 `news_updates(id, owner_id)`를 참조한다.
+`(post_id, owner_id)`는 `posts(id, owner_id)`를 `ON DELETE CASCADE`로 참조한다. `news_update_id`가 있으면 `(news_update_id, owner_id)`가 `news_updates(id, owner_id)`를 참조한다. 이 nullable 관계는 실제 PostgreSQL migration에서 `ON DELETE SET NULL (news_update_id)`를 사용해 `news_update_id`만 null로 만들고 `owner_id`는 유지한다.
 
 ## 6. 카테고리별 메타데이터
 
@@ -256,6 +292,21 @@ unique 조건:
 
 중국어 학습의 동일 원문 중복 저장은 `UNIQUE (owner_id, original_url)`로 차단한다.
 
+### 6.4 `series_counters`
+
+| 열 | 형식 | 조건 |
+|---|---|---|
+| `owner_id` | uuid | references `auth.users` |
+| `category_id` | text | references `categories` |
+| `last_issued_no` | integer | 필수 |
+| `updated_at` | timestamptz | 필수 |
+
+복합 primary key는 (`owner_id`, `category_id`)이다.
+
+AI·정보DB·중국어 학습의 `series_no`는 PostgreSQL RPC 함수로 원자적으로 발급한다. RPC 함수는 해당 카운터 행을 잠그거나 원자적으로 갱신한 뒤 다음 번호를 반환하며 `MAX(series_no) + 1` 방식은 사용하지 않는다. 삭제된 글의 번호는 재사용하지 않는다.
+
+기존 글 가져오기 또는 백업 JSON 복원에서 현재 카운터보다 큰 `series_no`가 저장되면 같은 트랜잭션에서 `last_issued_no = greatest(last_issued_no, imported_series_no)` 의미로 상향 조정한다.
+
 ## 7. 뉴스 추적
 
 ### 7.1 `news_topics`
@@ -277,6 +328,8 @@ unique 조건:
 
 뉴스 글과 뉴스 주제는 서로 다른 엔터티다. 같은 주제의 의미 있는 진전은 기존 주제에 업데이트로 연결하며, 모든 뉴스 항목을 새 주제로 만들지 않는다.
 
+복합 외래 키 부모용 `UNIQUE (id, owner_id)`를 둔다.
+
 ### 7.2 `news_updates`
 
 | 열 | 형식 | 조건 |
@@ -292,13 +345,13 @@ unique 조건:
 | `importance_summary` | text | nullable |
 | `impact_summary` | text | nullable |
 | `change_summary` | text | nullable |
-| `previous_update_id` | uuid | nullable, references `news_updates` |
+| `previous_update_id` | uuid | nullable, references `news_updates` on delete set null |
 | `created_at` | timestamptz | 필수 |
 | `updated_at` | timestamptz | 필수 |
 
 공식 발표, 새 수치, 정책 확정, 법적 결정, 기업 후속 조치, 중대한 변화, 오류 수정, 실제 영향처럼 의미 있는 변화만 업데이트로 저장한다. 표현만 바뀐 반복 보도는 새 업데이트로 저장하지 않는다.
 
-`previous_update_id`가 있으면 `(previous_update_id, owner_id)`가 `news_updates(id, owner_id)`를 참조한다.
+`previous_update_id`가 있으면 `(previous_update_id, owner_id)`가 `news_updates(id, owner_id)`를 참조한다. `news_updates`는 다른 하위 테이블의 부모가 되므로 복합 외래 키 부모용 `UNIQUE (id, owner_id)`를 둔다.
 
 ### 7.3 `news_followups`
 
@@ -335,6 +388,19 @@ unique 조건:
 - `posts` 삭제 시 `seo_data`, `post_tags`, `sources`, `ai_metadata`, `info_db_metadata`, `chinese_metadata`, `news_updates`를 `ON DELETE CASCADE`로 삭제한다.
 - `news_topics` 삭제 시 `news_followups`, `news_status_history`를 `ON DELETE CASCADE`로 삭제한다.
 - `news_updates.topic_id`는 `ON DELETE RESTRICT`로 두어 업데이트가 연결된 뉴스 주제의 물리 삭제를 막는다.
+- `news_updates.previous_update_id`와 `sources.news_update_id`는 `ON DELETE SET NULL` 관계다.
+- 복합 외래 키에서 참조 ID만 null 처리하고 `owner_id`를 유지하기 위해 실제 PostgreSQL migration은 다음처럼 컬럼 목록을 지정한다.
+
+```sql
+foreign key (previous_update_id, owner_id)
+  references news_updates (id, owner_id)
+  on delete set null (previous_update_id);
+
+foreign key (news_update_id, owner_id)
+  references news_updates (id, owner_id)
+  on delete set null (news_update_id);
+```
+
 - 발행된 `posts`는 물리 삭제보다 `content_status = archived` 전환을 우선한다.
 - `news_topics`는 물리 삭제보다 `closed` 등 상태 변경과 상태 이력 보존을 우선한다.
 - UI의 물리 삭제 작업은 파급 범위를 확인하고 명시적 확인을 거쳐야 한다.
@@ -348,7 +414,7 @@ unique 조건:
 - CCTV 원문의 게시·업데이트 시각은 `Asia/Shanghai` 기준으로 해석한 뒤 `timestamptz`에 저장한다.
 - 날짜-only 값을 임의로 UTC 자정 시각으로 변환하지 않는다.
 
-대표적인 날짜-only 필드는 `posts.briefing_date`, `news_topics.first_seen_at`, `news_topics.last_seen_at`, `news_followups.due_date`, `info_db_metadata.reference_date`다. `published_at`, `original_published_at`, `source_published_at`, `checked_at`, 생성·수정 시각은 `timestamptz`다.
+대표적인 날짜-only 필드는 `posts.briefing_date`, `posts.published_on`, `news_topics.first_seen_at`, `news_topics.last_seen_at`, `news_followups.due_date`, `info_db_metadata.reference_date`다. `published_at`, `original_published_at`, `source_published_at`, `checked_at`, 생성·수정 시각은 `timestamptz`다.
 
 ## 10. 프롬프트 생성 기록
 
@@ -361,6 +427,7 @@ unique 조건:
 | `id` | uuid | primary key |
 | `owner_id` | uuid | references `auth.users` |
 | `category_id` | text | references `categories` |
+| `requested_post_count` | integer | 사용자가 요청한 최근 글 수 |
 | `actual_post_count` | integer | 실제 사용한 최근 글 수 |
 | `prompt_mode` | text | 프롬프트 모드 |
 | `prompt_text` | text | 생성한 프롬프트 |
@@ -370,7 +437,9 @@ unique 조건:
 - 각 `(owner_id, category_id)`별로 `generated_at DESC` 기준 최근 30개의 고정되지 않은 기록을 보존한다.
 - `is_pinned = true`인 기록은 30개 계산과 자동 삭제 대상에서 제외한다.
 - 새 기록 저장 후 해당 카테고리의 30개를 초과한 고정되지 않은 오래된 기록을 정리한다.
-- `actual_post_count`에는 요청 개수가 아니라 실제 프롬프트 컨텍스트에 사용한 발행 글 수를 저장한다.
+- 기록 저장과 오래된 미고정 기록 정리는 PostgreSQL DB 함수가 하나의 트랜잭션에서 처리한다.
+- `requested_post_count`에는 사용자가 요청한 최근 글 수를 저장한다.
+- `actual_post_count`에는 실제 프롬프트 컨텍스트에 사용한 발행 글 수를 저장한다.
 - `prompt_text`에는 WordPress HTML 전문, 뉴스 기사 원문, CCTV 원문·전체 자막·전체 번역을 포함하지 않는다.
 
 ## 11. 인덱스와 중복 검사 기준
@@ -430,8 +499,5 @@ CSV는 검토와 내보내기 전용이며 전체 관계 복원 형식으로 사
 
 ## 13. 확인 필요 사항
 
-1. `news_updates.previous_update_id`와 nullable `sources.news_update_id`의 삭제 동작이 아직 정해지지 않았다.
-2. `prompt_mode`의 DB 허용값을 check constraint로 강제할지 확정이 필요하다.
-3. 프롬프트 기록의 최근 30개 정리를 insert transaction, database function, trigger 중 어떤 방식으로 실행할지 구현 단계에서 결정해야 한다.
-4. 백업 JSON의 정확한 필드 배치, 테이블별 배열 구조, 관계 복원 순서, `update` 시 하위 관계의 교체·병합 범위가 아직 정해지지 않았다.
-5. AI·정보DB·중국어 학습 `series_no`의 자동 생성 여부와 동시 등록 시 번호 할당 방식은 아직 정해지지 않았다.
+1. `prompt_mode`의 DB 허용값을 check constraint로 강제할지 확정이 필요하다.
+2. 백업 JSON의 테이블별 관계 복원 순서와 `update` 시 하위 관계의 교체·병합 범위가 아직 정해지지 않았다.
