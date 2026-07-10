@@ -31,7 +31,9 @@ export function ContentList({ categories, posts }: ContentListProps) {
                   <p className="content-card__category">
                     {category?.name ?? '알 수 없는 카테고리'}
                   </p>
-                  <h2>{post.title}</h2>
+                  <h2>
+                    <Link to={`/content/${post.id}`}>{post.title}</Link>
+                  </h2>
                 </div>
                 <span
                   className={`status-badge status-badge--${post.content_status}`}
@@ -65,3 +67,4 @@ export function ContentList({ categories, posts }: ContentListProps) {
     </ul>
   )
 }
+import { Link } from 'react-router-dom'

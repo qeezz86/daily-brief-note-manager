@@ -2,7 +2,7 @@
 
 Daily Brief Note의 콘텐츠, SEO 정보, 출처, 뉴스 추적 이력과 생성 프롬프트를 관리하기 위한 비공개 웹앱입니다.
 
-현재 저장소는 Phase 1B 단계입니다. 이메일·비밀번호 인증, 보호 라우트, 초기 데이터베이스 migration, RLS, 카테고리 seed와 DB 테스트, 타입 안전 읽기 데이터 계층과 `/content` 읽기 전용 목록을 포함합니다. 콘텐츠 CRUD와 가져오기, 뉴스 추적 UI, 프롬프트 생성기는 아직 구현하지 않았습니다.
+현재 저장소는 Phase 2A 단계입니다. 이메일·비밀번호 인증, 보호 라우트, 초기 데이터베이스 migration, RLS, 카테고리 seed와 DB 테스트, 콘텐츠 목록과 기본 정보 생성·상세·수정·논리적 보관을 포함합니다. HTML·SEO·출처 가져오기, 뉴스 추적 UI, 프롬프트 생성기는 아직 구현하지 않았습니다.
 
 ## 요구 환경
 
@@ -81,7 +81,7 @@ npm run db:stop
 npx supabase gen types typescript --local > src/shared/supabase/database.types.ts
 ```
 
-로그인 후 `/content`에서 활성 카테고리와 현재 사용자의 콘텐츠를 읽기 전용으로 조회하고 카테고리·상태·제목·slug로 필터링할 수 있습니다.
+로그인 후 `/content`에서 활성 카테고리와 현재 사용자의 콘텐츠를 조회하고 카테고리·상태·제목·slug로 필터링할 수 있습니다. `/content/new`에서 기본 정보를 생성하고, `/content/:postId`와 `/content/:postId/edit`에서 상세 조회와 수정을 할 수 있습니다. 삭제 대신 상태를 `archived`로 바꾸는 논리적 보관을 사용합니다.
 
 Playwright 브라우저를 설치한 뒤 E2E 테스트를 실행할 수 있습니다.
 

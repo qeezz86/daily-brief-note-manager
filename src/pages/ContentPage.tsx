@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 
 import { useActiveCategoriesQuery } from '../features/categories/categories.queries'
 import { ContentList } from '../features/posts/ContentList'
@@ -51,12 +52,17 @@ export function ContentPageContent({
     <section className="content-page" aria-labelledby="content-page-title">
       <div className="content-page__heading">
         <div>
-          <p className="dashboard__eyebrow">읽기 전용</p>
+          <p className="dashboard__eyebrow">콘텐츠 관리</p>
           <h1 id="content-page-title">콘텐츠 목록</h1>
         </div>
-        <div className="content-count" aria-label={`전체 글 ${posts.length}개`}>
-          <strong>{posts.length}</strong>
-          <span>전체 글</span>
+        <div className="content-page__heading-actions">
+          <Link className="primary-link primary-link--inline" to="/content/new">
+            새 콘텐츠
+          </Link>
+          <div className="content-count" aria-label={`전체 글 ${posts.length}개`}>
+            <strong>{posts.length}</strong>
+            <span>전체 글</span>
+          </div>
         </div>
       </div>
 

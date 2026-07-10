@@ -12,6 +12,9 @@ import { AppLayout } from '../layouts/AppLayout'
 import { LoginPage } from '../pages/LoginPage'
 import { DashboardPage } from '../pages/DashboardPage'
 import { ContentPage } from '../pages/ContentPage'
+import { ContentCreatePage } from '../pages/ContentCreatePage'
+import { ContentDetailPage } from '../pages/ContentDetailPage'
+import { ContentEditPage } from '../pages/ContentEditPage'
 import { NotFoundPage } from '../pages/NotFoundPage'
 
 export const routes: RouteObject[] = [
@@ -41,6 +44,18 @@ export const routes: RouteObject[] = [
           {
             path: '/content',
             element: <ContentPage />,
+          },
+          {
+            path: '/content/new',
+            element: <ContentCreatePage />,
+          },
+          {
+            path: '/content/:postId',
+            element: <ContentDetailPage />,
+          },
+          {
+            path: '/content/:postId/edit',
+            element: <ContentEditPage />,
           },
           {
             path: '*',

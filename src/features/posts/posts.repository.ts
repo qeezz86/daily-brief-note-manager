@@ -1,5 +1,51 @@
 import type { DatabaseClient } from '../../shared/supabase/client'
-import type { PostListItem } from './posts.types'
+import { buildDisplayId } from './postIdentifiers'
+import type {
+  CreatePostInput,
+  PostDetail,
+  PostInsert,
+  PostListItem,
+  PostUpdate,
+  UpdatePostInput,
+} from './posts.types'
+
+const postDetailFields =
+  'id, category_id, display_id, series_no, briefing_date, published_on, title, summary, slug, content_status, wordpress_url, created_at, updated_at'
+
+const pendingHtmlBody =
+  '<!-- WordPress HTML body has not been authored yet. -->'
+
+interface RepositoryError {
+  code?: string
+  message?: string
+  details?: string
+}
+
+function throwPostError(error: RepositoryError): never {
+  const detail = `${error.message ?? ''} ${error.details ?? ''}`
+
+  if (error.code === '23505') {
+    if (detail.includes('posts_owner_slug_key')) {
+      throw new Error('동일한 slug가 이미 존재합니다.')
+    }
+
+    if (detail.includes('posts_owner_news_date_key')) {
+      throw new Error('같은 날짜의 카테고리 브리핑이 이미 존재합니다.')
+    }
+
+    if (detail.includes('posts_owner_series_no_key')) {
+      throw new Error('해당 시리즈 번호가 이미 존재합니다.')
+    }
+
+    if (detail.includes('posts_owner_wordpress_url_key')) {
+      throw new Error('동일한 WordPress URL이 이미 존재합니다.')
+    }
+
+    throw new Error('중복된 콘텐츠가 이미 존재합니다.')
+  }
+
+  throw new Error('콘텐츠를 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.')
+}
 
 export async function getPosts(client: DatabaseClient): Promise<PostListItem[]> {
   const { data, error } = await client
@@ -12,6 +58,123 @@ export async function getPosts(client: DatabaseClient): Promise<PostListItem[]> 
   if (error) {
     throw new Error('콘텐츠 목록을 불러오지 못했습니다.')
   }
+
+  return data
+}
+
+export async function getPostById(
+  client: DatabaseClient,
+  postId: string,
+): Promise<PostDetail | null> {
+  const { data, error } = await client
+    .from('posts')
+    .select(postDetailFields)
+    .eq('id', postId)
+    .maybeSingle()
+
+  if (error) {
+    if (error.code === '22P02' || error.code === 'PGRST116') return null
+    throw new Error('콘텐츠 상세 정보를 불러오지 못했습니다.')
+  }
+
+  return data
+}
+
+export async function issueSeriesNo(
+  client: DatabaseClient,
+  ownerId: string,
+  categoryId: string,
+): Promise<number> {
+  const { data, error } = await client.rpc('issue_series_no', {
+    p_owner_id: ownerId,
+    p_category_id: categoryId,
+  })
+
+  if (error || data === null) {
+    throw new Error('시리즈 번호를 발급하지 못했습니다. 저장하지 않았습니다.')
+  }
+
+  return data
+}
+
+export async function createPost(
+  client: DatabaseClient,
+  input: CreatePostInput,
+): Promise<PostDetail> {
+  const isNews = input.category.content_group === 'news'
+  const seriesNo = isNews
+    ? null
+    : await issueSeriesNo(client, input.ownerId, input.category.id)
+  const displayId = buildDisplayId(input.category, {
+    date: input.briefingDate,
+    seriesNo,
+  })
+  const insert: PostInsert = {
+    owner_id: input.ownerId,
+    category_id: input.category.id,
+    series_no: seriesNo,
+    briefing_date: isNews ? input.briefingDate : null,
+    published_on: input.publishedOn,
+    display_id: displayId,
+    title: input.title,
+    summary: input.summary,
+    html_body: pendingHtmlBody,
+    slug: input.slug,
+    wordpress_url: input.wordpressUrl,
+    content_status: input.contentStatus,
+    source_import_type: 'manual_entry',
+  }
+
+  const { data, error } = await client
+    .from('posts')
+    .insert(insert)
+    .select(postDetailFields)
+    .single()
+
+  if (error) throwPostError(error)
+
+  return data
+}
+
+export async function updatePost(
+  client: DatabaseClient,
+  postId: string,
+  input: UpdatePostInput,
+): Promise<PostDetail> {
+  const update: PostUpdate = {
+    title: input.title,
+    summary: input.summary,
+    slug: input.slug,
+    content_status: input.contentStatus,
+    published_on: input.publishedOn,
+    wordpress_url: input.wordpressUrl,
+  }
+  const { data, error } = await client
+    .from('posts')
+    .update(update)
+    .eq('id', postId)
+    .select(postDetailFields)
+    .maybeSingle()
+
+  if (error) throwPostError(error)
+  if (!data) throw new Error('수정할 콘텐츠를 찾을 수 없습니다.')
+
+  return data
+}
+
+export async function archivePost(
+  client: DatabaseClient,
+  postId: string,
+): Promise<PostDetail> {
+  const { data, error } = await client
+    .from('posts')
+    .update({ content_status: 'archived' })
+    .eq('id', postId)
+    .select(postDetailFields)
+    .maybeSingle()
+
+  if (error) throwPostError(error)
+  if (!data) throw new Error('보관할 콘텐츠를 찾을 수 없습니다.')
 
   return data
 }

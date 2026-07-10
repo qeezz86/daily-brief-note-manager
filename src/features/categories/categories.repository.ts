@@ -1,7 +1,8 @@
 import type { DatabaseClient } from '../../shared/supabase/client'
 import type { Category } from './categories.types'
 
-const categoryListFields = 'id, content_group, name, sort_order'
+const categoryListFields =
+  'id, content_group, name, sort_order, display_id_pattern, slug_pattern, wrapper_class'
 
 export async function getActiveCategories(
   client: DatabaseClient,

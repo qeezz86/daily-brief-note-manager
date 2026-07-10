@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
 
 import type { Category } from '../features/categories/categories.types'
@@ -9,18 +10,32 @@ import type { DatabaseClient } from '../shared/supabase/client'
 import { ContentPageContent } from './ContentPage'
 
 const categories: Category[] = [
-  { id: 'economy', content_group: 'news', name: '경제', sort_order: 10 },
+  {
+    id: 'economy',
+    content_group: 'news',
+    name: '경제',
+    sort_order: 10,
+    display_id_pattern: '#YYYY-MM-DD-ECO',
+    slug_pattern: 'economy-briefing-YYYY-MM-DD',
+    wrapper_class: 'daily-brief-note news-briefing economy',
+  },
   {
     id: 'technology',
     content_group: 'news',
     name: '과학기술',
     sort_order: 20,
+    display_id_pattern: '#YYYY-MM-DD-TEC',
+    slug_pattern: 'technology-briefing-YYYY-MM-DD',
+    wrapper_class: 'daily-brief-note news-briefing technology',
   },
   {
     id: 'chinese-study',
     content_group: 'chinese',
     name: '중국어 학습',
     sort_order: 30,
+    display_id_pattern: null,
+    slug_pattern: 'cctv-chinese-news-study-###',
+    wrapper_class: 'daily-brief-note chinese-study',
   },
 ]
 
@@ -118,7 +133,9 @@ function renderContent(client: DatabaseClient) {
 
   return render(
     <QueryClientProvider client={queryClient}>
-      <ContentPageContent client={client} userId="owner-a" />
+      <MemoryRouter>
+        <ContentPageContent client={client} userId="owner-a" />
+      </MemoryRouter>
     </QueryClientProvider>,
   )
 }
