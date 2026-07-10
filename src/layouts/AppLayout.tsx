@@ -1,14 +1,43 @@
+import { useState } from 'react'
 import { Outlet } from 'react-router-dom'
 
+import { useAuth } from '../features/auth/useAuth'
+
 export function AppLayout() {
+  const [signOutError, setSignOutError] = useState<string | null>(null)
+  const [isSigningOut, setIsSigningOut] = useState(false)
+  const { signOut, user } = useAuth()
+
+  async function handleSignOut() {
+    setIsSigningOut(true)
+    setSignOutError(null)
+    const result = await signOut()
+    setSignOutError(result.error)
+    setIsSigningOut(false)
+  }
+
   return (
     <div className="app-shell">
       <header className="app-header">
         <div className="app-header__inner">
           <span className="app-header__brand">Daily Brief Note</span>
           <span className="app-header__section">Content Manager</span>
+          <div className="app-header__account">
+            <span title={user?.email}>{user?.email}</span>
+            <button
+              className="secondary-button"
+              type="button"
+              disabled={isSigningOut}
+              onClick={() => void handleSignOut()}
+            >
+              {isSigningOut ? '로그아웃 중' : '로그아웃'}
+            </button>
+          </div>
         </div>
       </header>
+      {signOutError ? (
+        <div className="app-alert" role="alert">{signOutError}</div>
+      ) : null}
       <main className="app-main">
         <Outlet />
       </main>

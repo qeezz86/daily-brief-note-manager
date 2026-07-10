@@ -53,6 +53,7 @@ a {
   padding: 0 20px;
   align-items: center;
   gap: 12px;
+  flex-wrap: wrap;
 }
 
 .app-header__brand {
@@ -65,6 +66,33 @@ a {
   padding-left: 12px;
   border-left: 1px solid #d9dfdc;
   color: #68736f;
+  font-size: 0.875rem;
+}
+
+.app-header__account {
+  display: flex;
+  margin-left: auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.app-header__account span {
+  max-width: 220px;
+  overflow: hidden;
+  color: #68736f;
+  font-size: 0.8125rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-alert {
+  width: min(calc(100% - 40px), 1056px);
+  margin: 16px auto 0;
+  padding: 12px 14px;
+  border: 1px solid #c96f68;
+  border-radius: 6px;
+  color: #7a2420;
+  background: #fff4f3;
   font-size: 0.875rem;
 }
 
@@ -131,6 +159,213 @@ a {
 .not-found a {
   display: inline-block;
   margin-top: 24px;
+}
+
+.auth-page {
+  display: grid;
+  min-height: 100vh;
+  padding: 24px 20px;
+  place-items: center;
+}
+
+.auth-panel {
+  width: min(100%, 420px);
+  padding: 28px 24px;
+  border: 1px solid #d9dfdc;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.auth-panel__brand {
+  color: #17634e;
+  font-size: 0.875rem;
+  font-weight: 750;
+}
+
+.auth-panel h1 {
+  margin: 8px 0 24px;
+  color: #17211e;
+  font-size: 1.5rem;
+  line-height: 1.3;
+}
+
+.segmented-control {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 3px;
+  border: 1px solid #d9dfdc;
+  border-radius: 6px;
+  background: #f4f6f5;
+}
+
+.segmented-control button {
+  min-height: 40px;
+  border: 0;
+  border-radius: 4px;
+  color: #68736f;
+  background: transparent;
+  cursor: pointer;
+}
+
+.segmented-control button[aria-pressed='true'] {
+  color: #173f35;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgb(23 63 53 / 12%);
+  font-weight: 700;
+}
+
+.auth-form {
+  display: grid;
+  margin-top: 24px;
+  gap: 8px;
+}
+
+.auth-form label {
+  margin-top: 10px;
+  color: #34403c;
+  font-size: 0.875rem;
+  font-weight: 650;
+}
+
+.auth-form input {
+  width: 100%;
+  min-height: 44px;
+  padding: 9px 11px;
+  border: 1px solid #bfc9c5;
+  border-radius: 6px;
+  color: #17211e;
+  background: #ffffff;
+}
+
+.auth-form input[aria-invalid='true'] {
+  border-color: #b54b43;
+}
+
+.auth-form input:focus-visible,
+.segmented-control button:focus-visible,
+.primary-button:focus-visible,
+.secondary-button:focus-visible {
+  outline: 3px solid #a8d5c3;
+  outline-offset: 2px;
+}
+
+.field-error,
+.form-alert,
+.form-success {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+.field-error,
+.form-alert {
+  color: #9a342d;
+}
+
+.form-alert,
+.form-success {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-radius: 6px;
+}
+
+.form-alert {
+  border: 1px solid #e4b5b1;
+  background: #fff4f3;
+}
+
+.form-success {
+  border: 1px solid #a9cfbf;
+  color: #17634e;
+  background: #eff8f4;
+}
+
+.primary-button,
+.secondary-button {
+  min-height: 42px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.primary-button {
+  margin-top: 16px;
+  padding: 10px 16px;
+  border: 1px solid #173f35;
+  color: #ffffff;
+  background: #173f35;
+}
+
+.secondary-button {
+  padding: 8px 12px;
+  border: 1px solid #bfc9c5;
+  color: #34403c;
+  background: #ffffff;
+}
+
+.primary-button:disabled,
+.secondary-button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.system-state {
+  display: grid;
+  width: min(calc(100% - 40px), 680px);
+  min-height: 100vh;
+  margin: 0 auto;
+  align-content: center;
+  justify-items: start;
+}
+
+.system-state h1 {
+  margin: 8px 0;
+  color: #17211e;
+  font-size: 1.5rem;
+  line-height: 1.35;
+}
+
+.system-state p {
+  margin: 0;
+  color: #68736f;
+  line-height: 1.7;
+}
+
+.system-state code {
+  color: #173f35;
+  font-size: 0.875em;
+}
+
+.loading-indicator {
+  width: 24px;
+  height: 24px;
+  margin-bottom: 16px;
+  border: 3px solid #cbd5d1;
+  border-top-color: #17634e;
+  border-radius: 50%;
+  animation: loading-spin 0.8s linear infinite;
+}
+
+@keyframes loading-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loading-indicator {
+    animation: none;
+  }
+}
+
+@media (max-width: 540px) {
+  .app-header__section {
+    display: none;
+  }
+
+  .app-header__account span {
+    max-width: 110px;
+  }
 }
 
 @media (min-width: 720px) {

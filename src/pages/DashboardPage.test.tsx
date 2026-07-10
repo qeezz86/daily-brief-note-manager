@@ -11,7 +11,7 @@ describe('DashboardPage', () => {
       screen.getByRole('heading', { name: '콘텐츠 관리' }),
     ).toBeInTheDocument()
     expect(
-      screen.getByText('기본 환경이 준비되었습니다'),
+      screen.getByText('인증 연결이 준비되었습니다'),
     ).toBeInTheDocument()
   })
 })

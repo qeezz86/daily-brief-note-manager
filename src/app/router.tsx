@@ -1,22 +1,50 @@
-import { createBrowserRouter } from 'react-router-dom'
+import {
+  createBrowserRouter,
+  Navigate,
+  type RouteObject,
+} from 'react-router-dom'
 
+import {
+  PublicOnlyRoute,
+  RequireAuth,
+} from '../features/auth/AuthRouteGuards'
 import { AppLayout } from '../layouts/AppLayout'
+import { LoginPage } from '../pages/LoginPage'
 import { DashboardPage } from '../pages/DashboardPage'
 import { NotFoundPage } from '../pages/NotFoundPage'
 
-export const router = createBrowserRouter([
+export const routes: RouteObject[] = [
   {
-    path: '/',
-    element: <AppLayout />,
+    element: <PublicOnlyRoute />,
     children: [
       {
-        index: true,
-        element: <DashboardPage />,
-      },
-      {
-        path: '*',
-        element: <NotFoundPage />,
+        path: '/login',
+        element: <LoginPage />,
       },
     ],
   },
-])
+  {
+    element: <RequireAuth />,
+    children: [
+      {
+        element: <AppLayout />,
+        children: [
+          {
+            path: '/',
+            element: <Navigate to="/dashboard" replace />,
+          },
+          {
+            path: '/dashboard',
+            element: <DashboardPage />,
+          },
+          {
+            path: '*',
+            element: <NotFoundPage />,
+          },
+        ],
+      },
+    ],
+  },
+]
+
+export const router = createBrowserRouter(routes)
