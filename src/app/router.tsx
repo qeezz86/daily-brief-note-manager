@@ -11,6 +11,7 @@ import {
 import { AppLayout } from '../layouts/AppLayout'
 import { LoginPage } from '../pages/LoginPage'
 import { DashboardPage } from '../pages/DashboardPage'
+import { ContentPage } from '../pages/ContentPage'
 import { NotFoundPage } from '../pages/NotFoundPage'
 
 export const routes: RouteObject[] = [
@@ -36,6 +37,10 @@ export const routes: RouteObject[] = [
           {
             path: '/dashboard',
             element: <DashboardPage />,
+          },
+          {
+            path: '/content',
+            element: <ContentPage />,
           },
           {
             path: '*',

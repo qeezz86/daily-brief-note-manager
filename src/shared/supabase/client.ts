@@ -3,6 +3,8 @@ import {
   type SupabaseClient,
 } from '@supabase/supabase-js'
 
+import type { Database } from './database.types'
+
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabasePublishableKey =
   import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
@@ -11,7 +13,9 @@ export const isSupabaseConfigured = Boolean(
   supabaseUrl && supabasePublishableKey,
 )
 
-export const supabase: SupabaseClient | null =
+export type DatabaseClient = SupabaseClient<Database>
+
+export const supabase: DatabaseClient | null =
   supabaseUrl && supabasePublishableKey
-    ? createClient(supabaseUrl, supabasePublishableKey)
+    ? createClient<Database>(supabaseUrl, supabasePublishableKey)
     : null

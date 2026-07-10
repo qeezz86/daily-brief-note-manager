@@ -2,7 +2,7 @@
 
 Daily Brief Note의 콘텐츠, SEO 정보, 출처, 뉴스 추적 이력과 생성 프롬프트를 관리하기 위한 비공개 웹앱입니다.
 
-현재 저장소는 Phase 1A 단계입니다. 이메일·비밀번호 인증, 보호 라우트, 초기 데이터베이스 migration, RLS, 카테고리 seed와 DB 테스트를 포함합니다. 콘텐츠 CRUD와 가져오기, 뉴스 추적 UI, 프롬프트 생성기는 아직 구현하지 않았습니다.
+현재 저장소는 Phase 1B 단계입니다. 이메일·비밀번호 인증, 보호 라우트, 초기 데이터베이스 migration, RLS, 카테고리 seed와 DB 테스트, 타입 안전 읽기 데이터 계층과 `/content` 읽기 전용 목록을 포함합니다. 콘텐츠 CRUD와 가져오기, 뉴스 추적 UI, 프롬프트 생성기는 아직 구현하지 않았습니다.
 
 ## 요구 환경
 
@@ -74,6 +74,14 @@ npm run db:stop
 `db:reset`은 로컬 Supabase 데이터베이스만 다시 만들고 `supabase/migrations/`와 `supabase/seed/`를 적용합니다. 원격 프로젝트에는 적용하지 않습니다.
 
 원격 migration은 SQL, RLS, 함수 권한과 로컬 테스트 결과를 검토한 뒤 별도 단계에서 수행해야 합니다. 이 저장소의 설정 과정에서는 `supabase link`, `supabase db push` 또는 원격 SQL 실행을 사용하지 않습니다.
+
+로컬 migration 스키마를 변경한 뒤에는 로컬 Supabase가 실행 중인 상태에서 데이터베이스 타입을 다시 생성합니다.
+
+```bash
+npx supabase gen types typescript --local > src/shared/supabase/database.types.ts
+```
+
+로그인 후 `/content`에서 활성 카테고리와 현재 사용자의 콘텐츠를 읽기 전용으로 조회하고 카테고리·상태·제목·slug로 필터링할 수 있습니다.
 
 Playwright 브라우저를 설치한 뒤 E2E 테스트를 실행할 수 있습니다.
 

@@ -89,7 +89,7 @@ function renderApp(
 
 describe('authentication foundation', () => {
   it('shows an explicit error when Supabase is not configured', () => {
-    renderApp(null)
+    renderApp(null, '/content')
 
     expect(
       screen.getByRole('heading', {
@@ -115,7 +115,7 @@ describe('authentication foundation', () => {
   it('redirects an unauthenticated user from a protected route', async () => {
     const { client } = createMockClient()
 
-    renderApp(client)
+    renderApp(client, '/content')
 
     expect(
       await screen.findByRole('heading', { name: '관리자 로그인' }),

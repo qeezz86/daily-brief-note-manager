@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom'
+
 export function DashboardPage() {
   return (
     <section className="dashboard" aria-labelledby="dashboard-title">
@@ -13,6 +15,10 @@ export function DashboardPage() {
           <p>콘텐츠 관리 기능은 다음 단계에서 추가됩니다.</p>
         </div>
       </div>
+
+      <Link className="primary-link" to="/content">
+        콘텐츠 목록 보기
+      </Link>
     </section>
   )
 }

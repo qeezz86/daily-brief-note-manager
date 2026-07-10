@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Outlet } from 'react-router-dom'
+import { NavLink, Outlet } from 'react-router-dom'
 
 import { useAuth } from '../features/auth/useAuth'
 
@@ -22,6 +22,10 @@ export function AppLayout() {
         <div className="app-header__inner">
           <span className="app-header__brand">Daily Brief Note</span>
           <span className="app-header__section">Content Manager</span>
+          <nav className="app-navigation" aria-label="주요 메뉴">
+            <NavLink to="/dashboard">대시보드</NavLink>
+            <NavLink to="/content">콘텐츠</NavLink>
+          </nav>
           <div className="app-header__account">
             <span title={user?.email}>{user?.email}</span>
             <button
