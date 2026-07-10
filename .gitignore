@@ -1,0 +1,26 @@
+# Dependencies and build output
+node_modules/
+dist/
+coverage/
+
+# Local environment variables
+.env
+.env.*
+!.env.example
+
+# Test artifacts
+playwright-report/
+test-results/
+
+# Local caches and logs
+*.local
+*.log
+.vite/
+
+# Private exports and backups
+backups/
+exports/
+
+# Operating system files
+.DS_Store
+Thumbs.db
