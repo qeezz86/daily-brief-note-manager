@@ -147,21 +147,22 @@ select is(
   'owner A cannot read owner B posts'
 );
 
+update public.posts
+   set title = 'Unauthorized change'
+ where id = '10000000-0000-0000-0000-000000000002';
+
+reset role;
+
 select is(
   (
-    with changed as (
-      update public.posts
-         set title = 'Unauthorized change'
-       where id = '10000000-0000-0000-0000-000000000002'
-      returning 1
-    )
-    select count(*) from changed
+    select count(*)
+      from public.posts
+     where id = '10000000-0000-0000-0000-000000000002'
+       and title = 'Unauthorized change'
   ),
   0::bigint,
   'owner A cannot update owner B posts'
 );
-
-reset role;
 
 set local role anon;
 set local "request.jwt.claims" = '{"role":"anon"}';
