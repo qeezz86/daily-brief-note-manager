@@ -154,7 +154,7 @@ categories
 | `display_id` | text | nullable |
 | `title` | text | 필수 |
 | `summary` | text | 필수 |
-| `html_body` | text | 필수 |
+| `html_body` | text | `draft`·`archived`에서는 nullable, `ready`·`published`에서는 비어 있지 않은 값 필수 |
 | `slug` | text | 필수, 사용자별 unique |
 | `wordpress_url` | text | nullable, 값이 있으면 사용자별 unique |
 | `content_status` | text | `draft`, `ready`, `published`, `archived` |
@@ -179,7 +179,7 @@ categories
 - 뉴스: `briefing_date` 필수
 - AI·정보DB·중국어 학습: `series_no` 필수
 - 중국어 학습: `display_id`를 사용하지 않음
-- `html_body`: 사용자가 작성·발행한 자체 콘텐츠만 저장
+- `html_body`: `draft`와 `archived`에서는 `NULL`을 허용한다. `ready`와 `published`에서는 공백이 아닌 본문이 필수다. 실제 wrapper·`h1`·태그 구조는 애플리케이션 strict validation에서 검증하며, 임시 HTML 주석이나 가짜 본문은 저장하지 않는다.
 - 날짜만 확인된 발행 정보는 `published_on`에 저장하고 `published_at`에 임의 시각을 만들지 않음
 
 unique 조건:

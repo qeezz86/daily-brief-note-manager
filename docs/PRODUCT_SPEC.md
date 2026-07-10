@@ -297,7 +297,7 @@ published_on             date nullable
 display_id               text nullable
 title                    text
 summary                  text
-html_body                text
+html_body                text nullable for draft and archived; non-blank for ready and published
 slug                     text
 wordpress_url            text nullable
 content_status           text
@@ -320,7 +320,7 @@ updated_at               timestamptz
 - 뉴스는 `unique (owner_id, category_id, briefing_date)`
 - AI·정보DB·중국어 학습은 `unique (owner_id, category_id, series_no)`
 - 중국어 학습은 `display_id`를 사용하지 않음
-- `html_body`는 사용자가 작성·발행한 자체 콘텐츠만 저장
+- `html_body`는 `draft`와 `archived`에서는 `NULL`을 허용하고, `ready`와 `published`에서는 공백이 아닌 값이 필수다. 실제 HTML 구조는 애플리케이션 strict validation에서 검증하며, 임시 HTML 주석이나 가짜 본문은 저장하지 않는다.
 - 날짜만 확인된 발행 정보는 `published_on`에 저장하고 `published_at`에 임의 시각을 만들지 않음
 
 `content_status` 허용값:

@@ -28,6 +28,7 @@ const savedPost: PostDetail = {
   published_on: null,
   title: 'AI 칼럼',
   summary: 'AI 칼럼 요약',
+  html_body: null,
   slug: 'ai-column',
   content_status: 'draft',
   wordpress_url: null,

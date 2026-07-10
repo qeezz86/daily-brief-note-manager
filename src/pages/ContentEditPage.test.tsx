@@ -28,6 +28,7 @@ const post: PostDetail = {
   published_on: null,
   title: '경제 브리핑',
   summary: '경제 브리핑 요약',
+  html_body: null,
   slug: 'economy-briefing-2026-07-10',
   content_status: 'draft',
   wordpress_url: null,

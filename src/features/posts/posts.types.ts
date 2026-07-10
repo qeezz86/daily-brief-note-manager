@@ -36,6 +36,7 @@ export type PostDetail = Pick<
   | 'published_on'
   | 'title'
   | 'summary'
+  | 'html_body'
   | 'slug'
   | 'content_status'
   | 'wordpress_url'

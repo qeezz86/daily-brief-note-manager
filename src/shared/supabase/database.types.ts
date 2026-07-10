@@ -491,7 +491,7 @@ export type Database = {
           content_status: string
           created_at: string
           display_id: string | null
-          html_body: string
+          html_body: string | null
           id: string
           image_alt: string | null
           image_prompt: string | null
@@ -514,7 +514,7 @@ export type Database = {
           content_status?: string
           created_at?: string
           display_id?: string | null
-          html_body: string
+          html_body?: string | null
           id?: string
           image_alt?: string | null
           image_prompt?: string | null
@@ -537,7 +537,7 @@ export type Database = {
           content_status?: string
           created_at?: string
           display_id?: string | null
-          html_body?: string
+          html_body?: string | null
           id?: string
           image_alt?: string | null
           image_prompt?: string | null

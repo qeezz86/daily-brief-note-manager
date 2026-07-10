@@ -39,6 +39,7 @@ export function PostForm({
     handleSubmit,
     control,
     setValue,
+    setError,
     formState: { errors, dirtyFields, isSubmitting },
   } = useForm<PostFormInput, unknown, PostFormValues>({
     resolver: zodResolver(postFormSchema),
@@ -60,10 +61,23 @@ export function PostForm({
     (category) => category.id === categoryId,
   )
   const disabled = isSaving || isSubmitting
-  const statusOptions =
-    mode === 'create'
-      ? contentStatuses.filter((status) => status !== 'archived')
-      : contentStatuses
+  const statusOptions = mode === 'create' ? ['draft'] : contentStatuses
+
+  async function handleValidSubmit(values: PostFormValues) {
+    const hasHtmlBody = Boolean(post?.html_body?.trim())
+
+    if (
+      !hasHtmlBody &&
+      (values.contentStatus === 'ready' || values.contentStatus === 'published')
+    ) {
+      setError('contentStatus', {
+        message: '본문을 작성한 후 상태를 변경할 수 있습니다.',
+      })
+      return
+    }
+
+    await onSubmit(values)
+  }
 
   useEffect(() => {
     setValue(
@@ -89,7 +103,7 @@ export function PostForm({
   }, [briefingDate, dirtyFields.slug, mode, selectedCategory, setValue])
 
   return (
-    <form className="post-form" noValidate onSubmit={handleSubmit(onSubmit)}>
+    <form className="post-form" noValidate onSubmit={handleSubmit(handleValidSubmit)}>
       <input type="hidden" {...register('contentGroup')} />
       <fieldset className="post-form__section" disabled={disabled}>
         <legend>콘텐츠 기본 정보</legend>
@@ -197,6 +211,9 @@ export function PostForm({
               </option>
             ))}
           </select>
+          {errors.contentStatus ? (
+            <p className="field-error">{errors.contentStatus.message}</p>
+          ) : null}
         </div>
 
         <div className="post-form__field">

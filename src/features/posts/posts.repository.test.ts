@@ -49,6 +49,7 @@ const savedPost: PostDetail = {
   published_on: null,
   title: 'AI 에이전트',
   summary: '요약',
+  html_body: null,
   slug: 'ai-agent',
   content_status: 'draft',
   wordpress_url: null,
@@ -162,14 +163,14 @@ describe('posts repository mutations', () => {
     )
   })
 
-  it('uses a transparent HTML placeholder and manual entry source', async () => {
+  it('stores a null HTML body without an interim placeholder', async () => {
     const { builder, client } = createInsertClient({ data: savedPost, error: null })
 
     await createPost(client, baseCreateInput(aiCategory))
 
     expect(builder.insert).toHaveBeenCalledWith(
       expect.objectContaining({
-        html_body: expect.stringContaining('has not been authored yet'),
+        html_body: null,
         source_import_type: 'manual_entry',
       }),
     )

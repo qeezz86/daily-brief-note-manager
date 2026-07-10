@@ -10,10 +10,7 @@ import type {
 } from './posts.types'
 
 const postDetailFields =
-  'id, category_id, display_id, series_no, briefing_date, published_on, title, summary, slug, content_status, wordpress_url, created_at, updated_at'
-
-const pendingHtmlBody =
-  '<!-- WordPress HTML body has not been authored yet. -->'
+  'id, category_id, display_id, series_no, briefing_date, published_on, title, summary, html_body, slug, content_status, wordpress_url, created_at, updated_at'
 
 interface RepositoryError {
   code?: string
@@ -118,7 +115,7 @@ export async function createPost(
     display_id: displayId,
     title: input.title,
     summary: input.summary,
-    html_body: pendingHtmlBody,
+    html_body: null,
     slug: input.slug,
     wordpress_url: input.wordpressUrl,
     content_status: input.contentStatus,

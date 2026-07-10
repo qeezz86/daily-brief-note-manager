@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(24);
+select plan(30);
 
 insert into auth.users (id, email)
 values
@@ -104,6 +104,54 @@ select is(
   ),
   'Owner A updated post',
   'owner A can read an owned post'
+);
+
+select lives_ok(
+  $$
+    insert into public.posts (id, owner_id, category_id, briefing_date, title, summary, slug, content_status, source_import_type)
+    values ('10000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-0000000000a1', 'economy', '2026-07-12', 'Draft without body', 'Summary', 'draft-without-body', 'draft', 'manual_entry')
+  $$,
+  'draft posts allow a NULL html_body'
+);
+
+select lives_ok(
+  $$
+    insert into public.posts (id, owner_id, category_id, briefing_date, title, summary, slug, content_status, source_import_type)
+    values ('10000000-0000-0000-0000-000000000004', '00000000-0000-0000-0000-0000000000a1', 'economy', '2026-07-13', 'Archived without body', 'Summary', 'archived-without-body', 'archived', 'manual_entry')
+  $$,
+  'archived posts allow a NULL html_body'
+);
+
+select throws_ok(
+  $$
+    insert into public.posts (id, owner_id, category_id, briefing_date, title, summary, slug, content_status, source_import_type)
+    values ('10000000-0000-0000-0000-000000000005', '00000000-0000-0000-0000-0000000000a1', 'economy', '2026-07-14', 'Ready without body', 'Summary', 'ready-without-body', 'ready', 'manual_entry')
+  $$,
+  '23514', null::text, 'ready posts reject a NULL html_body'
+);
+
+select throws_ok(
+  $$
+    insert into public.posts (id, owner_id, category_id, briefing_date, title, summary, slug, content_status, source_import_type)
+    values ('10000000-0000-0000-0000-000000000006', '00000000-0000-0000-0000-0000000000a1', 'economy', '2026-07-15', 'Published without body', 'Summary', 'published-without-body', 'published', 'manual_entry')
+  $$,
+  '23514', null::text, 'published posts reject a NULL html_body'
+);
+
+select throws_ok(
+  $$
+    insert into public.posts (id, owner_id, category_id, briefing_date, title, summary, html_body, slug, content_status, source_import_type)
+    values ('10000000-0000-0000-0000-000000000007', '00000000-0000-0000-0000-0000000000a1', 'economy', '2026-07-16', 'Ready blank body', 'Summary', '   ', 'ready-blank-body', 'ready', 'manual_entry')
+  $$,
+  '23514', null::text, 'ready posts reject a blank html_body'
+);
+
+select lives_ok(
+  $$
+    insert into public.posts (id, owner_id, category_id, briefing_date, title, summary, html_body, slug, content_status, source_import_type)
+    values ('10000000-0000-0000-0000-000000000008', '00000000-0000-0000-0000-0000000000a1', 'economy', '2026-07-17', 'Published body', 'Summary', '<div>Body</div>', 'published-with-body', 'published', 'manual_entry')
+  $$,
+  'published posts allow a non-blank html_body'
 );
 
 reset role;

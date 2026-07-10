@@ -36,6 +36,7 @@ const post: PostDetail = {
   published_on: null,
   title: '경제 브리핑',
   summary: '경제 브리핑 요약',
+  html_body: null,
   slug: 'economy-briefing-2026-07-10',
   content_status: 'draft',
   wordpress_url: null,
@@ -57,13 +58,15 @@ function renderCreateForm(onSubmit = vi.fn().mockResolvedValue(undefined)) {
 }
 
 describe('PostForm', () => {
-  it('renders the new content fields without archived as a create option', () => {
+  it('renders the new content fields with draft as the only create status', () => {
     renderCreateForm()
 
     expect(screen.getByLabelText('카테고리')).toBeInTheDocument()
     expect(screen.getByLabelText('제목')).toBeInTheDocument()
     expect(screen.getByLabelText('요약')).toBeInTheDocument()
-    expect(screen.queryByRole('option', { name: '보관됨' })).not.toBeInTheDocument()
+    expect(screen.getByRole('option', { name: '초안' })).toBeInTheDocument()
+    expect(screen.queryByRole('option', { name: '발행 준비' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('option', { name: '발행됨' })).not.toBeInTheDocument()
   })
 
   it('shows required field errors next to the inputs', async () => {
@@ -108,20 +111,30 @@ describe('PostForm', () => {
     ).toBeInTheDocument()
   })
 
-  it('requires a published date when status is published', async () => {
+  it('prevents a bodyless post from changing to ready or published', async () => {
     const browserUser = userEvent.setup()
-    renderCreateForm()
+    render(
+      <PostForm
+        mode="edit"
+        categories={categories}
+        post={post}
+        isSaving={false}
+        submitError={null}
+        onSubmit={vi.fn().mockResolvedValue(undefined)}
+      />,
+    )
 
-    await browserUser.selectOptions(screen.getByLabelText('카테고리'), 'ai-column')
-    await browserUser.type(screen.getByLabelText('제목'), 'AI 칼럼')
-    await browserUser.type(screen.getByLabelText('요약'), 'AI 칼럼 요약')
-    await browserUser.type(screen.getByLabelText('Slug'), 'ai-column')
-    await browserUser.selectOptions(screen.getByLabelText('상태'), 'published')
-    await browserUser.click(screen.getByRole('button', { name: '콘텐츠 저장' }))
+    await browserUser.selectOptions(screen.getByLabelText('상태'), 'ready')
+    await browserUser.click(screen.getByRole('button', { name: '변경 사항 저장' }))
 
     expect(
-      await screen.findByText('발행됨 상태에는 발행일이 필요합니다.'),
+      await screen.findByText('본문을 작성한 후 상태를 변경할 수 있습니다.'),
     ).toBeInTheDocument()
+
+    await browserUser.selectOptions(screen.getByLabelText('상태'), 'published')
+    await browserUser.type(screen.getByLabelText('발행일'), '2026-07-10')
+    await browserUser.click(screen.getByRole('button', { name: '변경 사항 저장' }))
+    expect(screen.getByText('본문을 작성한 후 상태를 변경할 수 있습니다.')).toBeInTheDocument()
   })
 
   it('keeps identity fields locked on edit', () => {

@@ -28,6 +28,7 @@ const post: PostDetail = {
   published_on: '2026-07-10',
   title: 'CCTV 뉴스로 배우는 중국어 #12',
   summary: '중국어 학습 요약',
+  html_body: null,
   slug: 'cctv-chinese-news-study-012',
   content_status: 'ready',
   wordpress_url: null,
