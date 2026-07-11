@@ -11,6 +11,7 @@ import {
 } from '../features/posts/postFormatters'
 import {
   useArchivePostMutation,
+  useChineseMetadataQuery,
   usePostQuery,
   usePostSourcesQuery,
   usePostTagsQuery,
@@ -36,6 +37,7 @@ export function ContentDetailPageContent({
   const categoriesQuery = useActiveCategoriesQuery(client)
   const tagsQuery = usePostTagsQuery(client, userId, postId)
   const sourcesQuery = usePostSourcesQuery(client, userId, postId)
+  const chineseMetadataQuery = useChineseMetadataQuery(client, userId, postId)
   const archiveMutation = useArchivePostMutation(client, userId, postId)
   const post = postQuery.data
   const seoData = seoQuery.data
@@ -71,7 +73,7 @@ export function ContentDetailPageContent({
     }
   }
 
-  if (postQuery.isPending || seoQuery.isPending || categoriesQuery.isPending || tagsQuery.isPending || sourcesQuery.isPending) {
+  if (postQuery.isPending || seoQuery.isPending || categoriesQuery.isPending || tagsQuery.isPending || sourcesQuery.isPending || chineseMetadataQuery.isPending) {
     return (
       <div className="content-state" role="status">
         <span className="loading-indicator" aria-hidden="true" />
@@ -80,7 +82,7 @@ export function ContentDetailPageContent({
     )
   }
 
-  if (postQuery.isError || seoQuery.isError || categoriesQuery.isError || tagsQuery.isError || sourcesQuery.isError) {
+  if (postQuery.isError || seoQuery.isError || categoriesQuery.isError || tagsQuery.isError || sourcesQuery.isError || chineseMetadataQuery.isError) {
     return (
       <div className="content-state content-state--error" role="alert">
         <h1>콘텐츠를 불러오지 못했습니다</h1>
@@ -170,6 +172,23 @@ export function ContentDetailPageContent({
           <div><dt>프롬프트 버전</dt><dd>{post.image_prompt_version}</dd></div>
         </dl>
       </section>
+
+      {category?.content_group === 'chinese' ? (
+        <section className="content-detail__section" aria-labelledby="chinese-metadata-title">
+          <h2 id="chinese-metadata-title">중국어 학습 정보</h2>
+          <dl className="content-detail__metadata content-detail__metadata--nested">
+            <div><dt>학습 주제</dt><dd>{chineseMetadataQuery.data?.learning_topic || '미입력'}</dd></div>
+            <div><dt>프로그램명</dt><dd>{chineseMetadataQuery.data?.program_name || '미입력'}</dd></div>
+            <div className="content-detail__wide"><dt>원문 제목</dt><dd>{chineseMetadataQuery.data?.original_title || '미입력'}</dd></div>
+            <div className="content-detail__wide"><dt>원문 URL</dt><dd>{chineseMetadataQuery.data?.original_url ? <a href={chineseMetadataQuery.data.original_url} target="_blank" rel="noopener noreferrer">{chineseMetadataQuery.data.original_url}</a> : '미입력'}</dd></div>
+            <div><dt>원문 게시·업데이트 시각</dt><dd>{chineseMetadataQuery.data?.original_published_at ? formatUpdatedAt(chineseMetadataQuery.data.original_published_at) : '미입력'}</dd></div>
+            <div><dt>본편 목록 포함 여부</dt><dd>{chineseMetadataQuery.data?.episode_list_included === null || chineseMetadataQuery.data?.episode_list_included === undefined ? '미확인' : chineseMetadataQuery.data.episode_list_included ? '포함' : '미포함'}</dd></div>
+            <div className="content-detail__wide"><dt>확인한 핵심 사실</dt><dd>{chineseMetadataQuery.data?.verified_core_fact || '미입력'}</dd></div>
+            <div><dt>난이도</dt><dd>{chineseMetadataQuery.data?.difficulty || '미입력'}</dd></div>
+            <div className="content-detail__wide"><dt>학습 포인트</dt><dd>{chineseMetadataQuery.data?.learning_points || '미입력'}</dd></div>
+          </dl>
+        </section>
+      ) : null}
 
       <section className="content-detail__section" aria-labelledby="tag-detail-title">
         <h2 id="tag-detail-title">SEO 태그 ({tagsQuery.data?.length ?? 0}개)</h2>

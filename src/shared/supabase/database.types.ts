@@ -113,27 +113,27 @@ export type Database = {
           difficulty: string | null
           episode_list_included: boolean | null
           learning_points: string | null
-          learning_topic: string
+          learning_topic: string | null
           original_published_at: string | null
-          original_title: string
-          original_url: string
+          original_title: string | null
+          original_url: string | null
           owner_id: string
           post_id: string
-          program_name: string
-          verified_core_fact: string
+          program_name: string | null
+          verified_core_fact: string | null
         }
         Insert: {
           difficulty?: string | null
           episode_list_included?: boolean | null
           learning_points?: string | null
-          learning_topic: string
+          learning_topic?: string | null
           original_published_at?: string | null
-          original_title: string
-          original_url: string
+          original_title?: string | null
+          original_url?: string | null
           owner_id: string
           post_id: string
-          program_name: string
-          verified_core_fact: string
+          program_name?: string | null
+          verified_core_fact?: string | null
         }
         Update: {
           difficulty?: string | null
@@ -772,6 +772,56 @@ export type Database = {
           p_representative_title: string
           p_slug: string
           p_summary: string
+          p_title: string
+          p_wordpress_url: string
+        }
+        Returns: {
+          briefing_date: string | null
+          category_id: string
+          content_status: string
+          created_at: string
+          display_id: string | null
+          html_body: string | null
+          id: string
+          image_alt: string | null
+          image_prompt: string | null
+          image_prompt_updated_at: string | null
+          image_prompt_version: number
+          owner_id: string
+          published_at: string | null
+          published_on: string | null
+          series_no: number | null
+          slug: string
+          source_import_type: string
+          summary: string
+          title: string
+          updated_at: string
+          wordpress_url: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "posts"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      save_chinese_publication_bundle: {
+        Args: {
+          p_alternative_titles: string[]
+          p_chinese_metadata: Json
+          p_content_status: string
+          p_focus_keyword: string
+          p_html_body: string
+          p_image_alt: string
+          p_image_prompt: string
+          p_meta_description: string
+          p_post_id: string
+          p_published_on: string
+          p_representative_title: string
+          p_slug: string
+          p_sources: Json
+          p_summary: string
+          p_tags: Json
           p_title: string
           p_wordpress_url: string
         }

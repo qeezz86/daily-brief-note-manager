@@ -71,6 +71,7 @@ export interface CreatePostInput {
 }
 
 export interface UpdatePostInput {
+  contentGroup?: 'news' | 'ai' | 'info_db' | 'chinese' | ''
   title: string
   summary: string
   slug: string
@@ -86,6 +87,33 @@ export interface UpdatePostInput {
   imageAlt: string | null
   tags: string[]
   sources: PublicationSourceInput[]
+  chineseMetadata?: ChineseMetadataInput | null
+}
+
+export type ChineseMetadata = Pick<
+  Tables<'chinese_metadata'>,
+  | 'post_id'
+  | 'learning_topic'
+  | 'program_name'
+  | 'original_title'
+  | 'original_url'
+  | 'original_published_at'
+  | 'episode_list_included'
+  | 'verified_core_fact'
+  | 'difficulty'
+  | 'learning_points'
+>
+
+export interface ChineseMetadataInput {
+  learningTopic: string | null
+  programName: string | null
+  originalTitle: string | null
+  originalUrl: string | null
+  originalPublishedAt: string | null
+  episodeListIncluded: boolean | null
+  verifiedCoreFact: string | null
+  difficulty: string | null
+  learningPoints: string | null
 }
 
 export type PostTag = Pick<Tables<'tags'>, 'id' | 'name'>

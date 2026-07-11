@@ -60,6 +60,15 @@ export const postFormSchema = z
       sourcePublishedAt: z.string(),
       checkedPoint: z.string(),
     })).default([]),
+    learningTopic: z.string().default(''),
+    programName: z.string().default(''),
+    originalTitle: z.string().default(''),
+    originalUrl: z.string().default(''),
+    originalPublishedAt: z.string().default(''),
+    episodeListIncluded: z.enum(['', 'true', 'false']).default(''),
+    verifiedCoreFact: z.string().default(''),
+    difficulty: z.string().default(''),
+    learningPoints: z.string().default(''),
   })
   .superRefine((values, context) => {
     if (values.contentStatus === 'published' && !values.publishedOn) {
@@ -144,6 +153,12 @@ export const postFormSchema = z
       if (new Set(sourceKeys).size !== sourceKeys.length) {
         context.addIssue({ code: 'custom', message: '출처 URL이 중복되었습니다.', path: ['sources'] })
       }
+      if (values.contentGroup === 'chinese' && values.originalUrl.trim() && !isHttpUrl(values.originalUrl)) {
+        context.addIssue({ code: 'custom', message: '원문 URL은 절대 HTTP 또는 HTTPS URL이어야 합니다.', path: ['originalUrl'] })
+      }
+      if (values.contentGroup === 'chinese' && values.originalPublishedAt.trim() && Number.isNaN(Date.parse(values.originalPublishedAt))) {
+        context.addIssue({ code: 'custom', message: '올바른 원문 게시·업데이트 시각을 입력해 주세요.', path: ['originalPublishedAt'] })
+      }
     }
 
     if (!['ready', 'published'].includes(values.contentStatus)) return
@@ -162,6 +177,24 @@ export const postFormSchema = z
       }
       if (!completeSources.some((source) => isOfficialCctvArticleUrl(source.sourceUrl))) {
         context.addIssue({ code: 'custom', message: '중국어 학습에는 공식 CCTV 개별 원문 URL이 필요합니다.', path: ['sources'] })
+      }
+      if (!values.learningTopic.trim()) context.addIssue({ code: 'custom', message: '학습 주제를 입력해 주세요.', path: ['learningTopic'] })
+      if (!values.programName.trim()) context.addIssue({ code: 'custom', message: '프로그램명을 입력해 주세요.', path: ['programName'] })
+      if (!values.originalTitle.trim()) context.addIssue({ code: 'custom', message: 'CCTV 원문 제목을 입력해 주세요.', path: ['originalTitle'] })
+      if (!values.originalUrl.trim()) {
+        context.addIssue({ code: 'custom', message: 'CCTV 개별 원문 URL을 입력해 주세요.', path: ['originalUrl'] })
+      } else if (!isOfficialCctvArticleUrl(values.originalUrl)) {
+        context.addIssue({ code: 'custom', message: '공식 CCTV 개별 원문 URL을 입력해 주세요.', path: ['originalUrl'] })
+      }
+      if (!values.originalPublishedAt.trim()) {
+        context.addIssue({ code: 'custom', message: '원문 게시·업데이트 시각을 입력해 주세요.', path: ['originalPublishedAt'] })
+      } else if (Number.isNaN(Date.parse(values.originalPublishedAt))) {
+        context.addIssue({ code: 'custom', message: '올바른 원문 게시·업데이트 시각을 입력해 주세요.', path: ['originalPublishedAt'] })
+      }
+      if (!values.episodeListIncluded) context.addIssue({ code: 'custom', message: '본편 목록 포함 여부를 명시적으로 선택해 주세요.', path: ['episodeListIncluded'] })
+      if (!values.verifiedCoreFact.trim()) context.addIssue({ code: 'custom', message: '확인한 핵심 사실을 입력해 주세요.', path: ['verifiedCoreFact'] })
+      if (values.originalUrl.trim() && !completeSources.some((source) => normalizeSourceUrl(source.sourceUrl) === normalizeSourceUrl(values.originalUrl))) {
+        context.addIssue({ code: 'custom', message: '중국어 원문 URL과 출처 목록의 URL이 일치하지 않습니다.', path: ['originalUrl'] })
       }
     }
 

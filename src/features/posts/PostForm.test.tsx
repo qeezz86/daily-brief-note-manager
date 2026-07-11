@@ -25,6 +25,11 @@ const categories: Category[] = [
     slug_pattern: 'ai-###',
     wrapper_class: 'daily-brief-note ai-column',
   },
+  {
+    id: 'chinese-study', content_group: 'chinese', name: '중국어 학습', sort_order: 80,
+    display_id_pattern: null, slug_pattern: 'cctv-chinese-news-study-###',
+    wrapper_class: 'daily-brief-note chinese-study',
+  },
 ]
 
 const post: PostDetail = {
@@ -62,6 +67,22 @@ function renderCreateForm(onSubmit = vi.fn().mockResolvedValue(undefined)) {
 }
 
 describe('PostForm', () => {
+  it('shows Chinese metadata fields only for the Chinese study category', () => {
+    render(
+      <PostForm mode="edit" categories={categories} post={{ ...post, category_id: 'chinese-study', display_id: null, series_no: 1, briefing_date: null }}
+        isSaving={false} submitError={null} onSubmit={vi.fn().mockResolvedValue(undefined)} />,
+    )
+    expect(screen.getByRole('group', { name: '중국어 학습 정보' })).toBeInTheDocument()
+    expect(screen.getByLabelText('학습 주제')).toBeInTheDocument()
+    expect(screen.getByLabelText('본편 목록 포함 여부')).toHaveValue('')
+
+    render(
+      <PostForm mode="edit" categories={categories} post={post}
+        isSaving={false} submitError={null} onSubmit={vi.fn().mockResolvedValue(undefined)} />,
+    )
+    expect(screen.getAllByLabelText('학습 주제')).toHaveLength(1)
+  })
+
   it('renders the new content fields with draft as the only create status', () => {
     renderCreateForm()
 

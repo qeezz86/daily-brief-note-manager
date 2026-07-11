@@ -457,6 +457,8 @@ learning_points            text nullable
 - 기사 전체 번역이나 전체 자막 저장 금지
 - 동일 사용자의 같은 `original_url`은 저장 금지
 
+`draft`는 metadata 없이 또는 부분 입력으로 저장할 수 있고 `archived`는 기존 불완전 값을 보존한다. `ready`·`published`에서는 학습 주제, 프로그램명, 원문 제목·URL·실제 게시 시각, 본편 목록 포함 여부, 확인한 핵심 사실을 모두 입력한다. 본편 목록 포함 여부는 포함과 미포함 모두 유효하며 미확인만 차단한다. 원문 URL은 fragment와 불필요한 trailing slash를 제거한 기준으로 출처 URL 중 하나와 일치해야 하며, 날짜만 확인된 경우 임의 시각을 생성하지 않는다.
+
 ## 6.10 `series_counters`
 
 ```text

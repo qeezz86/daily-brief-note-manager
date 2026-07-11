@@ -250,6 +250,25 @@ describe('posts repository mutations', () => {
     }))
   })
 
+  it('maps Chinese metadata to the Chinese atomic publication RPC', async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: savedPost, error: null })
+    const client = { rpc } as unknown as DatabaseClient
+
+    await updatePost(client, 'post-1', {
+      contentGroup: 'chinese', title: '제목', summary: '요약', slug: 'chinese-slug', contentStatus: 'draft',
+      publishedOn: null, wordpressUrl: null, htmlBody: null, representativeTitle: '', alternativeTitles: [],
+      metaDescription: '', focusKeyword: '', imagePrompt: null, imageAlt: null, tags: [], sources: [],
+      chineseMetadata: {
+        learningTopic: '학습 주제', programName: 'CCTV 뉴스', originalTitle: '원문 제목', originalUrl: 'https://news.cctv.com/a/1',
+        originalPublishedAt: '2026-07-11T12:00', episodeListIncluded: false, verifiedCoreFact: '확인한 사실', difficulty: null, learningPoints: null,
+      },
+    })
+
+    expect(rpc).toHaveBeenCalledWith('save_chinese_publication_bundle', expect.objectContaining({
+      p_chinese_metadata: expect.objectContaining({ original_url: 'https://news.cctv.com/a/1', episode_list_included: false }),
+    }))
+  })
+
   it('loads only explicit SEO fields', async () => {
     const seoData = {
       post_id: 'post-1',
@@ -289,6 +308,18 @@ describe('posts repository mutations', () => {
       focusKeyword: '', imagePrompt: null, imageAlt: null,
       tags: [], sources: [],
     })).rejects.toThrow('기존 데이터는 변경되지 않았습니다.')
+  })
+
+  it('maps duplicate Chinese original URLs to a clear editor message', async () => {
+    const client = {
+      rpc: vi.fn().mockResolvedValue({ data: null, error: { code: '23505', message: 'CHINESE_METADATA_ORIGINAL_URL_DUPLICATE' } }),
+    } as unknown as DatabaseClient
+
+    await expect(updatePost(client, 'post-1', {
+      contentGroup: 'chinese', title: '제목', summary: '요약', slug: 'slug', contentStatus: 'draft', publishedOn: null,
+      wordpressUrl: null, htmlBody: null, representativeTitle: '', alternativeTitles: [], metaDescription: '', focusKeyword: '',
+      imagePrompt: null, imageAlt: null, tags: [], sources: [], chineseMetadata: null,
+    })).rejects.toThrow('동일한 중국어 원문 URL이 이미 존재합니다.')
   })
 
   it('archives by updating content status without deleting', async () => {

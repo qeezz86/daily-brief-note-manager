@@ -21,7 +21,41 @@ const validValues = {
   imageAlt: '',
 }
 
+const validChineseReadyValues = {
+  ...validValues,
+  categoryId: 'chinese-study', categoryName: '중국어 학습', contentGroup: 'chinese' as const,
+  contentStatus: 'ready' as const, htmlBody: '<div><h1>본문</h1></div>', representativeTitle: '대표',
+  alternativeTitles: ['1', '2', '3', '4'], metaDescription: '설명', focusKeyword: '키워드', imagePrompt: '프롬프트', imageAlt: 'ALT',
+  tags: ['A', 'B', 'C', 'D', 'E'], sources: [{ sourceName: 'CCTV', sourceTitle: '원문', sourceUrl: 'https://news.cctv.com/a/1', sourcePublishedAt: '2026-07-11T12:00', checkedPoint: '확인' }],
+  learningTopic: '학습 주제', programName: 'CCTV 뉴스', originalTitle: '원문 제목', originalUrl: 'https://news.cctv.com/a/1', originalPublishedAt: '2026-07-11T12:00', episodeListIncluded: 'true' as const, verifiedCoreFact: '확인한 사실', difficulty: '', learningPoints: '',
+}
+
 describe('postFormSchema', () => {
+  it('allows a Chinese draft with no metadata', () => {
+    expect(postFormSchema.safeParse({ ...validValues, categoryId: 'chinese-study', contentGroup: 'chinese' }).success).toBe(true)
+  })
+
+  it.each([
+    ['learningTopic', 'learningTopic'], ['programName', 'programName'], ['originalTitle', 'originalTitle'],
+    ['originalUrl', 'originalUrl'], ['originalPublishedAt', 'originalPublishedAt'],
+    ['episodeListIncluded', 'episodeListIncluded'], ['verifiedCoreFact', 'verifiedCoreFact'],
+  ] as const)('rejects ready Chinese content without %s', (field, expectedPath) => {
+    const value = field === 'episodeListIncluded' ? '' : ''
+    const result = postFormSchema.safeParse({ ...validChineseReadyValues, [field]: value })
+    expect(result.success).toBe(false)
+    if (!result.success) expect(result.error.issues.map((issue) => issue.path[0])).toContain(expectedPath)
+  })
+
+  it('rejects a spoofed CCTV original URL even when its source matches', () => {
+    const result = postFormSchema.safeParse({
+      ...validChineseReadyValues,
+      originalUrl: 'https://cctv.com.example.com/a/1',
+      sources: [{ ...validChineseReadyValues.sources[0], sourceUrl: 'https://cctv.com.example.com/a/1' }],
+    })
+    expect(result.success).toBe(false)
+    if (!result.success) expect(result.error.issues.map((issue) => issue.message)).toContain('공식 CCTV 개별 원문 URL을 입력해 주세요.')
+  })
+
   it('requires category, title, summary, and slug', () => {
     const result = postFormSchema.safeParse({
       ...validValues,
@@ -212,6 +246,9 @@ describe('postFormSchema', () => {
       contentStatus: 'ready' as const, htmlBody: '<div><h1>본문</h1></div>', representativeTitle: '대표',
       alternativeTitles: ['1', '2', '3', '4'], metaDescription: '설명', focusKeyword: '키워드',
       imagePrompt: '프롬프트', imageAlt: 'ALT', tags: ['A', 'B', 'C', 'D', 'E'],
+      learningTopic: '학습 주제', programName: 'CCTV 뉴스', originalTitle: '원문 제목',
+      originalUrl: 'https://news.cctv.com/a/1', originalPublishedAt: '2026-07-11T12:00',
+      episodeListIncluded: 'false' as const, verifiedCoreFact: '원문에서 학습 문장을 확인했습니다.',
     }
     const invalid = postFormSchema.safeParse({
       ...baseReady,
@@ -226,5 +263,24 @@ describe('postFormSchema', () => {
       ...baseReady,
       sources: [{ sourceName: 'CCTV', sourceTitle: '원문', sourceUrl: 'https://news.cctv.com/a/1', sourcePublishedAt: '2026-07-11T12:00', checkedPoint: '확인' }],
     }).success).toBe(true)
+  })
+
+  it('requires complete Chinese metadata and a source URL matching the original URL', () => {
+    const baseReady = {
+      ...validValues, categoryId: 'chinese-study', categoryName: '중국어 학습', contentGroup: 'chinese' as const,
+      contentStatus: 'ready' as const, htmlBody: '<div><h1>본문</h1></div>', representativeTitle: '대표',
+      alternativeTitles: ['1', '2', '3', '4'], metaDescription: '설명', focusKeyword: '키워드', imagePrompt: '프롬프트', imageAlt: 'ALT',
+      tags: ['A', 'B', 'C', 'D', 'E'], sources: [{ sourceName: 'CCTV', sourceTitle: '원문', sourceUrl: 'https://news.cctv.com/a/1#source', sourcePublishedAt: '2026-07-11T12:00', checkedPoint: '확인' }],
+      learningTopic: '학습 주제', programName: 'CCTV 뉴스', originalTitle: '원문 제목', originalUrl: 'https://news.cctv.com/a/1/', originalPublishedAt: '2026-07-11T12:00', episodeListIncluded: 'false' as const, verifiedCoreFact: '확인한 사실', difficulty: '', learningPoints: '',
+    }
+    expect(postFormSchema.safeParse(baseReady).success).toBe(true)
+
+    const incomplete = postFormSchema.safeParse({ ...baseReady, learningTopic: '', episodeListIncluded: '' })
+    expect(incomplete.success).toBe(false)
+    if (!incomplete.success) expect(incomplete.error.issues.map((issue) => issue.path[0])).toEqual(expect.arrayContaining(['learningTopic', 'episodeListIncluded']))
+
+    const mismatch = postFormSchema.safeParse({ ...baseReady, originalUrl: 'https://news.cctv.com/a/2' })
+    expect(mismatch.success).toBe(false)
+    if (!mismatch.success) expect(mismatch.error.issues.map((issue) => issue.message)).toContain('중국어 원문 URL과 출처 목록의 URL이 일치하지 않습니다.')
   })
 })

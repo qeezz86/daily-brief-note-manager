@@ -17,6 +17,17 @@ export function toNullablePostFormValues(values: PostFormValues) {
     htmlBody: htmlToNull(values.htmlBody),
     imagePrompt: emptyToNull(values.imagePrompt),
     imageAlt: emptyToNull(values.imageAlt),
+    learningTopic: emptyToNull(values.learningTopic),
+    programName: emptyToNull(values.programName),
+    originalTitle: emptyToNull(values.originalTitle),
+    originalUrl: emptyToNull(values.originalUrl),
+    originalPublishedAt: emptyToNull(values.originalPublishedAt),
+    episodeListIncluded: values.episodeListIncluded === ''
+      ? null
+      : values.episodeListIncluded === 'true',
+    verifiedCoreFact: emptyToNull(values.verifiedCoreFact),
+    difficulty: emptyToNull(values.difficulty),
+    learningPoints: emptyToNull(values.learningPoints),
     tags: values.tags.map((tag) => tag.trim().replace(/\s+/g, ' ')).filter(Boolean),
     sources: values.sources
       .filter((source) => Object.values(source).some((value) => value.trim()))

@@ -3,6 +3,7 @@ import { buildDisplayId } from './postIdentifiers'
 import type {
   CreatePostInput,
   PostDetail,
+  ChineseMetadata,
   PostInsert,
   PostListItem,
   PostSource,
@@ -16,6 +17,9 @@ const postDetailFields =
 
 const seoDataFields =
   'post_id, representative_title, alternative_titles, meta_description, focus_keyword'
+
+const chineseMetadataFields =
+  'post_id, learning_topic, program_name, original_title, original_url, original_published_at, episode_list_included, verified_core_fact, difficulty, learning_points'
 
 interface RepositoryError {
   code?: string
@@ -50,16 +54,23 @@ function throwPostError(error: RepositoryError): never {
 }
 
 function throwPostEditorError(error: RepositoryError): never {
+  const detail = `${error.message ?? ''} ${error.details ?? ''}`
+  if (detail.includes('CHINESE_METADATA_ORIGINAL_URL_DUPLICATE')) {
+    throw new Error('동일한 중국어 원문 URL이 이미 존재합니다.')
+  }
   if (error.code === '23505') throwPostError(error)
   if (error.code === '42501') {
     throw new Error('수정할 콘텐츠를 찾을 수 없거나 접근 권한이 없습니다.')
   }
-  const detail = `${error.message ?? ''} ${error.details ?? ''}`
   if (detail.includes('TAG_COUNT')) throw new Error('태그는 5개 이상 8개 이하로 입력해 주세요.')
   if (detail.includes('TAG_FORBIDDEN_CATEGORY')) throw new Error('카테고리명은 태그로 사용할 수 없습니다.')
   if (detail.includes('TAG_DUPLICATE')) throw new Error('동일한 태그가 이미 입력되어 있습니다.')
   if (detail.includes('SOURCE_DUPLICATE')) throw new Error('출처 URL이 중복되었습니다.')
   if (detail.includes('SOURCE_REQUIRED') || detail.includes('SOURCE_INCOMPLETE')) throw new Error('출처 정보를 모두 입력해 주세요.')
+  if (detail.includes('CHINESE_METADATA_URL_SOURCE_MISMATCH')) throw new Error('중국어 원문 URL과 출처 목록의 URL이 일치하지 않습니다.')
+  if (detail.includes('CHINESE_METADATA_URL_INVALID')) throw new Error('공식 CCTV 개별 원문 URL을 입력해 주세요.')
+  if (detail.includes('CHINESE_METADATA_REQUIRED')) throw new Error('중국어 학습 정보의 필수 항목을 입력해 주세요.')
+  if (detail.includes('CHINESE_METADATA_DATE_INVALID')) throw new Error('올바른 원문 게시·업데이트 시각을 입력해 주세요.')
 
   throw new Error(
     '콘텐츠 편집 정보를 저장하지 못했습니다. 기존 데이터는 변경되지 않았습니다.',
@@ -138,6 +149,24 @@ export async function getSeoDataByPostId(
   return data
 }
 
+export async function getChineseMetadataByPostId(
+  client: DatabaseClient,
+  postId: string,
+): Promise<ChineseMetadata | null> {
+  const { data, error } = await client
+    .from('chinese_metadata')
+    .select(chineseMetadataFields)
+    .eq('post_id', postId)
+    .maybeSingle()
+
+  if (error) {
+    if (error.code === '22P02' || error.code === 'PGRST116') return null
+    throw new Error('중국어 학습 정보를 불러오지 못했습니다.')
+  }
+
+  return data
+}
+
 export async function issueSeriesNo(
   client: DatabaseClient,
   ownerId: string,
@@ -199,7 +228,7 @@ export async function updatePost(
   postId: string,
   input: UpdatePostInput,
 ): Promise<PostDetail> {
-  const { data, error } = await client.rpc('save_post_publication_bundle', {
+  const payload = {
     p_post_id: postId,
     p_title: input.title,
     p_summary: input.summary,
@@ -225,7 +254,23 @@ export async function updatePost(
       checked_point: source.checkedPoint,
       sort_order: sortOrder,
     })),
-  })
+  }
+  const { data, error } = input.contentGroup === 'chinese'
+    ? await client.rpc('save_chinese_publication_bundle', {
+      ...payload,
+      p_chinese_metadata: {
+        learning_topic: input.chineseMetadata?.learningTopic ?? null,
+        program_name: input.chineseMetadata?.programName ?? null,
+        original_title: input.chineseMetadata?.originalTitle ?? null,
+        original_url: input.chineseMetadata?.originalUrl ?? null,
+        original_published_at: input.chineseMetadata?.originalPublishedAt ?? null,
+        episode_list_included: input.chineseMetadata?.episodeListIncluded ?? null,
+        verified_core_fact: input.chineseMetadata?.verifiedCoreFact ?? null,
+        difficulty: input.chineseMetadata?.difficulty ?? null,
+        learning_points: input.chineseMetadata?.learningPoints ?? null,
+      },
+    })
+    : await client.rpc('save_post_publication_bundle', payload)
 
   if (error) throwPostEditorError(error)
   if (!data) throw new Error('수정할 콘텐츠를 찾을 수 없습니다.')

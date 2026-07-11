@@ -285,19 +285,21 @@ generic `sources`에는 중국어 전용 프로그램명과 본편 목록 포함
 |---|---|---|
 | `post_id` | uuid | primary key, references `posts` on delete cascade |
 | `owner_id` | uuid | references `auth.users` |
-| `learning_topic` | text | 필수 |
-| `program_name` | text | 필수 |
-| `original_title` | text | 필수 |
-| `original_url` | text | 개별 CCTV 기사 또는 영상 URL, 필수 |
-| `original_published_at` | timestamptz | nullable, 누락 시 경고 |
+| `learning_topic` | text | draft·archived에서는 nullable, ready·published 필수 |
+| `program_name` | text | draft·archived에서는 nullable, ready·published 필수 |
+| `original_title` | text | draft·archived에서는 nullable, ready·published 필수 |
+| `original_url` | text | 개별 CCTV 기사 또는 영상 URL, ready·published 필수 |
+| `original_published_at` | timestamptz | ready·published 필수, 실제 확인 시각만 저장 |
 | `episode_list_included` | boolean | nullable |
-| `verified_core_fact` | text | 필수 |
+| `verified_core_fact` | text | draft·archived에서는 nullable, ready·published 필수 |
 | `difficulty` | text | nullable |
 | `learning_points` | text | nullable |
 
 중국어 학습은 `posts.series_no`를 식별자로 사용하고 브리핑 ID를 생성하지 않는다. 핵심 문장 3~5개는 자체 작성 HTML에 포함할 수 있지만 원문 전체를 별도 복제하지 않는다.
 
-중국어 학습의 동일 원문 중복 저장은 `UNIQUE (owner_id, original_url)`로 차단한다.
+중국어 학습의 동일 원문 중복 저장은 fragment 제거, trailing slash 제거, hostname 소문자화 기준으로 사용자별 차단한다. `episode_list_included`는 `true`와 `false` 모두 확인값이고 `NULL`만 미확인이다. `ready`·`published`의 원문 URL은 정규화 후 구조화 출처 URL 중 하나와 일치해야 한다.
+
+`save_chinese_publication_bundle` RPC는 소유권과 중국어 카테고리를 확인한 뒤 기존 publication bundle 저장을 같은 트랜잭션에서 재사용하고 `chinese_metadata`를 upsert한다.
 
 ### 6.4 `series_counters`
 

@@ -21,6 +21,7 @@ import {
 import {
   contentStatuses,
   type PostDetail,
+  type ChineseMetadata,
   type PostSource,
   type PostTag,
   type SeoData,
@@ -33,6 +34,7 @@ interface PostFormProps {
   seoData?: SeoData | null
   postTags?: PostTag[]
   postSources?: PostSource[]
+  chineseMetadata?: ChineseMetadata | null
   isSaving: boolean
   submitError: string | null
   submitSuccess?: string | null
@@ -46,6 +48,7 @@ export function PostForm({
   seoData = null,
   postTags = [],
   postSources = [],
+  chineseMetadata = null,
   isSaving,
   submitError,
   submitSuccess = null,
@@ -94,6 +97,19 @@ export function PostForm({
           : '',
         checkedPoint: source.checked_point,
       })),
+      learningTopic: chineseMetadata?.learning_topic ?? '',
+      programName: chineseMetadata?.program_name ?? '',
+      originalTitle: chineseMetadata?.original_title ?? '',
+      originalUrl: chineseMetadata?.original_url ?? '',
+      originalPublishedAt: chineseMetadata?.original_published_at
+        ? chineseMetadata.original_published_at.slice(0, 16)
+        : '',
+      episodeListIncluded: chineseMetadata?.episode_list_included === null || chineseMetadata?.episode_list_included === undefined
+        ? ''
+        : String(chineseMetadata.episode_list_included) as 'true' | 'false',
+      verifiedCoreFact: chineseMetadata?.verified_core_fact ?? '',
+      difficulty: chineseMetadata?.difficulty ?? '',
+      learningPoints: chineseMetadata?.learning_points ?? '',
     },
   })
   const sourceFields = useFieldArray({ control, name: 'sources' })
@@ -496,6 +512,57 @@ export function PostForm({
               )}
             </div>
           </fieldset>
+
+          {selectedCategory?.content_group === 'chinese' ? (
+            <fieldset className="post-form__section" disabled={disabled}>
+              <legend>중국어 학습 정보</legend>
+              <div className="post-form__field">
+                <label htmlFor="chinese-learning-topic">학습 주제</label>
+                <input id="chinese-learning-topic" type="text" aria-invalid={Boolean(errors.learningTopic)} {...register('learningTopic')} />
+                {errors.learningTopic ? <p className="field-error">{errors.learningTopic.message}</p> : null}
+              </div>
+              <div className="post-form__field">
+                <label htmlFor="chinese-program-name">프로그램명</label>
+                <input id="chinese-program-name" type="text" aria-invalid={Boolean(errors.programName)} {...register('programName')} />
+                {errors.programName ? <p className="field-error">{errors.programName.message}</p> : null}
+              </div>
+              <div className="post-form__field post-form__field--wide">
+                <label htmlFor="chinese-original-title">CCTV 원문 제목</label>
+                <input id="chinese-original-title" type="text" aria-invalid={Boolean(errors.originalTitle)} {...register('originalTitle')} />
+                {errors.originalTitle ? <p className="field-error">{errors.originalTitle.message}</p> : null}
+              </div>
+              <div className="post-form__field post-form__field--wide">
+                <label htmlFor="chinese-original-url">CCTV 개별 원문 URL</label>
+                <input id="chinese-original-url" type="url" aria-invalid={Boolean(errors.originalUrl)} {...register('originalUrl')} />
+                {errors.originalUrl ? <p className="field-error">{errors.originalUrl.message}</p> : null}
+              </div>
+              <div className="post-form__field">
+                <label htmlFor="chinese-original-published-at">원문 게시·업데이트 시각</label>
+                <input id="chinese-original-published-at" type="datetime-local" aria-invalid={Boolean(errors.originalPublishedAt)} {...register('originalPublishedAt')} />
+                {errors.originalPublishedAt ? <p className="field-error">{errors.originalPublishedAt.message}</p> : <p className="field-help">확인한 실제 시각만 입력하며 날짜만으로 임의 시각을 만들지 않습니다.</p>}
+              </div>
+              <div className="post-form__field">
+                <label htmlFor="chinese-episode-list-included">본편 목록 포함 여부</label>
+                <select id="chinese-episode-list-included" aria-invalid={Boolean(errors.episodeListIncluded)} {...register('episodeListIncluded')}>
+                  <option value="">미확인</option><option value="true">포함</option><option value="false">미포함</option>
+                </select>
+                {errors.episodeListIncluded ? <p className="field-error">{errors.episodeListIncluded.message}</p> : null}
+              </div>
+              <div className="post-form__field post-form__field--wide">
+                <label htmlFor="chinese-verified-core-fact">확인한 핵심 사실</label>
+                <textarea id="chinese-verified-core-fact" rows={4} aria-invalid={Boolean(errors.verifiedCoreFact)} {...register('verifiedCoreFact')} />
+                {errors.verifiedCoreFact ? <p className="field-error">{errors.verifiedCoreFact.message}</p> : null}
+              </div>
+              <div className="post-form__field">
+                <label htmlFor="chinese-difficulty">난이도</label>
+                <input id="chinese-difficulty" type="text" {...register('difficulty')} />
+              </div>
+              <div className="post-form__field post-form__field--wide">
+                <label htmlFor="chinese-learning-points">학습 포인트</label>
+                <textarea id="chinese-learning-points" rows={4} {...register('learningPoints')} />
+              </div>
+            </fieldset>
+          ) : null}
 
           <fieldset className="post-form__section" disabled={disabled}>
             <legend>출처 및 참고자료</legend>

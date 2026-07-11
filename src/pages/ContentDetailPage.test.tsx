@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import type { Category } from '../features/categories/categories.types'
 import type { PostDetail } from '../features/posts/posts.types'
-import type { PostSource, PostTag } from '../features/posts/posts.types'
+import type { ChineseMetadata, PostSource, PostTag } from '../features/posts/posts.types'
 import type { DatabaseClient } from '../shared/supabase/client'
 import { ContentDetailPageContent } from './ContentDetailPage'
 
@@ -41,7 +41,7 @@ const post: PostDetail = {
   updated_at: '2026-07-10T02:00:00Z',
 }
 
-function createClient(postResult: PostDetail | null, tags: PostTag[] = [], sources: PostSource[] = []) {
+function createClient(postResult: PostDetail | null, tags: PostTag[] = [], sources: PostSource[] = [], chineseMetadata: ChineseMetadata | null = null) {
   const categoryBuilder = {
     select: vi.fn(),
     eq: vi.fn(),
@@ -78,6 +78,10 @@ function createClient(postResult: PostDetail | null, tags: PostTag[] = [], sourc
   sourceBuilder.select.mockReturnValue(sourceBuilder)
   sourceBuilder.eq.mockReturnValue(sourceBuilder)
   sourceBuilder.order.mockResolvedValue({ data: sources, error: null })
+  const chineseMetadataBuilder = { select: vi.fn(), eq: vi.fn(), maybeSingle: vi.fn() }
+  chineseMetadataBuilder.select.mockReturnValue(chineseMetadataBuilder)
+  chineseMetadataBuilder.eq.mockReturnValue(chineseMetadataBuilder)
+  chineseMetadataBuilder.maybeSingle.mockResolvedValue({ data: chineseMetadata, error: null })
 
   return {
     client: {
@@ -90,6 +94,8 @@ function createClient(postResult: PostDetail | null, tags: PostTag[] = [], sourc
               ? tagBuilder
               : table === 'sources'
                 ? sourceBuilder
+                : table === 'chinese_metadata'
+                  ? chineseMetadataBuilder
                 : postBuilder,
       ),
     } as unknown as DatabaseClient,
@@ -175,6 +181,23 @@ describe('ContentDetailPage', () => {
     expect(screen.getByText('新闻节目')).toBeInTheDocument()
     expect(screen.getByText('핵심 문장 확인')).toBeInTheDocument()
     const link = screen.getByRole('link', { name: sources[0].source_url })
+    expect(link).toHaveAttribute('target', '_blank')
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer')
+  })
+
+  it('renders Chinese metadata and the original URL as a safe external link', async () => {
+    const chineseMetadata: ChineseMetadata = {
+      post_id: post.id, learning_topic: '경제 표현', program_name: 'CCTV 뉴스', original_title: '原文标题',
+      original_url: 'https://news.cctv.com/article/1', original_published_at: '2026-07-11T04:00:00Z',
+      episode_list_included: false, verified_core_fact: '원문에서 학습 표현을 확인했습니다.', difficulty: '중급', learning_points: '핵심 표현 요약',
+    }
+    const { client } = createClient(post, [], [], chineseMetadata)
+    renderDetail(client)
+
+    expect(await screen.findByRole('heading', { name: '중국어 학습 정보' })).toBeInTheDocument()
+    expect(screen.getByText('경제 표현')).toBeInTheDocument()
+    expect(screen.getByText('미포함')).toBeInTheDocument()
+    const link = screen.getByRole('link', { name: chineseMetadata.original_url! })
     expect(link).toHaveAttribute('target', '_blank')
     expect(link).toHaveAttribute('rel', 'noopener noreferrer')
   })

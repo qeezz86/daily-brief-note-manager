@@ -5,6 +5,7 @@ import {
   archivePost,
   createPost,
   getPostById,
+  getChineseMetadataByPostId,
   getPostSources,
   getPostTags,
   getPosts,
@@ -24,6 +25,8 @@ export const postQueryKeys = {
     [...postQueryKeys.all, 'tags', userId, postId] as const,
   sources: (userId: string, postId: string) =>
     [...postQueryKeys.all, 'sources', userId, postId] as const,
+  chineseMetadata: (userId: string, postId: string) =>
+    [...postQueryKeys.all, 'chinese-metadata', userId, postId] as const,
 }
 
 export function usePostTagsQuery(client: DatabaseClient | null, userId: string, postId: string) {
@@ -39,6 +42,15 @@ export function usePostSourcesQuery(client: DatabaseClient | null, userId: strin
   return useQuery({
     queryKey: postQueryKeys.sources(userId, postId),
     queryFn: () => getPostSources(requireClient(client), postId),
+    enabled: client !== null && userId !== '' && postId !== '',
+    retry: false,
+  })
+}
+
+export function useChineseMetadataQuery(client: DatabaseClient | null, userId: string, postId: string) {
+  return useQuery({
+    queryKey: postQueryKeys.chineseMetadata(userId, postId),
+    queryFn: () => getChineseMetadataByPostId(requireClient(client), postId),
     enabled: client !== null && userId !== '' && postId !== '',
     retry: false,
   })
@@ -151,6 +163,7 @@ export function useUpdatePostMutation(
       })
       void queryClient.invalidateQueries({ queryKey: postQueryKeys.tags(userId, postId) })
       void queryClient.invalidateQueries({ queryKey: postQueryKeys.sources(userId, postId) })
+      void queryClient.invalidateQueries({ queryKey: postQueryKeys.chineseMetadata(userId, postId) })
     },
   })
 }
