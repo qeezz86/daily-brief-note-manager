@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(14);
+select plan(16);
 
 insert into auth.users (id, email)
 values
@@ -124,6 +124,30 @@ select is(
   ),
   2,
   'an unchanged image prompt does not increment its version'
+);
+
+select lives_ok(
+  $$
+    select public.save_post_editor(
+      '70000000-0000-0000-0000-000000000001',
+      'Edited title', 'Edited summary', 'editor-updated', 'draft', null, null,
+      '<div class="daily-brief-note news-briefing economy"><h1>Edited</h1></div>',
+      null, 'Objective ALT text', 'Representative title',
+      array['Alternative 1', 'Alternative 2', 'Alternative 3', 'Alternative 4'],
+      'Short draft meta description', 'focus keyword'
+    )
+  $$,
+  'removing an image prompt is treated as a prompt change'
+);
+
+select is(
+  (
+    select image_prompt_version
+      from public.posts
+     where id = '70000000-0000-0000-0000-000000000001'
+  ),
+  3,
+  'removing an image prompt increments its version'
 );
 
 set local "request.jwt.claims" =

@@ -47,6 +47,15 @@ describe('validateWordPressHtml', () => {
     ).toContain('마지막 wrapper div가 닫혀 있지 않습니다.')
   })
 
+  it('does not mistake a nested div close for the final wrapper close', () => {
+    expect(
+      validateWordPressHtml(
+        `<div class="${newsWrapper}"><h1>제목</h1><div></div>`,
+        newsWrapper,
+      ),
+    ).toContain('마지막 wrapper div가 닫혀 있지 않습니다.')
+  })
+
   it('rejects Markdown fences, script, iframe, events, and javascript URLs', () => {
     const result = validateWordPressHtml(
       newsHtml(
@@ -61,6 +70,27 @@ describe('validateWordPressHtml', () => {
       '허용되지 않은 iframe 태그가 포함되어 있습니다.',
       'inline event handler는 사용할 수 없습니다.',
       'javascript: URL은 사용할 수 없습니다.',
+    ]))
+  })
+
+  it('rejects javascript URLs obfuscated with HTML whitespace', () => {
+    expect(
+      validateWordPressHtml(
+        newsHtml('<h1>제목</h1><a href="java&#x0A;script:alert(1)">링크</a>'),
+        newsWrapper,
+      ),
+    ).toContain('javascript: URL은 사용할 수 없습니다.')
+  })
+
+  it('rejects forbidden elements and handlers inside template content', () => {
+    const result = validateWordPressHtml(
+      newsHtml('<h1>제목</h1><template><script>alert(1)</script><a onclick="run()">링크</a></template>'),
+      newsWrapper,
+    )
+
+    expect(result).toEqual(expect.arrayContaining([
+      '허용되지 않은 script 태그가 포함되어 있습니다.',
+      'inline event handler는 사용할 수 없습니다.',
     ]))
   })
 
