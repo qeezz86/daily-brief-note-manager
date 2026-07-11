@@ -356,9 +356,9 @@ updated_at               timestamptz
 - 대안 제목은 정확히 4개 권장
 - `ready`와 `published`에서는 대표 제목, 서로 다른 대안 제목 4개, 메타 설명, 포커스 키워드가 모두 필수
 - 메타 설명 120~160자 경고
-- SEO 태그는 5~8개 경고
+- SEO 태그는 `ready`·`published`에서 5~8개 필수이며 `draft`에서는 0개 허용
 - 카테고리명, `Daily Brief Note`, `DailyBriefNote` 태그 금지
-- 동일·유사 태그 중복 경고
+- 공백 정규화와 영문 대소문자 무시로 결정되는 동일 태그는 차단하고 의미 기반 유사 태그는 자동 차단하지 않음
 
 ## 6.4 `tags`
 
@@ -366,10 +366,11 @@ updated_at               timestamptz
 id          uuid primary key
 owner_id    uuid references auth.users
 name        text
+normalized_name text
 created_at  timestamptz
 ```
 
-사용자별 태그명 unique.
+`name`은 앞뒤 공백을 제거하고 내부 연속 공백을 한 칸으로 축소한다. `normalized_name`은 정규화된 `name`의 소문자 값이며 `(owner_id, normalized_name)` unique로 경쟁 조건에서도 중복 생성을 차단한다.
 
 ## 6.5 `post_tags`
 
@@ -403,6 +404,9 @@ updated_at           timestamptz
 규칙:
 
 - 검색 결과 URL이나 홈페이지 첫 화면만 저장하지 않도록 경고
+- 절대 HTTP·HTTPS 개별 URL만 허용하고 fragment와 trailing slash 차이만 있는 게시물 내 중복은 차단
+- 사용자 입력 순서를 0부터 시작하는 `sort_order`로 보존하며 `(post_id, sort_order)`는 unique
+- 일반 콘텐츠의 `source_published_at`은 nullable
 - 개별 원문 URL 권장
 - 기사 전문이나 원문 전문은 저장하지 않음
 - 확인한 핵심 내용만 저장
@@ -1204,7 +1208,7 @@ generated_at       timestamptz
 6. 이미지 프롬프트
 7. 뉴스 추적 정보 또는 카테고리별 메타데이터
 
-WordPress HTML, SEO 데이터, 대표 이미지 프롬프트·ALT, 기본 편집 필드와 상태 변경은 인증 사용자의 소유권을 확인하는 제한적 DB 함수에서 하나의 트랜잭션으로 저장한다. `draft`는 비어 있거나 미완성인 편집 데이터를 허용한다. `ready`와 `published`는 strict HTML validation, 완성된 SEO, 이미지 프롬프트와 ALT가 필요하며 `published`는 `published_on`도 필요하다. 메타 설명 120~160자는 저장 차단이 아닌 경고다.
+WordPress HTML, SEO 데이터, 태그·관계, 순서가 있는 출처, 대표 이미지 프롬프트·ALT, 기본 편집 필드와 상태 변경은 인증 사용자의 소유권을 확인하는 `save_post_publication_bundle` 함수에서 하나의 트랜잭션으로 저장한다. `draft`는 태그·출처가 없어도 저장할 수 있고 기존 `archived` 데이터는 미완성을 허용한다. `ready`와 `published`는 strict HTML validation, 완성된 SEO, 5~8개 태그, 이미지 프롬프트와 ALT, 완전한 출처 1개 이상과 HTML `#sources` 링크 일치가 필요하며 `published`는 `published_on`도 필요하다. 메타 설명 120~160자는 저장 차단이 아닌 경고다.
 
 ## 12.5 기존 글 가져오기
 
@@ -1312,7 +1316,9 @@ WordPress HTML, SEO 데이터, 대표 이미지 프롬프트·ALT, 기본 편집
 ## 14.3 출처
 
 - URL 형식 검증
-- 출처명·제목·URL 누락 경고
+- 출처명·제목·URL·확인한 핵심 내용 누락 차단
+- 같은 게시물의 fragment 차이만 있는 중복 URL 차단
+- 입력 순서를 `sort_order`로 보존
 - 홈페이지 루트 URL 가능성 경고
 - 확인한 핵심 내용 누락 경고
 
@@ -1332,9 +1338,12 @@ WordPress HTML, SEO 데이터, 대표 이미지 프롬프트·ALT, 기본 편집
 - 프로그램명 존재
 - 원문 제목 존재
 - 개별 원문 URL 존재
-- 게시·업데이트 시간 존재 또는 누락 경고
+- `ready`·`published`에서 게시·업데이트 시간 필수
+- `cctv.com`, `cctv.cn` 또는 해당 하위 도메인의 루트가 아닌 개별 원문 URL 1개 이상 필수
 - 본편 목록 포함 여부 기록
 - 확인한 핵심 사실 존재
+
+Phase 2B-2의 generic `sources`는 기관명·원문 제목·URL·게시 시각·확인 핵심 내용만 표현한다. 중국어 전용 프로그램명과 본편 목록 포함 여부는 `chinese_metadata`의 별도 필드이며 이번 단계의 출처 편집 UI에는 합쳐 저장하지 않는다.
 
 ---
 

@@ -1,5 +1,6 @@
 import type { Tables, TablesInsert, TablesUpdate } from '../../shared/supabase/database.types'
 import type { Category } from '../categories/categories.types'
+import type { PublicationSourceInput } from './publicationFields'
 
 export const contentStatuses = [
   'draft',
@@ -83,7 +84,21 @@ export interface UpdatePostInput {
   focusKeyword: string
   imagePrompt: string | null
   imageAlt: string | null
+  tags: string[]
+  sources: PublicationSourceInput[]
 }
+
+export type PostTag = Pick<Tables<'tags'>, 'id' | 'name'>
+export type PostSource = Pick<
+  Tables<'sources'>,
+  | 'id'
+  | 'source_name'
+  | 'source_title'
+  | 'source_url'
+  | 'source_published_at'
+  | 'checked_point'
+  | 'sort_order'
+>
 
 export type PostInsert = TablesInsert<'posts'>
 export type PostUpdate = TablesUpdate<'posts'>

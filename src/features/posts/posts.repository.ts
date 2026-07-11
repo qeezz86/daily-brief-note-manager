@@ -5,6 +5,8 @@ import type {
   PostDetail,
   PostInsert,
   PostListItem,
+  PostSource,
+  PostTag,
   SeoData,
   UpdatePostInput,
 } from './posts.types'
@@ -52,10 +54,37 @@ function throwPostEditorError(error: RepositoryError): never {
   if (error.code === '42501') {
     throw new Error('수정할 콘텐츠를 찾을 수 없거나 접근 권한이 없습니다.')
   }
+  const detail = `${error.message ?? ''} ${error.details ?? ''}`
+  if (detail.includes('TAG_COUNT')) throw new Error('태그는 5개 이상 8개 이하로 입력해 주세요.')
+  if (detail.includes('TAG_FORBIDDEN_CATEGORY')) throw new Error('카테고리명은 태그로 사용할 수 없습니다.')
+  if (detail.includes('TAG_DUPLICATE')) throw new Error('동일한 태그가 이미 입력되어 있습니다.')
+  if (detail.includes('SOURCE_DUPLICATE')) throw new Error('출처 URL이 중복되었습니다.')
+  if (detail.includes('SOURCE_REQUIRED') || detail.includes('SOURCE_INCOMPLETE')) throw new Error('출처 정보를 모두 입력해 주세요.')
 
   throw new Error(
     '콘텐츠 편집 정보를 저장하지 못했습니다. 기존 데이터는 변경되지 않았습니다.',
   )
+}
+
+export async function getPostTags(client: DatabaseClient, postId: string): Promise<PostTag[]> {
+  const { data, error } = await client
+    .from('post_tags')
+    .select('tag_id, tags!inner(id, name)')
+    .eq('post_id', postId)
+
+  if (error) throw new Error('태그를 불러오지 못했습니다.')
+  return data.map((row) => row.tags)
+}
+
+export async function getPostSources(client: DatabaseClient, postId: string): Promise<PostSource[]> {
+  const { data, error } = await client
+    .from('sources')
+    .select('id, source_name, source_title, source_url, source_published_at, checked_point, sort_order')
+    .eq('post_id', postId)
+    .order('sort_order', { ascending: true })
+
+  if (error) throw new Error('출처를 불러오지 못했습니다.')
+  return data
 }
 
 export async function getPosts(client: DatabaseClient): Promise<PostListItem[]> {
@@ -170,21 +199,32 @@ export async function updatePost(
   postId: string,
   input: UpdatePostInput,
 ): Promise<PostDetail> {
-  const { data, error } = await client.rpc('save_post_editor', {
+  const { data, error } = await client.rpc('save_post_publication_bundle', {
     p_post_id: postId,
     p_title: input.title,
     p_summary: input.summary,
     p_slug: input.slug,
     p_content_status: input.contentStatus,
-    p_published_on: input.publishedOn,
-    p_wordpress_url: input.wordpressUrl,
-    p_html_body: input.htmlBody,
-    p_image_prompt: input.imagePrompt,
-    p_image_alt: input.imageAlt,
+    // Supabase type generation marks nullable SQL function parameters as strings.
+    // The RPC accepts SQL NULL, so preserve the runtime values with assertions.
+    p_published_on: input.publishedOn!,
+    p_wordpress_url: input.wordpressUrl!,
+    p_html_body: input.htmlBody!,
+    p_image_prompt: input.imagePrompt!,
+    p_image_alt: input.imageAlt!,
     p_representative_title: input.representativeTitle,
     p_alternative_titles: input.alternativeTitles,
     p_meta_description: input.metaDescription,
     p_focus_keyword: input.focusKeyword,
+    p_tags: input.tags,
+    p_sources: input.sources.map((source, sortOrder) => ({
+      source_name: source.sourceName,
+      source_title: source.sourceTitle,
+      source_url: source.sourceUrl,
+      source_published_at: source.sourcePublishedAt || null,
+      checked_point: source.checkedPoint,
+      sort_order: sortOrder,
+    })),
   })
 
   if (error) throwPostEditorError(error)

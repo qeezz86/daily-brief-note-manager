@@ -227,9 +227,15 @@ describe('posts repository mutations', () => {
       focusKeyword: '포커스 키워드',
       imagePrompt: '이미지 프롬프트',
       imageAlt: 'ALT 문구',
+      tags: ['AI', '에이전트', '자동화', '업무 혁신', '생성형 AI'],
+      sources: [{
+        sourceName: 'OpenAI', sourceTitle: 'Agents guide',
+        sourceUrl: 'https://example.com/agents', sourcePublishedAt: '',
+        checkedPoint: '에이전트 정의',
+      }],
     })
 
-    expect(rpc).toHaveBeenCalledWith('save_post_editor', expect.any(Object))
+    expect(rpc).toHaveBeenCalledWith('save_post_publication_bundle', expect.any(Object))
     const payload = rpc.mock.calls[0][1]
     expect(payload).not.toHaveProperty('category_id')
     expect(payload).not.toHaveProperty('briefing_date')
@@ -239,6 +245,8 @@ describe('posts repository mutations', () => {
       p_html_body: '<div>HTML</div>',
       p_alternative_titles: ['대안 1', '대안 2', '대안 3', '대안 4'],
       p_image_prompt: '이미지 프롬프트',
+      p_tags: ['AI', '에이전트', '자동화', '업무 혁신', '생성형 AI'],
+      p_sources: [expect.objectContaining({ source_name: 'OpenAI', sort_order: 0 })],
     }))
   })
 
@@ -279,6 +287,7 @@ describe('posts repository mutations', () => {
       publishedOn: null, wordpressUrl: null, htmlBody: null,
       representativeTitle: '', alternativeTitles: [], metaDescription: '',
       focusKeyword: '', imagePrompt: null, imageAlt: null,
+      tags: [], sources: [],
     })).rejects.toThrow('기존 데이터는 변경되지 않았습니다.')
   })
 

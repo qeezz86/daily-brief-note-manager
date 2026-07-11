@@ -221,4 +221,52 @@ describe('PostForm', () => {
     expect(screen.queryByLabelText('시리즈 번호')).not.toBeInTheDocument()
     expect(screen.queryByLabelText('표시 ID')).not.toBeInTheDocument()
   })
+
+  it('adds normalized tags with Enter, shows the count, and removes them accessibly', async () => {
+    const browserUser = userEvent.setup()
+    render(
+      <PostForm mode="edit" categories={categories} post={post} isSaving={false}
+        submitError={null} onSubmit={vi.fn().mockResolvedValue(undefined)} />,
+    )
+    const input = screen.getByLabelText('태그 추가')
+    await browserUser.type(input, '  AI   기술  {Enter}')
+    expect(screen.getByText('현재 1개 · 발행 준비·발행됨은 5~8개')).toBeInTheDocument()
+    expect(screen.getByText('AI 기술')).toBeInTheDocument()
+    await browserUser.click(screen.getByRole('button', { name: 'AI 기술 태그 삭제' }))
+    expect(screen.getByText('등록된 태그가 없습니다.')).toBeInTheDocument()
+  })
+
+  it('immediately blocks duplicate, brand, and category-name tags', async () => {
+    const browserUser = userEvent.setup()
+    render(
+      <PostForm mode="edit" categories={categories} post={post} postTags={[{ id: 'tag-1', name: 'AI 기술' }]}
+        isSaving={false} submitError={null} onSubmit={vi.fn().mockResolvedValue(undefined)} />,
+    )
+    const input = screen.getByLabelText('태그 추가')
+    await browserUser.type(input, ' ai   기술 {Enter}')
+    expect(screen.getByRole('alert')).toHaveTextContent('동일한 태그')
+    await browserUser.clear(input)
+    await browserUser.type(input, 'DailyBriefNote{Enter}')
+    expect(screen.getByRole('alert')).toHaveTextContent('Daily Brief Note')
+    await browserUser.clear(input)
+    await browserUser.type(input, '경제{Enter}')
+    expect(screen.getByRole('alert')).toHaveTextContent('카테고리명')
+  })
+
+  it('adds, reorders, and removes source rows', async () => {
+    const browserUser = userEvent.setup()
+    render(
+      <PostForm mode="edit" categories={categories} post={post} isSaving={false}
+        submitError={null} onSubmit={vi.fn().mockResolvedValue(undefined)} />,
+    )
+    await browserUser.click(screen.getByRole('button', { name: '출처 추가' }))
+    await browserUser.click(screen.getByRole('button', { name: '출처 추가' }))
+    const names = screen.getAllByLabelText('출처명')
+    await browserUser.type(names[0], '첫 번째')
+    await browserUser.type(names[1], '두 번째')
+    await browserUser.click(screen.getByRole('button', { name: '출처 2 위로 이동' }))
+    expect(screen.getAllByLabelText('출처명')[0]).toHaveValue('두 번째')
+    await browserUser.click(screen.getByRole('button', { name: '출처 1 삭제' }))
+    expect(screen.getByText('현재 1개 · 발행 준비·발행됨은 1개 이상')).toBeInTheDocument()
+  })
 })

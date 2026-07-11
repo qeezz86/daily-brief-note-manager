@@ -17,5 +17,15 @@ export function toNullablePostFormValues(values: PostFormValues) {
     htmlBody: htmlToNull(values.htmlBody),
     imagePrompt: emptyToNull(values.imagePrompt),
     imageAlt: emptyToNull(values.imageAlt),
+    tags: values.tags.map((tag) => tag.trim().replace(/\s+/g, ' ')).filter(Boolean),
+    sources: values.sources
+      .filter((source) => Object.values(source).some((value) => value.trim()))
+      .map((source) => ({
+        sourceName: source.sourceName.trim(),
+        sourceTitle: source.sourceTitle.trim(),
+        sourceUrl: source.sourceUrl.trim(),
+        sourcePublishedAt: source.sourcePublishedAt.trim(),
+        checkedPoint: source.checkedPoint.trim(),
+      })),
   }
 }

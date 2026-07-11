@@ -71,6 +71,14 @@ function createClient() {
   seoBuilder.eq.mockReturnValue(seoBuilder)
   seoBuilder.maybeSingle.mockResolvedValue({ data: null, error: null })
 
+  const tagBuilder = { select: vi.fn(), eq: vi.fn() }
+  tagBuilder.select.mockReturnValue(tagBuilder)
+  tagBuilder.eq.mockResolvedValue({ data: [], error: null })
+  const sourceBuilder = { select: vi.fn(), eq: vi.fn(), order: vi.fn() }
+  sourceBuilder.select.mockReturnValue(sourceBuilder)
+  sourceBuilder.eq.mockReturnValue(sourceBuilder)
+  sourceBuilder.order.mockResolvedValue({ data: [], error: null })
+
   const rpc = vi.fn().mockResolvedValue({
     data: { ...post, title: '수정된 경제 브리핑' },
     error: null,
@@ -83,7 +91,11 @@ function createClient() {
           ? categoryBuilder
           : table === 'seo_data'
             ? seoBuilder
-            : postBuilder,
+            : table === 'post_tags'
+              ? tagBuilder
+              : table === 'sources'
+                ? sourceBuilder
+                : postBuilder,
       ),
       rpc,
     } as unknown as DatabaseClient,
@@ -115,7 +127,7 @@ describe('ContentEditPage', () => {
 
     expect(await screen.findByText('변경 사항을 저장했습니다.')).toBeInTheDocument()
     expect(rpc).toHaveBeenCalledWith(
-      'save_post_editor',
+      'save_post_publication_bundle',
       expect.not.objectContaining({ category_id: expect.anything() }),
     )
     expect(screen.getByLabelText('카테고리')).toBeDisabled()

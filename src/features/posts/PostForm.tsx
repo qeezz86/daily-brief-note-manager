@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useEffect, useState } from 'react'
-import { useForm, useWatch } from 'react-hook-form'
+import { useFieldArray, useForm, useWatch } from 'react-hook-form'
 
 import type { Category } from '../categories/categories.types'
 import { buildSuggestedSlug } from './postIdentifiers'
@@ -12,8 +12,17 @@ import {
 } from './postFormSchema'
 import { getStatusLabel } from './postFormatters'
 import {
+  isBrandTag,
+  normalizeTag,
+  sourceUrlWarning,
+  tagComparisonKey,
+  validateHtmlSources,
+} from './publicationFields'
+import {
   contentStatuses,
   type PostDetail,
+  type PostSource,
+  type PostTag,
   type SeoData,
 } from './posts.types'
 
@@ -22,6 +31,8 @@ interface PostFormProps {
   categories: Category[]
   post?: PostDetail
   seoData?: SeoData | null
+  postTags?: PostTag[]
+  postSources?: PostSource[]
   isSaving: boolean
   submitError: string | null
   submitSuccess?: string | null
@@ -33,12 +44,16 @@ export function PostForm({
   categories,
   post,
   seoData = null,
+  postTags = [],
+  postSources = [],
   isSaving,
   submitError,
   submitSuccess = null,
   onSubmit,
 }: PostFormProps) {
   const [htmlValidationErrors, setHtmlValidationErrors] = useState<string[]>([])
+  const [tagInput, setTagInput] = useState('')
+  const [tagInputError, setTagInputError] = useState<string | null>(null)
   const initialCategory = categories.find(
     (category) => category.id === post?.category_id,
   )
@@ -54,6 +69,7 @@ export function PostForm({
     defaultValues: {
       categoryId: post?.category_id ?? '',
       contentGroup: (initialCategory?.content_group ?? '') as PostFormValues['contentGroup'],
+      categoryName: initialCategory?.name ?? '',
       title: post?.title ?? '',
       summary: post?.summary ?? '',
       slug: post?.slug ?? '',
@@ -68,13 +84,26 @@ export function PostForm({
       focusKeyword: seoData?.focus_keyword ?? '',
       imagePrompt: post?.image_prompt ?? '',
       imageAlt: post?.image_alt ?? '',
+      tags: postTags.map((tag) => tag.name),
+      sources: postSources.map((source) => ({
+        sourceName: source.source_name,
+        sourceTitle: source.source_title,
+        sourceUrl: source.source_url,
+        sourcePublishedAt: source.source_published_at
+          ? source.source_published_at.slice(0, 16)
+          : '',
+        checkedPoint: source.checked_point,
+      })),
     },
   })
+  const sourceFields = useFieldArray({ control, name: 'sources' })
   const categoryId = useWatch({ control, name: 'categoryId' })
   const briefingDate = useWatch({ control, name: 'briefingDate' })
   const metaDescription = useWatch({ control, name: 'metaDescription' })
   const htmlBody = useWatch({ control, name: 'htmlBody' })
   const contentStatus = useWatch({ control, name: 'contentStatus' })
+  const tags = useWatch({ control, name: 'tags' }) ?? []
+  const sources = useWatch({ control, name: 'sources' }) ?? []
   const selectedCategory = categories.find(
     (category) => category.id === categoryId,
   )
@@ -105,16 +134,49 @@ export function PostForm({
         setError('htmlBody', { message: validationErrors[0] })
         return
       }
+
+      if (['ready', 'published'].includes(values.contentStatus)) {
+        const sourceErrors = validateHtmlSources(values.htmlBody, values.sources)
+        if (sourceErrors.length > 0) {
+          setHtmlValidationErrors(sourceErrors)
+          setError('htmlBody', { message: sourceErrors[0] })
+          return
+        }
+      }
     }
 
     await onSubmit(values)
   }
+
+  function addTag() {
+    const normalized = normalizeTag(tagInput)
+    if (!normalized) return
+    const error = isBrandTag(normalized)
+      ? 'Daily Brief Note는 태그로 사용할 수 없습니다.'
+      : selectedCategory && tagComparisonKey(normalized) === tagComparisonKey(selectedCategory.name)
+        ? '카테고리명은 태그로 사용할 수 없습니다.'
+        : tagComparisonKey(normalized) === tagComparisonKey(useWatchTitle)
+          ? '제목 전체를 태그로 사용할 수 없습니다.'
+          : tags.some((tag) => tagComparisonKey(tag) === tagComparisonKey(normalized))
+            ? '동일한 태그가 이미 입력되어 있습니다.'
+            : null
+    if (error) {
+      setTagInputError(error)
+      return
+    }
+    setValue('tags', [...tags, normalized], { shouldDirty: true, shouldValidate: true })
+    setTagInput('')
+    setTagInputError(null)
+  }
+
+  const useWatchTitle = useWatch({ control, name: 'title' })
 
   useEffect(() => {
     setValue(
       'contentGroup',
       (selectedCategory?.content_group ?? '') as PostFormValues['contentGroup'],
     )
+    setValue('categoryName', selectedCategory?.name ?? '')
   }, [selectedCategory, setValue])
 
   useEffect(() => {
@@ -136,6 +198,7 @@ export function PostForm({
   return (
     <form className="post-form" noValidate onSubmit={handleSubmit(handleValidSubmit)}>
       <input type="hidden" {...register('contentGroup')} />
+      <input type="hidden" {...register('categoryName')} />
       <fieldset className="post-form__section" disabled={disabled}>
         <legend>콘텐츠 기본 정보</legend>
 
@@ -299,6 +362,46 @@ export function PostForm({
           </fieldset>
 
           <fieldset className="post-form__section" disabled={disabled}>
+            <legend>SEO 태그</legend>
+            <div className="post-form__field post-form__field--wide">
+              <label htmlFor="post-tag-input">태그 추가</label>
+              <div className="tag-input-row">
+                <input
+                  id="post-tag-input"
+                  type="text"
+                  value={tagInput}
+                  aria-invalid={Boolean(tagInputError || errors.tags)}
+                  onChange={(event) => { setTagInput(event.target.value); setTagInputError(null) }}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault()
+                      addTag()
+                    }
+                  }}
+                />
+                <button className="secondary-button" type="button" onClick={addTag}>추가</button>
+              </div>
+              <p className="field-help">현재 {tags.length}개 · 발행 준비·발행됨은 5~8개</p>
+              {tagInputError ? <p className="field-error" role="alert">{tagInputError}</p> : null}
+              {errors.tags ? <p className="field-error">{errors.tags.message ?? errors.tags.root?.message}</p> : null}
+              {tags.length > 0 ? (
+                <ul className="tag-list" aria-label="등록된 태그">
+                  {tags.map((tag, index) => (
+                    <li key={`${tag}-${index}`}>
+                      <span>{tag}</span>
+                      <button
+                        type="button"
+                        aria-label={`${tag} 태그 삭제`}
+                        onClick={() => setValue('tags', tags.filter((_, itemIndex) => itemIndex !== index), { shouldDirty: true, shouldValidate: true })}
+                      >삭제</button>
+                    </li>
+                  ))}
+                </ul>
+              ) : <p className="field-help">등록된 태그가 없습니다.</p>}
+            </div>
+          </fieldset>
+
+          <fieldset className="post-form__section" disabled={disabled}>
             <legend>SEO</legend>
             <div className="post-form__field post-form__field--wide">
               <label htmlFor="post-representative-title">SEO 대표 제목</label>
@@ -394,12 +497,52 @@ export function PostForm({
             </div>
           </fieldset>
 
+          <fieldset className="post-form__section" disabled={disabled}>
+            <legend>출처 및 참고자료</legend>
+            <div className="post-form__field post-form__field--wide source-heading">
+              <p className="field-help">현재 {sourceFields.fields.length}개 · 발행 준비·발행됨은 1개 이상</p>
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={() => sourceFields.append({ sourceName: '', sourceTitle: '', sourceUrl: '', sourcePublishedAt: '', checkedPoint: '' })}
+              >출처 추가</button>
+              {errors.sources?.root?.message ? <p className="field-error">{errors.sources.root.message}</p> : null}
+              {typeof errors.sources?.message === 'string' ? <p className="field-error">{errors.sources.message}</p> : null}
+            </div>
+            {sourceFields.fields.map((field, index) => {
+              const warning = sources[index]?.sourceUrl ? sourceUrlWarning(sources[index].sourceUrl) : null
+              const sourceError = errors.sources?.[index]
+              return (
+                <section className="source-card post-form__field--wide" key={field.id} aria-label={`출처 ${index + 1}`}>
+                  <div className="source-card__heading">
+                    <h3>출처 {index + 1}</h3>
+                    <div>
+                      <button type="button" aria-label={`출처 ${index + 1} 위로 이동`} disabled={index === 0} onClick={() => sourceFields.swap(index, index - 1)}>위로</button>
+                      <button type="button" aria-label={`출처 ${index + 1} 아래로 이동`} disabled={index === sourceFields.fields.length - 1} onClick={() => sourceFields.swap(index, index + 1)}>아래로</button>
+                      <button type="button" aria-label={`출처 ${index + 1} 삭제`} onClick={() => sourceFields.remove(index)}>삭제</button>
+                    </div>
+                  </div>
+                  <div className="source-card__grid">
+                    <div className="post-form__field"><label htmlFor={`source-name-${index}`}>출처명</label><input id={`source-name-${index}`} {...register(`sources.${index}.sourceName`)} /></div>
+                    <div className="post-form__field"><label htmlFor={`source-title-${index}`}>원문 제목</label><input id={`source-title-${index}`} {...register(`sources.${index}.sourceTitle`)} /></div>
+                    <div className="post-form__field post-form__field--wide"><label htmlFor={`source-url-${index}`}>개별 원문 URL</label><input id={`source-url-${index}`} type="url" {...register(`sources.${index}.sourceUrl`)} />{warning ? <p className="field-warning">{warning}</p> : null}</div>
+                    <div className="post-form__field"><label htmlFor={`source-published-${index}`}>게시·업데이트 일시</label><input id={`source-published-${index}`} type="datetime-local" {...register(`sources.${index}.sourcePublishedAt`)} /></div>
+                    <div className="post-form__field post-form__field--wide"><label htmlFor={`source-checked-${index}`}>확인한 핵심 내용</label><textarea id={`source-checked-${index}`} rows={3} {...register(`sources.${index}.checkedPoint`)} /></div>
+                  </div>
+                  {sourceError ? <p className="field-error">{sourceError.message ?? sourceError.sourceUrl?.message ?? sourceError.sourcePublishedAt?.message}</p> : null}
+                </section>
+              )
+            })}
+          </fieldset>
+
           <section className="post-form__validation" aria-labelledby="post-validation-title">
             <h2 id="post-validation-title">저장 상태와 검증 결과</h2>
             <dl>
               <div><dt>현재 선택 상태</dt><dd>{getStatusLabel(contentStatus)}</dd></div>
               <div><dt>본문 문자 수</dt><dd>{htmlBody.length.toLocaleString('ko-KR')}자</dd></div>
               <div><dt>카테고리 wrapper</dt><dd><code>{selectedCategory?.wrapper_class ?? '확인 불가'}</code></dd></div>
+              <div><dt>태그</dt><dd>{tags.length}개</dd></div>
+              <div><dt>출처</dt><dd>{sourceFields.fields.length}개</dd></div>
             </dl>
             {htmlValidationErrors.length > 0 ? (
               <div className="validation-errors" role="alert">

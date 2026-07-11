@@ -8,6 +8,8 @@ import type { PostFormValues } from '../features/posts/postFormSchema'
 import { toNullablePostFormValues } from '../features/posts/postFormValues'
 import {
   usePostQuery,
+  usePostSourcesQuery,
+  usePostTagsQuery,
   useSeoDataQuery,
   useUpdatePostMutation,
 } from '../features/posts/posts.queries'
@@ -29,6 +31,8 @@ export function ContentEditPageContent({
   const postQuery = usePostQuery(client, userId, postId)
   const seoQuery = useSeoDataQuery(client, userId, postId)
   const categoriesQuery = useActiveCategoriesQuery(client)
+  const tagsQuery = usePostTagsQuery(client, userId, postId)
+  const sourcesQuery = usePostSourcesQuery(client, userId, postId)
   const updateMutation = useUpdatePostMutation(client, userId, postId)
 
   async function handleSubmit(values: PostFormValues) {
@@ -51,6 +55,8 @@ export function ContentEditPageContent({
         focusKeyword: values.focusKeyword,
         imagePrompt: normalized.imagePrompt,
         imageAlt: normalized.imageAlt,
+        tags: normalized.tags,
+        sources: normalized.sources,
       })
       setSubmitSuccess('변경 사항을 저장했습니다.')
     } catch (error) {
@@ -62,7 +68,7 @@ export function ContentEditPageContent({
     }
   }
 
-  if (postQuery.isPending || seoQuery.isPending || categoriesQuery.isPending) {
+  if (postQuery.isPending || seoQuery.isPending || categoriesQuery.isPending || tagsQuery.isPending || sourcesQuery.isPending) {
     return (
       <div className="content-state" role="status">
         <span className="loading-indicator" aria-hidden="true" />
@@ -71,7 +77,7 @@ export function ContentEditPageContent({
     )
   }
 
-  if (postQuery.isError || seoQuery.isError || categoriesQuery.isError) {
+  if (postQuery.isError || seoQuery.isError || categoriesQuery.isError || tagsQuery.isError || sourcesQuery.isError) {
     return (
       <div className="content-state content-state--error" role="alert">
         <h1>콘텐츠를 불러오지 못했습니다</h1>
@@ -106,6 +112,8 @@ export function ContentEditPageContent({
         categories={categoriesQuery.data}
         post={postQuery.data}
         seoData={seoQuery.data}
+        postTags={tagsQuery.data}
+        postSources={sourcesQuery.data}
         isSaving={updateMutation.isPending}
         submitError={submitError}
         submitSuccess={submitSuccess}

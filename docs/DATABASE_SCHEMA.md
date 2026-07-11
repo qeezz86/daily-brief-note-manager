@@ -202,9 +202,9 @@ unique 조건:
 | `created_at` | timestamptz | 필수 |
 | `updated_at` | timestamptz | 필수 |
 
-태그는 `tags`와 `post_tags`에서 관리한다. 태그 수는 5~8개를 권장하며 카테고리명, `Daily Brief Note`, `DailyBriefNote`는 금지한다. 동일 태그와 정규화된 유사 태그는 경고한다.
+태그는 `tags`와 `post_tags`에서 사용자별 공유 데이터로 관리한다. 앞뒤 공백을 제거하고 내부 연속 공백을 한 칸으로 축소하며 소문자 비교 키를 사용한다. `ready`·`published`는 5~8개가 필수이고 `draft`는 0개를 허용한다. 카테고리명, `Daily Brief Note`, `DailyBriefNote`, 제목 전체는 금지하며 의미 기반 유사 태그는 자동 차단하지 않는다.
 
-`save_post_editor` 함수는 현재 인증 사용자가 소유한 post만 잠근 뒤 기본 편집 필드, WordPress HTML, 대표 이미지 정보와 `seo_data` upsert를 하나의 트랜잭션에서 처리한다. 함수는 `SECURITY DEFINER`와 빈 `search_path`를 사용하고 소유권을 직접 확인하며 authenticated에만 실행 권한을 부여한다. `ready`·`published`에는 비어 있지 않은 HTML, 완성된 SEO, 이미지 프롬프트와 ALT가 필요하고 `published`에는 `published_on`도 필요하다. HTML 구조 검증은 애플리케이션 strict validation에서 수행한다.
+`save_post_publication_bundle` 함수는 현재 인증 사용자가 소유한 post만 잠근 뒤 기본 편집 필드, WordPress HTML, 대표 이미지 정보, `seo_data`, `post_tags`, `sources`를 하나의 트랜잭션에서 처리한다. 함수는 `SECURITY DEFINER`와 빈 `search_path`를 사용하고 소유권을 직접 확인하며 authenticated에만 실행 권한을 부여한다. `ready`·`published`에는 비어 있지 않은 HTML, 완성된 SEO, 5~8개 태그, 이미지 프롬프트·ALT, 완전한 출처 1개 이상과 HTML `#sources` URL 일치가 필요하고 `published`에는 `published_on`도 필요하다. 애플리케이션은 DOMParser로 출처 anchor를 검증하고 DB 함수도 필수 상태 조건을 재검증한다.
 
 이미지 프롬프트가 실제로 변경되면 DB trigger가 `image_prompt_version`을 1 증가시키고 `image_prompt_updated_at`을 갱신한다. 동일한 프롬프트를 다시 저장할 때는 버전과 변경 시각을 증가시키지 않는다.
 
@@ -214,10 +214,11 @@ unique 조건:
 |---|---|---|
 | `id` | uuid | primary key |
 | `owner_id` | uuid | references `auth.users` |
-| `name` | text | 사용자별 unique |
+| `name` | text | 공백 정규화된 표시 이름, 최대 80자 |
+| `normalized_name` | text | 정규화된 `name`의 소문자 값 |
 | `created_at` | timestamptz | 필수 |
 
-복합 외래 키 부모용 `UNIQUE (id, owner_id)`를 둔다.
+복합 외래 키 부모용 `UNIQUE (id, owner_id)`와 사용자별 중복 방지용 `UNIQUE (owner_id, normalized_name)`을 둔다.
 
 ### 5.4 `post_tags`
 
@@ -249,7 +250,9 @@ unique 조건:
 | `created_at` | timestamptz | 필수 |
 | `updated_at` | timestamptz | 필수 |
 
-개별 원문 URL을 권장하고 홈페이지, 검색, 목록 URL 가능성은 경고한다. 전문 대신 확인한 핵심 내용만 저장한다.
+절대 HTTP·HTTPS 개별 원문 URL을 사용한다. 홈페이지, 검색, 목록 URL 가능성은 경고하고 전문 대신 확인한 핵심 내용만 저장한다. fragment와 불필요한 trailing slash 차이만 있는 게시물 내 URL 중복은 통합 RPC에서 차단한다. `sort_order`는 UI 순서대로 0부터 다시 부여하며 `(post_id, sort_order)` unique index로 충돌을 막는다. 일반 콘텐츠의 `source_published_at`은 nullable이고 중국어 학습 `ready`·`published`에는 값이 필수다. 중국어 학습은 `cctv.com`, `cctv.cn` 또는 그 하위 도메인의 루트가 아닌 개별 URL을 최소 1개 요구한다.
+
+generic `sources`에는 중국어 전용 프로그램명과 본편 목록 포함 여부 열이 없다. 해당 값은 기존 `chinese_metadata.program_name`, `chinese_metadata.episode_list_included`에서 별도로 표현하며 Phase 2B-2 저장 payload에는 억지로 합치지 않는다.
 
 `(post_id, owner_id)`는 `posts(id, owner_id)`를 `ON DELETE CASCADE`로 참조한다. `news_update_id`가 있으면 `(news_update_id, owner_id)`가 `news_updates(id, owner_id)`를 참조한다. 이 nullable 관계는 실제 PostgreSQL migration에서 `ON DELETE SET NULL (news_update_id)`를 사용해 `news_update_id`만 null로 만들고 `owner_id`는 유지한다.
 

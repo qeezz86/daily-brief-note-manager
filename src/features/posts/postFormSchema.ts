@@ -1,6 +1,16 @@
 import { z } from 'zod'
 
 import { contentStatuses } from './posts.types'
+import {
+  isBrandTag,
+  isEmptySource,
+  isHttpUrl,
+  isOfficialCctvArticleUrl,
+  MAX_TAG_LENGTH,
+  normalizeSourceUrl,
+  normalizeTag,
+  tagComparisonKey,
+} from './publicationFields'
 
 const slugPattern = /^(?!-)(?!.*--)[a-z0-9]+(?:-[a-z0-9]+)*$/
 
@@ -8,6 +18,7 @@ export const postFormSchema = z
   .object({
     categoryId: z.string().trim().min(1, '카테고리를 선택해 주세요.'),
     contentGroup: z.enum(['', 'news', 'ai', 'info_db', 'chinese']),
+    categoryName: z.string().default(''),
     title: z.string().trim().min(1, '제목을 입력해 주세요.'),
     summary: z.string().trim().min(1, '요약을 입력해 주세요.'),
     slug: z
@@ -41,6 +52,14 @@ export const postFormSchema = z
     focusKeyword: z.string().trim(),
     imagePrompt: z.string().trim(),
     imageAlt: z.string().trim(),
+    tags: z.array(z.string()).default([]),
+    sources: z.array(z.object({
+      sourceName: z.string(),
+      sourceTitle: z.string(),
+      sourceUrl: z.string(),
+      sourcePublishedAt: z.string(),
+      checkedPoint: z.string(),
+    })).default([]),
   })
   .superRefine((values, context) => {
     if (values.contentStatus === 'published' && !values.publishedOn) {
@@ -87,7 +106,64 @@ export const postFormSchema = z
       })
     }
 
+    if (values.contentStatus !== 'archived') {
+      const normalizedTags = values.tags.map(normalizeTag).filter(Boolean)
+      const tagKeys = normalizedTags.map(tagComparisonKey)
+      if (new Set(tagKeys).size !== tagKeys.length) {
+        context.addIssue({ code: 'custom', message: '동일한 태그가 이미 입력되어 있습니다.', path: ['tags'] })
+      }
+      normalizedTags.forEach((tag, index) => {
+        if (tag.length > MAX_TAG_LENGTH) {
+          context.addIssue({ code: 'custom', message: `태그는 ${MAX_TAG_LENGTH}자 이하로 입력해 주세요.`, path: ['tags', index] })
+        }
+        if (isBrandTag(tag)) {
+          context.addIssue({ code: 'custom', message: 'Daily Brief Note는 태그로 사용할 수 없습니다.', path: ['tags', index] })
+        }
+        if (values.categoryName && tagComparisonKey(tag) === tagComparisonKey(values.categoryName)) {
+          context.addIssue({ code: 'custom', message: '카테고리명은 태그로 사용할 수 없습니다.', path: ['tags', index] })
+        }
+        if (tagComparisonKey(tag) === tagComparisonKey(values.title)) {
+          context.addIssue({ code: 'custom', message: '제목 전체를 태그로 사용할 수 없습니다.', path: ['tags', index] })
+        }
+      })
+
+      const nonEmptySources = values.sources.filter((source) => !isEmptySource(source))
+      nonEmptySources.forEach((source) => {
+        const sourcePath = values.sources.indexOf(source)
+        if (!source.sourceName.trim() || !source.sourceTitle.trim() ||
+          !source.sourceUrl.trim() || !source.checkedPoint.trim()) {
+          context.addIssue({ code: 'custom', message: '출처 정보를 모두 입력해 주세요.', path: ['sources', sourcePath] })
+        } else if (!isHttpUrl(source.sourceUrl)) {
+          context.addIssue({ code: 'custom', message: '출처 URL은 절대 HTTP 또는 HTTPS URL이어야 합니다.', path: ['sources', sourcePath, 'sourceUrl'] })
+        }
+        if (source.sourcePublishedAt && Number.isNaN(Date.parse(source.sourcePublishedAt))) {
+          context.addIssue({ code: 'custom', message: '올바른 게시·업데이트 일시를 입력해 주세요.', path: ['sources', sourcePath, 'sourcePublishedAt'] })
+        }
+      })
+      const sourceKeys = nonEmptySources.filter((source) => isHttpUrl(source.sourceUrl)).map((source) => normalizeSourceUrl(source.sourceUrl))
+      if (new Set(sourceKeys).size !== sourceKeys.length) {
+        context.addIssue({ code: 'custom', message: '출처 URL이 중복되었습니다.', path: ['sources'] })
+      }
+    }
+
     if (!['ready', 'published'].includes(values.contentStatus)) return
+
+    const normalizedTags = values.tags.map(normalizeTag).filter(Boolean)
+    const completeSources = values.sources.filter((source) => !isEmptySource(source))
+    if (normalizedTags.length < 5 || normalizedTags.length > 8) {
+      context.addIssue({ code: 'custom', message: '태그는 5개 이상 8개 이하로 입력해 주세요.', path: ['tags'] })
+    }
+    if (completeSources.length < 1) {
+      context.addIssue({ code: 'custom', message: '발행 준비 또는 발행됨 상태에는 출처가 1개 이상 필요합니다.', path: ['sources'] })
+    }
+    if (values.contentGroup === 'chinese') {
+      if (completeSources.some((source) => !source.sourcePublishedAt.trim())) {
+        context.addIssue({ code: 'custom', message: '중국어 학습 출처에는 게시·업데이트 일시가 필요합니다.', path: ['sources'] })
+      }
+      if (!completeSources.some((source) => isOfficialCctvArticleUrl(source.sourceUrl))) {
+        context.addIssue({ code: 'custom', message: '중국어 학습에는 공식 CCTV 개별 원문 URL이 필요합니다.', path: ['sources'] })
+      }
+    }
 
     if (!values.htmlBody.trim()) {
       context.addIssue({

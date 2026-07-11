@@ -12,6 +12,8 @@ import {
 import {
   useArchivePostMutation,
   usePostQuery,
+  usePostSourcesQuery,
+  usePostTagsQuery,
   useSeoDataQuery,
 } from '../features/posts/posts.queries'
 import { supabase, type DatabaseClient } from '../shared/supabase/client'
@@ -32,6 +34,8 @@ export function ContentDetailPageContent({
   const postQuery = usePostQuery(client, userId, postId)
   const seoQuery = useSeoDataQuery(client, userId, postId)
   const categoriesQuery = useActiveCategoriesQuery(client)
+  const tagsQuery = usePostTagsQuery(client, userId, postId)
+  const sourcesQuery = usePostSourcesQuery(client, userId, postId)
   const archiveMutation = useArchivePostMutation(client, userId, postId)
   const post = postQuery.data
   const seoData = seoQuery.data
@@ -67,7 +71,7 @@ export function ContentDetailPageContent({
     }
   }
 
-  if (postQuery.isPending || seoQuery.isPending || categoriesQuery.isPending) {
+  if (postQuery.isPending || seoQuery.isPending || categoriesQuery.isPending || tagsQuery.isPending || sourcesQuery.isPending) {
     return (
       <div className="content-state" role="status">
         <span className="loading-indicator" aria-hidden="true" />
@@ -76,7 +80,7 @@ export function ContentDetailPageContent({
     )
   }
 
-  if (postQuery.isError || seoQuery.isError || categoriesQuery.isError) {
+  if (postQuery.isError || seoQuery.isError || categoriesQuery.isError || tagsQuery.isError || sourcesQuery.isError) {
     return (
       <div className="content-state content-state--error" role="alert">
         <h1>콘텐츠를 불러오지 못했습니다</h1>
@@ -165,6 +169,29 @@ export function ContentDetailPageContent({
           <div className="content-detail__wide"><dt>ALT 문구</dt><dd>{post.image_alt || '미입력'}</dd></div>
           <div><dt>프롬프트 버전</dt><dd>{post.image_prompt_version}</dd></div>
         </dl>
+      </section>
+
+      <section className="content-detail__section" aria-labelledby="tag-detail-title">
+        <h2 id="tag-detail-title">SEO 태그 ({tagsQuery.data?.length ?? 0}개)</h2>
+        {tagsQuery.data?.length ? (
+          <ul className="detail-tag-list">{tagsQuery.data.map((tag) => <li key={tag.id}>{tag.name}</li>)}</ul>
+        ) : <p className="field-help">미등록</p>}
+      </section>
+
+      <section className="content-detail__section" aria-labelledby="source-detail-title">
+        <h2 id="source-detail-title">출처 및 참고자료 ({sourcesQuery.data?.length ?? 0}개)</h2>
+        {sourcesQuery.data?.length ? (
+          <ol className="detail-source-list">
+            {sourcesQuery.data.map((source) => (
+              <li key={source.id}>
+                <h3>{source.source_name}</h3>
+                <p>{source.source_title}</p>
+                <a href={source.source_url} target="_blank" rel="noopener noreferrer">{source.source_url}</a>
+                <dl><div><dt>게시·업데이트일</dt><dd>{source.source_published_at ? formatUpdatedAt(source.source_published_at) : '미입력'}</dd></div><div><dt>확인한 핵심 내용</dt><dd>{source.checked_point}</dd></div></dl>
+              </li>
+            ))}
+          </ol>
+        ) : <p className="field-help">미등록</p>}
       </section>
 
       {actionError ? <p className="form-alert" role="alert">{actionError}</p> : null}

@@ -22,6 +22,7 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: './src/test/setup.ts',
     css: true,
+    maxWorkers: 4,
     exclude: [...configDefaults.exclude, 'e2e/**'],
   },
 })

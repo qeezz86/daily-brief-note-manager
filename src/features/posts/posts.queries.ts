@@ -5,6 +5,8 @@ import {
   archivePost,
   createPost,
   getPostById,
+  getPostSources,
+  getPostTags,
   getPosts,
   getSeoDataByPostId,
   updatePost,
@@ -18,6 +20,28 @@ export const postQueryKeys = {
     [...postQueryKeys.all, 'detail', userId, postId] as const,
   seo: (userId: string, postId: string) =>
     [...postQueryKeys.all, 'seo', userId, postId] as const,
+  tags: (userId: string, postId: string) =>
+    [...postQueryKeys.all, 'tags', userId, postId] as const,
+  sources: (userId: string, postId: string) =>
+    [...postQueryKeys.all, 'sources', userId, postId] as const,
+}
+
+export function usePostTagsQuery(client: DatabaseClient | null, userId: string, postId: string) {
+  return useQuery({
+    queryKey: postQueryKeys.tags(userId, postId),
+    queryFn: () => getPostTags(requireClient(client), postId),
+    enabled: client !== null && userId !== '' && postId !== '',
+    retry: false,
+  })
+}
+
+export function usePostSourcesQuery(client: DatabaseClient | null, userId: string, postId: string) {
+  return useQuery({
+    queryKey: postQueryKeys.sources(userId, postId),
+    queryFn: () => getPostSources(requireClient(client), postId),
+    enabled: client !== null && userId !== '' && postId !== '',
+    retry: false,
+  })
 }
 
 export function useSeoDataQuery(
@@ -125,6 +149,8 @@ export function useUpdatePostMutation(
       void queryClient.invalidateQueries({
         queryKey: postQueryKeys.seo(userId, postId),
       })
+      void queryClient.invalidateQueries({ queryKey: postQueryKeys.tags(userId, postId) })
+      void queryClient.invalidateQueries({ queryKey: postQueryKeys.sources(userId, postId) })
     },
   })
 }

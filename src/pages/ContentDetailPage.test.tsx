@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import type { Category } from '../features/categories/categories.types'
 import type { PostDetail } from '../features/posts/posts.types'
+import type { PostSource, PostTag } from '../features/posts/posts.types'
 import type { DatabaseClient } from '../shared/supabase/client'
 import { ContentDetailPageContent } from './ContentDetailPage'
 
@@ -40,7 +41,7 @@ const post: PostDetail = {
   updated_at: '2026-07-10T02:00:00Z',
 }
 
-function createClient(postResult: PostDetail | null) {
+function createClient(postResult: PostDetail | null, tags: PostTag[] = [], sources: PostSource[] = []) {
   const categoryBuilder = {
     select: vi.fn(),
     eq: vi.fn(),
@@ -70,6 +71,14 @@ function createClient(postResult: PostDetail | null) {
   seoBuilder.eq.mockReturnValue(seoBuilder)
   seoBuilder.maybeSingle.mockResolvedValue({ data: null, error: null })
 
+  const tagBuilder = { select: vi.fn(), eq: vi.fn() }
+  tagBuilder.select.mockReturnValue(tagBuilder)
+  tagBuilder.eq.mockResolvedValue({ data: tags.map((tag) => ({ tag_id: tag.id, tags: tag })), error: null })
+  const sourceBuilder = { select: vi.fn(), eq: vi.fn(), order: vi.fn() }
+  sourceBuilder.select.mockReturnValue(sourceBuilder)
+  sourceBuilder.eq.mockReturnValue(sourceBuilder)
+  sourceBuilder.order.mockResolvedValue({ data: sources, error: null })
+
   return {
     client: {
       from: vi.fn((table: string) =>
@@ -77,7 +86,11 @@ function createClient(postResult: PostDetail | null) {
           ? categoryBuilder
           : table === 'seo_data'
             ? seoBuilder
-            : postBuilder,
+            : table === 'post_tags'
+              ? tagBuilder
+              : table === 'sources'
+                ? sourceBuilder
+                : postBuilder,
       ),
     } as unknown as DatabaseClient,
     postBuilder,
@@ -145,5 +158,24 @@ describe('ContentDetailPage', () => {
     expect(await screen.findByText('콘텐츠를 보관 처리했습니다.')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '보관 처리' })).not.toBeInTheDocument()
     expect(postBuilder.update).toHaveBeenCalledWith({ content_status: 'archived' })
+  })
+
+  it('renders tags and ordered source metadata with a safe external link', async () => {
+    const tags = [{ id: 'tag-1', name: 'CCTV 중국어' }]
+    const sources: PostSource[] = [{
+      id: 'source-1', source_name: 'CCTV', source_title: '新闻节目',
+      source_url: 'https://news.cctv.com/article/1',
+      source_published_at: '2026-07-11T04:00:00Z', checked_point: '핵심 문장 확인', sort_order: 0,
+    }]
+    const { client } = createClient(post, tags, sources)
+    renderDetail(client)
+
+    expect(await screen.findByRole('heading', { name: 'SEO 태그 (1개)' })).toBeInTheDocument()
+    expect(screen.getByText('CCTV 중국어')).toBeInTheDocument()
+    expect(screen.getByText('新闻节目')).toBeInTheDocument()
+    expect(screen.getByText('핵심 문장 확인')).toBeInTheDocument()
+    const link = screen.getByRole('link', { name: sources[0].source_url })
+    expect(link).toHaveAttribute('target', '_blank')
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer')
   })
 })

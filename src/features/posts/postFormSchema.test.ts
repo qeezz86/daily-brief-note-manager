@@ -145,4 +145,86 @@ describe('postFormSchema', () => {
       ]),
     )
   })
+
+  it('allows a draft with zero tags and sources', () => {
+    expect(postFormSchema.safeParse({ ...validValues, tags: [], sources: [] }).success).toBe(true)
+  })
+
+  it.each([4, 9])('rejects ready content with %i tags', (count) => {
+    const result = postFormSchema.safeParse({
+      ...validValues,
+      contentStatus: 'ready',
+      htmlBody: '<div><h1>본문</h1></div>', representativeTitle: '대표',
+      alternativeTitles: ['1', '2', '3', '4'], metaDescription: '설명',
+      focusKeyword: '키워드', imagePrompt: '프롬프트', imageAlt: 'ALT',
+      tags: Array.from({ length: count }, (_, index) => `태그 ${index}`),
+      sources: [{ sourceName: '기관', sourceTitle: '원문', sourceUrl: 'https://example.com/a', sourcePublishedAt: '', checkedPoint: '확인' }],
+    })
+    expect(result.success).toBe(false)
+    if (!result.success) expect(result.error.issues.some((issue) => issue.path[0] === 'tags')).toBe(true)
+  })
+
+  it('rejects normalized duplicate, brand, category, and full-title tags', () => {
+    const result = postFormSchema.safeParse({
+      ...validValues,
+      categoryName: 'AI 칼럼',
+      tags: ['AI 기술', ' ai   기술 ', 'DailyBriefNote', 'AI 칼럼', validValues.title],
+      sources: [],
+    })
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      const messages = result.error.issues.map((issue) => issue.message)
+      expect(messages).toEqual(expect.arrayContaining([
+        '동일한 태그가 이미 입력되어 있습니다.',
+        'Daily Brief Note는 태그로 사용할 수 없습니다.',
+        '카테고리명은 태그로 사용할 수 없습니다.',
+        '제목 전체를 태그로 사용할 수 없습니다.',
+      ]))
+    }
+  })
+
+  it('rejects partially entered, invalid, and duplicate source URLs', () => {
+    const result = postFormSchema.safeParse({
+      ...validValues,
+      sources: [
+        { sourceName: '기관', sourceTitle: '', sourceUrl: 'javascript:alert(1)', sourcePublishedAt: '', checkedPoint: '' },
+        { sourceName: 'A', sourceTitle: 'A', sourceUrl: 'https://example.com/a#one', sourcePublishedAt: '', checkedPoint: 'A' },
+        { sourceName: 'B', sourceTitle: 'B', sourceUrl: 'https://example.com/a#two', sourcePublishedAt: '', checkedPoint: 'B' },
+      ],
+    })
+    expect(result.success).toBe(false)
+    if (!result.success) expect(result.error.issues.map((issue) => issue.message)).toEqual(
+      expect.arrayContaining(['출처 정보를 모두 입력해 주세요.', '출처 URL이 중복되었습니다.']),
+    )
+  })
+
+  it('allows nullable publication time for an ordinary complete source', () => {
+    const result = postFormSchema.safeParse({
+      ...validValues,
+      sources: [{ sourceName: '기관', sourceTitle: '원문', sourceUrl: 'https://example.com/a', sourcePublishedAt: '', checkedPoint: '확인' }],
+    })
+    expect(result.success).toBe(true)
+  })
+
+  it('requires a publication time and official individual CCTV URL for Chinese ready content', () => {
+    const baseReady = {
+      ...validValues, categoryId: 'chinese-study', categoryName: '중국어 학습', contentGroup: 'chinese' as const,
+      contentStatus: 'ready' as const, htmlBody: '<div><h1>본문</h1></div>', representativeTitle: '대표',
+      alternativeTitles: ['1', '2', '3', '4'], metaDescription: '설명', focusKeyword: '키워드',
+      imagePrompt: '프롬프트', imageAlt: 'ALT', tags: ['A', 'B', 'C', 'D', 'E'],
+    }
+    const invalid = postFormSchema.safeParse({
+      ...baseReady,
+      sources: [{ sourceName: 'CCTV', sourceTitle: '원문', sourceUrl: 'https://example.com/a', sourcePublishedAt: '', checkedPoint: '확인' }],
+    })
+    expect(invalid.success).toBe(false)
+    if (!invalid.success) expect(invalid.error.issues.map((issue) => issue.message)).toEqual(
+      expect.arrayContaining(['중국어 학습 출처에는 게시·업데이트 일시가 필요합니다.', '중국어 학습에는 공식 CCTV 개별 원문 URL이 필요합니다.']),
+    )
+
+    expect(postFormSchema.safeParse({
+      ...baseReady,
+      sources: [{ sourceName: 'CCTV', sourceTitle: '원문', sourceUrl: 'https://news.cctv.com/a/1', sourcePublishedAt: '2026-07-11T12:00', checkedPoint: '확인' }],
+    }).success).toBe(true)
+  })
 })

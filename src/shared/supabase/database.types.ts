@@ -702,18 +702,21 @@ export type Database = {
           created_at: string
           id: string
           name: string
+          normalized_name: string
           owner_id: string
         }
         Insert: {
           created_at?: string
           id?: string
           name: string
+          normalized_name: string
           owner_id: string
         }
         Update: {
           created_at?: string
           id?: string
           name?: string
+          normalized_name?: string
           owner_id?: string
         }
         Relationships: []
@@ -760,17 +763,66 @@ export type Database = {
           p_alternative_titles: string[]
           p_content_status: string
           p_focus_keyword: string
-          p_html_body: string | null
-          p_image_alt: string | null
-          p_image_prompt: string | null
+          p_html_body: string
+          p_image_alt: string
+          p_image_prompt: string
           p_meta_description: string
           p_post_id: string
-          p_published_on: string | null
+          p_published_on: string
           p_representative_title: string
           p_slug: string
           p_summary: string
           p_title: string
-          p_wordpress_url: string | null
+          p_wordpress_url: string
+        }
+        Returns: {
+          briefing_date: string | null
+          category_id: string
+          content_status: string
+          created_at: string
+          display_id: string | null
+          html_body: string | null
+          id: string
+          image_alt: string | null
+          image_prompt: string | null
+          image_prompt_updated_at: string | null
+          image_prompt_version: number
+          owner_id: string
+          published_at: string | null
+          published_on: string | null
+          series_no: number | null
+          slug: string
+          source_import_type: string
+          summary: string
+          title: string
+          updated_at: string
+          wordpress_url: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "posts"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      save_post_publication_bundle: {
+        Args: {
+          p_alternative_titles: string[]
+          p_content_status: string
+          p_focus_keyword: string
+          p_html_body: string
+          p_image_alt: string
+          p_image_prompt: string
+          p_meta_description: string
+          p_post_id: string
+          p_published_on: string
+          p_representative_title: string
+          p_slug: string
+          p_sources: Json
+          p_summary: string
+          p_tags: Json
+          p_title: string
+          p_wordpress_url: string
         }
         Returns: {
           briefing_date: string | null
