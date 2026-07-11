@@ -6,6 +6,7 @@ import {
   createPost,
   getPostById,
   getPosts,
+  getSeoDataByPostId,
   updatePost,
 } from './posts.repository'
 import type { CreatePostInput, UpdatePostInput } from './posts.types'
@@ -15,6 +16,27 @@ export const postQueryKeys = {
   list: (userId: string) => [...postQueryKeys.all, 'list', userId] as const,
   detail: (userId: string, postId: string) =>
     [...postQueryKeys.all, 'detail', userId, postId] as const,
+  seo: (userId: string, postId: string) =>
+    [...postQueryKeys.all, 'seo', userId, postId] as const,
+}
+
+export function useSeoDataQuery(
+  client: DatabaseClient | null,
+  userId: string,
+  postId: string,
+) {
+  return useQuery({
+    queryKey: postQueryKeys.seo(userId, postId),
+    queryFn: () => {
+      if (!client) {
+        throw new Error('Supabase 연결이 설정되지 않았습니다.')
+      }
+
+      return getSeoDataByPostId(client, postId)
+    },
+    enabled: client !== null && userId !== '' && postId !== '',
+    retry: false,
+  })
 }
 
 export function usePostsQuery(
@@ -99,6 +121,9 @@ export function useUpdatePostMutation(
       )
       void queryClient.invalidateQueries({
         queryKey: postQueryKeys.list(userId),
+      })
+      void queryClient.invalidateQueries({
+        queryKey: postQueryKeys.seo(userId, postId),
       })
     },
   })

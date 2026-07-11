@@ -321,6 +321,7 @@ updated_at               timestamptz
 - AI·정보DB·중국어 학습은 `unique (owner_id, category_id, series_no)`
 - 중국어 학습은 `display_id`를 사용하지 않음
 - `html_body`는 `draft`와 `archived`에서는 `NULL`을 허용하고, `ready`와 `published`에서는 공백이 아닌 값이 필수다. 실제 HTML 구조는 애플리케이션 strict validation에서 검증하며, 임시 HTML 주석이나 가짜 본문은 저장하지 않는다.
+- `image_prompt_version`은 이미지 프롬프트 값이 실제로 변경될 때만 DB trigger가 증가시키며, `image_prompt_updated_at`도 같은 trigger가 기록한다.
 - 날짜만 확인된 발행 정보는 `published_on`에 저장하고 `published_at`에 임의 시각을 만들지 않음
 
 `content_status` 허용값:
@@ -342,10 +343,10 @@ updated_at               timestamptz
 ```text
 post_id                  uuid primary key references posts on delete cascade
 owner_id                 uuid references auth.users
-representative_title     text
+representative_title     text nullable while a draft is incomplete
 alternative_titles       jsonb
 meta_description         text
-focus_keyword            text
+focus_keyword            text nullable while a draft is incomplete
 created_at               timestamptz
 updated_at               timestamptz
 ```
@@ -353,6 +354,7 @@ updated_at               timestamptz
 검증:
 
 - 대안 제목은 정확히 4개 권장
+- `ready`와 `published`에서는 대표 제목, 서로 다른 대안 제목 4개, 메타 설명, 포커스 키워드가 모두 필수
 - 메타 설명 120~160자 경고
 - SEO 태그는 5~8개 경고
 - 카테고리명, `Daily Brief Note`, `DailyBriefNote` 태그 금지
@@ -1201,6 +1203,8 @@ generated_at       timestamptz
 5. 출처
 6. 이미지 프롬프트
 7. 뉴스 추적 정보 또는 카테고리별 메타데이터
+
+WordPress HTML, SEO 데이터, 대표 이미지 프롬프트·ALT, 기본 편집 필드와 상태 변경은 인증 사용자의 소유권을 확인하는 제한적 DB 함수에서 하나의 트랜잭션으로 저장한다. `draft`는 비어 있거나 미완성인 편집 데이터를 허용한다. `ready`와 `published`는 strict HTML validation, 완성된 SEO, 이미지 프롬프트와 ALT가 필요하며 `published`는 `published_on`도 필요하다. 메타 설명 120~160자는 저장 차단이 아닌 경고다.
 
 ## 12.5 기존 글 가져오기
 

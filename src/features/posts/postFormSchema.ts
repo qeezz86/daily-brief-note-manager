@@ -34,6 +34,13 @@ export const postFormSchema = z
           return false
         }
       }, '올바른 WordPress URL을 입력해 주세요.'),
+    htmlBody: z.string(),
+    representativeTitle: z.string().trim(),
+    alternativeTitles: z.array(z.string().trim()).length(4),
+    metaDescription: z.string().trim(),
+    focusKeyword: z.string().trim(),
+    imagePrompt: z.string().trim(),
+    imageAlt: z.string().trim(),
   })
   .superRefine((values, context) => {
     if (values.contentStatus === 'published' && !values.publishedOn) {
@@ -49,6 +56,86 @@ export const postFormSchema = z
         code: 'custom',
         message: '뉴스 브리핑에는 브리핑 날짜가 필요합니다.',
         path: ['briefingDate'],
+      })
+    }
+
+    const completedAlternativeTitles = values.alternativeTitles.filter(Boolean)
+    const normalizedAlternativeTitles = completedAlternativeTitles.map((title) =>
+      title.toLocaleLowerCase('ko-KR'),
+    )
+    const duplicateAlternativeTitles =
+      new Set(normalizedAlternativeTitles).size !== normalizedAlternativeTitles.length
+
+    if (duplicateAlternativeTitles) {
+      context.addIssue({
+        code: 'custom',
+        message: '대안 제목은 서로 달라야 합니다.',
+        path: ['alternativeTitles'],
+      })
+    }
+
+    if (
+      values.representativeTitle &&
+      normalizedAlternativeTitles.includes(
+        values.representativeTitle.toLocaleLowerCase('ko-KR'),
+      )
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: '대안 제목은 대표 제목과 달라야 합니다.',
+        path: ['alternativeTitles'],
+      })
+    }
+
+    if (!['ready', 'published'].includes(values.contentStatus)) return
+
+    if (!values.htmlBody.trim()) {
+      context.addIssue({
+        code: 'custom',
+        message: '발행 준비 또는 발행됨 상태에는 WordPress 본문 HTML이 필요합니다.',
+        path: ['htmlBody'],
+      })
+    }
+    if (!values.representativeTitle) {
+      context.addIssue({
+        code: 'custom',
+        message: '발행 준비 또는 발행됨 상태에는 SEO 대표 제목이 필요합니다.',
+        path: ['representativeTitle'],
+      })
+    }
+    if (completedAlternativeTitles.length !== 4) {
+      context.addIssue({
+        code: 'custom',
+        message: '발행 준비 또는 발행됨 상태에는 대안 제목 4개가 필요합니다.',
+        path: ['alternativeTitles'],
+      })
+    }
+    if (!values.focusKeyword) {
+      context.addIssue({
+        code: 'custom',
+        message: '발행 준비 또는 발행됨 상태에는 포커스 키워드가 필요합니다.',
+        path: ['focusKeyword'],
+      })
+    }
+    if (!values.metaDescription) {
+      context.addIssue({
+        code: 'custom',
+        message: '발행 준비 또는 발행됨 상태에는 메타 설명이 필요합니다.',
+        path: ['metaDescription'],
+      })
+    }
+    if (!values.imagePrompt) {
+      context.addIssue({
+        code: 'custom',
+        message: '발행 준비 또는 발행됨 상태에는 이미지 프롬프트가 필요합니다.',
+        path: ['imagePrompt'],
+      })
+    }
+    if (!values.imageAlt) {
+      context.addIssue({
+        code: 'custom',
+        message: '발행 준비 또는 발행됨 상태에는 이미지 ALT 문구가 필요합니다.',
+        path: ['imageAlt'],
       })
     }
   })

@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
@@ -29,6 +29,10 @@ const post: PostDetail = {
   title: '경제 브리핑',
   summary: '경제 브리핑 요약',
   html_body: null,
+  image_prompt: null,
+  image_alt: null,
+  image_prompt_version: 1,
+  image_prompt_updated_at: null,
   slug: 'economy-briefing-2026-07-10',
   content_status: 'draft',
   wordpress_url: null,
@@ -56,26 +60,43 @@ function createClient() {
   postBuilder.eq.mockReturnValue(postBuilder)
   postBuilder.update.mockReturnValue(postBuilder)
   postBuilder.maybeSingle
-    .mockResolvedValueOnce({ data: post, error: null })
-    .mockResolvedValueOnce({
-      data: { ...post, title: '수정된 경제 브리핑' },
-      error: null,
-    })
+    .mockResolvedValue({ data: post, error: null })
+
+  const seoBuilder = {
+    select: vi.fn(),
+    eq: vi.fn(),
+    maybeSingle: vi.fn(),
+  }
+  seoBuilder.select.mockReturnValue(seoBuilder)
+  seoBuilder.eq.mockReturnValue(seoBuilder)
+  seoBuilder.maybeSingle.mockResolvedValue({ data: null, error: null })
+
+  const rpc = vi.fn().mockResolvedValue({
+    data: { ...post, title: '수정된 경제 브리핑' },
+    error: null,
+  })
 
   return {
     client: {
       from: vi.fn((table: string) =>
-        table === 'categories' ? categoryBuilder : postBuilder,
+        table === 'categories'
+          ? categoryBuilder
+          : table === 'seo_data'
+            ? seoBuilder
+            : postBuilder,
       ),
+      rpc,
     } as unknown as DatabaseClient,
     postBuilder,
+    rpc,
+    seoBuilder,
   }
 }
 
 describe('ContentEditPage', () => {
   it('saves editable fields and keeps identity fields out of the update', async () => {
     const browserUser = userEvent.setup()
-    const { client, postBuilder } = createClient()
+    const { client, rpc, seoBuilder } = createClient()
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
     })
@@ -93,10 +114,12 @@ describe('ContentEditPage', () => {
     await browserUser.click(screen.getByRole('button', { name: '변경 사항 저장' }))
 
     expect(await screen.findByText('변경 사항을 저장했습니다.')).toBeInTheDocument()
-    expect(postBuilder.update).toHaveBeenCalledWith(
+    expect(rpc).toHaveBeenCalledWith(
+      'save_post_editor',
       expect.not.objectContaining({ category_id: expect.anything() }),
     )
     expect(screen.getByLabelText('카테고리')).toBeDisabled()
     expect(screen.getByLabelText('브리핑 날짜')).toBeDisabled()
+    await waitFor(() => expect(seoBuilder.maybeSingle).toHaveBeenCalledTimes(2))
   })
 })

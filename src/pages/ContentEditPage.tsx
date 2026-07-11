@@ -8,6 +8,7 @@ import type { PostFormValues } from '../features/posts/postFormSchema'
 import { toNullablePostFormValues } from '../features/posts/postFormValues'
 import {
   usePostQuery,
+  useSeoDataQuery,
   useUpdatePostMutation,
 } from '../features/posts/posts.queries'
 import { supabase, type DatabaseClient } from '../shared/supabase/client'
@@ -26,6 +27,7 @@ export function ContentEditPageContent({
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [submitSuccess, setSubmitSuccess] = useState<string | null>(null)
   const postQuery = usePostQuery(client, userId, postId)
+  const seoQuery = useSeoDataQuery(client, userId, postId)
   const categoriesQuery = useActiveCategoriesQuery(client)
   const updateMutation = useUpdatePostMutation(client, userId, postId)
 
@@ -42,6 +44,13 @@ export function ContentEditPageContent({
         contentStatus: values.contentStatus,
         publishedOn: normalized.publishedOn,
         wordpressUrl: normalized.wordpressUrl,
+        htmlBody: normalized.htmlBody,
+        representativeTitle: values.representativeTitle,
+        alternativeTitles: values.alternativeTitles.filter(Boolean),
+        metaDescription: values.metaDescription,
+        focusKeyword: values.focusKeyword,
+        imagePrompt: normalized.imagePrompt,
+        imageAlt: normalized.imageAlt,
       })
       setSubmitSuccess('변경 사항을 저장했습니다.')
     } catch (error) {
@@ -53,7 +62,7 @@ export function ContentEditPageContent({
     }
   }
 
-  if (postQuery.isPending || categoriesQuery.isPending) {
+  if (postQuery.isPending || seoQuery.isPending || categoriesQuery.isPending) {
     return (
       <div className="content-state" role="status">
         <span className="loading-indicator" aria-hidden="true" />
@@ -62,7 +71,7 @@ export function ContentEditPageContent({
     )
   }
 
-  if (postQuery.isError || categoriesQuery.isError) {
+  if (postQuery.isError || seoQuery.isError || categoriesQuery.isError) {
     return (
       <div className="content-state content-state--error" role="alert">
         <h1>콘텐츠를 불러오지 못했습니다</h1>
@@ -96,6 +105,7 @@ export function ContentEditPageContent({
         mode="edit"
         categories={categoriesQuery.data}
         post={postQuery.data}
+        seoData={seoQuery.data}
         isSaving={updateMutation.isPending}
         submitError={submitError}
         submitSuccess={submitSuccess}

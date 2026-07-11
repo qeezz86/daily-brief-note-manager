@@ -568,31 +568,31 @@ export type Database = {
         Row: {
           alternative_titles: Json
           created_at: string
-          focus_keyword: string
+          focus_keyword: string | null
           meta_description: string
           owner_id: string
           post_id: string
-          representative_title: string
+          representative_title: string | null
           updated_at: string
         }
         Insert: {
           alternative_titles?: Json
           created_at?: string
-          focus_keyword: string
+          focus_keyword?: string | null
           meta_description: string
           owner_id: string
           post_id: string
-          representative_title: string
+          representative_title?: string | null
           updated_at?: string
         }
         Update: {
           alternative_titles?: Json
           created_at?: string
-          focus_keyword?: string
+          focus_keyword?: string | null
           meta_description?: string
           owner_id?: string
           post_id?: string
-          representative_title?: string
+          representative_title?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -751,6 +751,53 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "generated_prompts"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      save_post_editor: {
+        Args: {
+          p_alternative_titles: string[]
+          p_content_status: string
+          p_focus_keyword: string
+          p_html_body: string | null
+          p_image_alt: string | null
+          p_image_prompt: string | null
+          p_meta_description: string
+          p_post_id: string
+          p_published_on: string | null
+          p_representative_title: string
+          p_slug: string
+          p_summary: string
+          p_title: string
+          p_wordpress_url: string | null
+        }
+        Returns: {
+          briefing_date: string | null
+          category_id: string
+          content_status: string
+          created_at: string
+          display_id: string | null
+          html_body: string | null
+          id: string
+          image_alt: string | null
+          image_prompt: string | null
+          image_prompt_updated_at: string | null
+          image_prompt_version: number
+          owner_id: string
+          published_at: string | null
+          published_on: string | null
+          series_no: number | null
+          slug: string
+          source_import_type: string
+          summary: string
+          title: string
+          updated_at: string
+          wordpress_url: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "posts"
           isOneToOne: true
           isSetofReturn: false
         }

@@ -6,6 +6,7 @@ import {
   archivePost,
   createPost,
   getPostById,
+  getSeoDataByPostId,
   updatePost,
 } from './posts.repository'
 import type { PostDetail } from './posts.types'
@@ -50,6 +51,10 @@ const savedPost: PostDetail = {
   title: 'AI 에이전트',
   summary: '요약',
   html_body: null,
+  image_prompt: null,
+  image_alt: null,
+  image_prompt_version: 1,
+  image_prompt_updated_at: null,
   slug: 'ai-agent',
   content_status: 'draft',
   wordpress_url: null,
@@ -204,18 +209,9 @@ describe('posts repository mutations', () => {
     await expect(getPostById(client, 'missing')).resolves.toBeNull()
   })
 
-  it('updates only editable basic fields', async () => {
-    const builder = {
-      update: vi.fn(),
-      eq: vi.fn(),
-      select: vi.fn(),
-      maybeSingle: vi.fn(),
-    }
-    builder.update.mockReturnValue(builder)
-    builder.eq.mockReturnValue(builder)
-    builder.select.mockReturnValue(builder)
-    builder.maybeSingle.mockResolvedValue({ data: savedPost, error: null })
-    const client = { from: vi.fn(() => builder) } as unknown as DatabaseClient
+  it('maps post, SEO, and image fields to the atomic editor RPC', async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: savedPost, error: null })
+    const client = { rpc } as unknown as DatabaseClient
 
     await updatePost(client, 'post-1', {
       title: '수정 제목',
@@ -224,13 +220,66 @@ describe('posts repository mutations', () => {
       contentStatus: 'ready',
       publishedOn: null,
       wordpressUrl: null,
+      htmlBody: '<div>HTML</div>',
+      representativeTitle: '대표 제목',
+      alternativeTitles: ['대안 1', '대안 2', '대안 3', '대안 4'],
+      metaDescription: '메타 설명',
+      focusKeyword: '포커스 키워드',
+      imagePrompt: '이미지 프롬프트',
+      imageAlt: 'ALT 문구',
     })
 
-    const payload = builder.update.mock.calls[0][0]
+    expect(rpc).toHaveBeenCalledWith('save_post_editor', expect.any(Object))
+    const payload = rpc.mock.calls[0][1]
     expect(payload).not.toHaveProperty('category_id')
     expect(payload).not.toHaveProperty('briefing_date')
     expect(payload).not.toHaveProperty('series_no')
     expect(payload).not.toHaveProperty('display_id')
+    expect(payload).toEqual(expect.objectContaining({
+      p_html_body: '<div>HTML</div>',
+      p_alternative_titles: ['대안 1', '대안 2', '대안 3', '대안 4'],
+      p_image_prompt: '이미지 프롬프트',
+    }))
+  })
+
+  it('loads only explicit SEO fields', async () => {
+    const seoData = {
+      post_id: 'post-1',
+      representative_title: '대표 제목',
+      alternative_titles: ['대안 1', '대안 2', '대안 3', '대안 4'],
+      meta_description: '메타 설명',
+      focus_keyword: '키워드',
+    }
+    const builder = {
+      select: vi.fn(),
+      eq: vi.fn(),
+      maybeSingle: vi.fn(),
+    }
+    builder.select.mockReturnValue(builder)
+    builder.eq.mockReturnValue(builder)
+    builder.maybeSingle.mockResolvedValue({ data: seoData, error: null })
+    const client = { from: vi.fn(() => builder) } as unknown as DatabaseClient
+
+    await expect(getSeoDataByPostId(client, 'post-1')).resolves.toEqual(seoData)
+    expect(builder.select).toHaveBeenCalledWith(
+      'post_id, representative_title, alternative_titles, meta_description, focus_keyword',
+    )
+  })
+
+  it('reports atomic editor failures without exposing database details', async () => {
+    const client = {
+      rpc: vi.fn().mockResolvedValue({
+        data: null,
+        error: { code: '23514', message: 'sensitive failure detail' },
+      }),
+    } as unknown as DatabaseClient
+
+    await expect(updatePost(client, 'post-1', {
+      title: '제목', summary: '요약', slug: 'slug', contentStatus: 'draft',
+      publishedOn: null, wordpressUrl: null, htmlBody: null,
+      representativeTitle: '', alternativeTitles: [], metaDescription: '',
+      focusKeyword: '', imagePrompt: null, imageAlt: null,
+    })).rejects.toThrow('기존 데이터는 변경되지 않았습니다.')
   })
 
   it('archives by updating content status without deleting', async () => {

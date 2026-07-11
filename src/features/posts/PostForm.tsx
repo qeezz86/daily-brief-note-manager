@@ -1,21 +1,27 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 
 import type { Category } from '../categories/categories.types'
 import { buildSuggestedSlug } from './postIdentifiers'
+import { validateWordPressHtml } from './htmlValidation'
 import {
   postFormSchema,
   type PostFormInput,
   type PostFormValues,
 } from './postFormSchema'
 import { getStatusLabel } from './postFormatters'
-import { contentStatuses, type PostDetail } from './posts.types'
+import {
+  contentStatuses,
+  type PostDetail,
+  type SeoData,
+} from './posts.types'
 
 interface PostFormProps {
   mode: 'create' | 'edit'
   categories: Category[]
   post?: PostDetail
+  seoData?: SeoData | null
   isSaving: boolean
   submitError: string | null
   submitSuccess?: string | null
@@ -26,11 +32,13 @@ export function PostForm({
   mode,
   categories,
   post,
+  seoData = null,
   isSaving,
   submitError,
   submitSuccess = null,
   onSubmit,
 }: PostFormProps) {
+  const [htmlValidationErrors, setHtmlValidationErrors] = useState<string[]>([])
   const initialCategory = categories.find(
     (category) => category.id === post?.category_id,
   )
@@ -53,27 +61,50 @@ export function PostForm({
       briefingDate: post?.briefing_date ?? '',
       publishedOn: post?.published_on ?? '',
       wordpressUrl: post?.wordpress_url ?? '',
+      htmlBody: post?.html_body ?? '',
+      representativeTitle: seoData?.representative_title ?? '',
+      alternativeTitles: getAlternativeTitles(seoData),
+      metaDescription: seoData?.meta_description ?? '',
+      focusKeyword: seoData?.focus_keyword ?? '',
+      imagePrompt: post?.image_prompt ?? '',
+      imageAlt: post?.image_alt ?? '',
     },
   })
   const categoryId = useWatch({ control, name: 'categoryId' })
   const briefingDate = useWatch({ control, name: 'briefingDate' })
+  const metaDescription = useWatch({ control, name: 'metaDescription' })
+  const htmlBody = useWatch({ control, name: 'htmlBody' })
+  const contentStatus = useWatch({ control, name: 'contentStatus' })
   const selectedCategory = categories.find(
     (category) => category.id === categoryId,
   )
   const disabled = isSaving || isSubmitting
-  const statusOptions = mode === 'create' ? ['draft'] : contentStatuses
+  const statusOptions = mode === 'create'
+    ? ['draft']
+    : post?.content_status === 'archived'
+      ? ['archived']
+      : contentStatuses
 
   async function handleValidSubmit(values: PostFormValues) {
-    const hasHtmlBody = Boolean(post?.html_body?.trim())
+    setHtmlValidationErrors([])
 
     if (
-      !hasHtmlBody &&
-      (values.contentStatus === 'ready' || values.contentStatus === 'published')
+      mode === 'edit' &&
+      values.contentStatus !== 'archived' &&
+      values.htmlBody.trim() &&
+      selectedCategory
     ) {
-      setError('contentStatus', {
-        message: '본문을 작성한 후 상태를 변경할 수 있습니다.',
-      })
-      return
+      const validationErrors = validateWordPressHtml(
+        values.htmlBody,
+        selectedCategory.wrapper_class,
+        values.imagePrompt,
+      )
+
+      if (validationErrors.length > 0) {
+        setHtmlValidationErrors(validationErrors)
+        setError('htmlBody', { message: validationErrors[0] })
+        return
+      }
     }
 
     await onSubmit(values)
@@ -243,6 +274,147 @@ export function PostForm({
         </div>
       </fieldset>
 
+      {mode === 'edit' ? (
+        <>
+          <fieldset className="post-form__section" disabled={disabled}>
+            <legend>WordPress 본문 HTML</legend>
+            <div className="post-form__field post-form__field--wide">
+              <label htmlFor="post-html-body">HTML 본문</label>
+              <textarea
+                id="post-html-body"
+                className="post-form__html-editor"
+                rows={18}
+                spellCheck={false}
+                aria-invalid={Boolean(errors.htmlBody)}
+                {...register('htmlBody')}
+              />
+              {errors.htmlBody ? (
+                <p className="field-error">{errors.htmlBody.message}</p>
+              ) : (
+                <p className="field-help">
+                  원문 HTML을 그대로 저장하며 실제 HTML로 실행하거나 미리보기하지 않습니다.
+                </p>
+              )}
+            </div>
+          </fieldset>
+
+          <fieldset className="post-form__section" disabled={disabled}>
+            <legend>SEO</legend>
+            <div className="post-form__field post-form__field--wide">
+              <label htmlFor="post-representative-title">SEO 대표 제목</label>
+              <input
+                id="post-representative-title"
+                type="text"
+                aria-invalid={Boolean(errors.representativeTitle)}
+                {...register('representativeTitle')}
+              />
+              {errors.representativeTitle ? (
+                <p className="field-error">{errors.representativeTitle.message}</p>
+              ) : null}
+            </div>
+
+            {[0, 1, 2, 3].map((index) => (
+              <div className="post-form__field" key={index}>
+                <label htmlFor={`post-alternative-title-${index + 1}`}>
+                  대안 제목 {index + 1}
+                </label>
+                <input
+                  id={`post-alternative-title-${index + 1}`}
+                  type="text"
+                  {...register(`alternativeTitles.${index}` as const)}
+                />
+              </div>
+            ))}
+            {errors.alternativeTitles ? (
+              <p className="field-error post-form__field--wide">
+                {errors.alternativeTitles.message ?? errors.alternativeTitles.root?.message}
+              </p>
+            ) : null}
+
+            <div className="post-form__field post-form__field--wide">
+              <label htmlFor="post-meta-description">메타 설명</label>
+              <textarea
+                id="post-meta-description"
+                rows={4}
+                aria-invalid={Boolean(errors.metaDescription)}
+                {...register('metaDescription')}
+              />
+              {errors.metaDescription ? (
+                <p className="field-error">{errors.metaDescription.message}</p>
+              ) : metaDescription && (metaDescription.length < 120 || metaDescription.length > 160) ? (
+                <p className="field-warning" role="status">
+                  현재 {metaDescription.length}자입니다. 권장 길이는 120~160자입니다.
+                </p>
+              ) : (
+                <p className="field-help">권장 길이는 120~160자이며 범위를 벗어나도 draft 저장은 가능합니다.</p>
+              )}
+            </div>
+
+            <div className="post-form__field post-form__field--wide">
+              <label htmlFor="post-focus-keyword">포커스 키워드</label>
+              <input
+                id="post-focus-keyword"
+                type="text"
+                aria-invalid={Boolean(errors.focusKeyword)}
+                {...register('focusKeyword')}
+              />
+              {errors.focusKeyword ? (
+                <p className="field-error">{errors.focusKeyword.message}</p>
+              ) : null}
+            </div>
+          </fieldset>
+
+          <fieldset className="post-form__section" disabled={disabled}>
+            <legend>대표 이미지 정보</legend>
+            <div className="post-form__field post-form__field--wide">
+              <label htmlFor="post-image-prompt">이미지 프롬프트</label>
+              <textarea
+                id="post-image-prompt"
+                rows={6}
+                aria-invalid={Boolean(errors.imagePrompt)}
+                {...register('imagePrompt')}
+              />
+              {errors.imagePrompt ? (
+                <p className="field-error">{errors.imagePrompt.message}</p>
+              ) : null}
+            </div>
+            <div className="post-form__field post-form__field--wide">
+              <label htmlFor="post-image-alt">이미지 ALT 문구</label>
+              <input
+                id="post-image-alt"
+                type="text"
+                aria-invalid={Boolean(errors.imageAlt)}
+                {...register('imageAlt')}
+              />
+              {errors.imageAlt ? (
+                <p className="field-error">{errors.imageAlt.message}</p>
+              ) : (
+                <p className="field-help">이미지 파일이나 URL은 저장하지 않습니다.</p>
+              )}
+            </div>
+          </fieldset>
+
+          <section className="post-form__validation" aria-labelledby="post-validation-title">
+            <h2 id="post-validation-title">저장 상태와 검증 결과</h2>
+            <dl>
+              <div><dt>현재 선택 상태</dt><dd>{getStatusLabel(contentStatus)}</dd></div>
+              <div><dt>본문 문자 수</dt><dd>{htmlBody.length.toLocaleString('ko-KR')}자</dd></div>
+              <div><dt>카테고리 wrapper</dt><dd><code>{selectedCategory?.wrapper_class ?? '확인 불가'}</code></dd></div>
+            </dl>
+            {htmlValidationErrors.length > 0 ? (
+              <div className="validation-errors" role="alert">
+                <h3>HTML을 수정해 주세요</h3>
+                <ul>
+                  {htmlValidationErrors.map((message) => <li key={message}>{message}</li>)}
+                </ul>
+              </div>
+            ) : (
+              <p className="field-help">HTML이 입력된 draft와 ready·published 저장 시 strict validation을 실행합니다.</p>
+            )}
+          </section>
+        </>
+      ) : null}
+
       {submitError ? (
         <p className="form-alert" role="alert">{submitError}</p>
       ) : null}
@@ -257,4 +429,12 @@ export function PostForm({
       </div>
     </form>
   )
+}
+
+function getAlternativeTitles(seoData: SeoData | null): [string, string, string, string] {
+  const values = Array.isArray(seoData?.alternative_titles)
+    ? seoData.alternative_titles.filter((value): value is string => typeof value === 'string')
+    : []
+
+  return [values[0] ?? '', values[1] ?? '', values[2] ?? '', values[3] ?? '']
 }

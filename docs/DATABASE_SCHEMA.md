@@ -195,14 +195,18 @@ unique 조건:
 |---|---|---|
 | `post_id` | uuid | primary key, references `posts` on delete cascade |
 | `owner_id` | uuid | references `auth.users` |
-| `representative_title` | text | 필수 |
+| `representative_title` | text | nullable, `ready`·`published`에서는 필수 |
 | `alternative_titles` | jsonb | 대안 제목 정확히 4개 권장 |
 | `meta_description` | text | 120~160자 경고 |
-| `focus_keyword` | text | 필수 |
+| `focus_keyword` | text | nullable, `ready`·`published`에서는 필수 |
 | `created_at` | timestamptz | 필수 |
 | `updated_at` | timestamptz | 필수 |
 
 태그는 `tags`와 `post_tags`에서 관리한다. 태그 수는 5~8개를 권장하며 카테고리명, `Daily Brief Note`, `DailyBriefNote`는 금지한다. 동일 태그와 정규화된 유사 태그는 경고한다.
+
+`save_post_editor` 함수는 현재 인증 사용자가 소유한 post만 잠근 뒤 기본 편집 필드, WordPress HTML, 대표 이미지 정보와 `seo_data` upsert를 하나의 트랜잭션에서 처리한다. 함수는 `SECURITY DEFINER`와 빈 `search_path`를 사용하고 소유권을 직접 확인하며 authenticated에만 실행 권한을 부여한다. `ready`·`published`에는 비어 있지 않은 HTML, 완성된 SEO, 이미지 프롬프트와 ALT가 필요하고 `published`에는 `published_on`도 필요하다. HTML 구조 검증은 애플리케이션 strict validation에서 수행한다.
+
+이미지 프롬프트가 실제로 변경되면 DB trigger가 `image_prompt_version`을 1 증가시키고 `image_prompt_updated_at`을 갱신한다. 동일한 프롬프트를 다시 저장할 때는 버전과 변경 시각을 증가시키지 않는다.
 
 ### 5.3 `tags`
 

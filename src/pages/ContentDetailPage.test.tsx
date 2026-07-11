@@ -29,6 +29,10 @@ const post: PostDetail = {
   title: 'CCTV 뉴스로 배우는 중국어 #12',
   summary: '중국어 학습 요약',
   html_body: null,
+  image_prompt: null,
+  image_alt: null,
+  image_prompt_version: 1,
+  image_prompt_updated_at: null,
   slug: 'cctv-chinese-news-study-012',
   content_status: 'ready',
   wordpress_url: null,
@@ -57,10 +61,23 @@ function createClient(postResult: PostDetail | null) {
   postBuilder.update.mockReturnValue(postBuilder)
   postBuilder.maybeSingle.mockResolvedValue({ data: postResult, error: null })
 
+  const seoBuilder = {
+    select: vi.fn(),
+    eq: vi.fn(),
+    maybeSingle: vi.fn(),
+  }
+  seoBuilder.select.mockReturnValue(seoBuilder)
+  seoBuilder.eq.mockReturnValue(seoBuilder)
+  seoBuilder.maybeSingle.mockResolvedValue({ data: null, error: null })
+
   return {
     client: {
       from: vi.fn((table: string) =>
-        table === 'categories' ? categoryBuilder : postBuilder,
+        table === 'categories'
+          ? categoryBuilder
+          : table === 'seo_data'
+            ? seoBuilder
+            : postBuilder,
       ),
     } as unknown as DatabaseClient,
     postBuilder,
@@ -96,6 +113,9 @@ describe('ContentDetailPage', () => {
     expect(screen.getByText('#12')).toBeInTheDocument()
     expect(screen.queryByText(/브리핑 ID/)).not.toBeInTheDocument()
     expect(screen.getByText('중국어 학습 요약')).toBeInTheDocument()
+    expect(screen.getByText('WordPress 본문')).toBeInTheDocument()
+    expect(screen.getAllByText('SEO').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('미입력').length).toBeGreaterThan(0)
   })
 
   it('shows a safe not-found state for inaccessible content', async () => {

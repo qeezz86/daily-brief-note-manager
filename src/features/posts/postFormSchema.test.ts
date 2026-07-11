@@ -12,6 +12,13 @@ const validValues = {
   briefingDate: '',
   publishedOn: '',
   wordpressUrl: '',
+  htmlBody: '',
+  representativeTitle: '',
+  alternativeTitles: ['', '', '', ''],
+  metaDescription: '',
+  focusKeyword: '',
+  imagePrompt: '',
+  imageAlt: '',
 }
 
 describe('postFormSchema', () => {
@@ -79,5 +86,63 @@ describe('postFormSchema', () => {
 
     expect(result.title).toBe('AI 에이전트 이해하기')
     expect(result.wordpressUrl).toBe('')
+  })
+
+  it('requires complete HTML, SEO, and image fields for ready content', () => {
+    const result = postFormSchema.safeParse({
+      ...validValues,
+      contentStatus: 'ready',
+    })
+
+    expect(result.success).toBe(false)
+    if (result.success) return
+    expect(result.error.issues.map((issue) => issue.path[0])).toEqual(
+      expect.arrayContaining([
+        'htmlBody',
+        'representativeTitle',
+        'alternativeTitles',
+        'metaDescription',
+        'focusKeyword',
+        'imagePrompt',
+        'imageAlt',
+      ]),
+    )
+  })
+
+  it('rejects duplicate alternative titles', () => {
+    const result = postFormSchema.safeParse({
+      ...validValues,
+      alternativeTitles: ['같은 제목', '다른 제목', '같은 제목', '또 다른 제목'],
+    })
+
+    expect(result.success).toBe(false)
+    if (result.success) return
+    expect(result.error.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ path: ['alternativeTitles'] }),
+      ]),
+    )
+  })
+
+  it('requires exactly four non-empty alternative titles for ready content', () => {
+    const result = postFormSchema.safeParse({
+      ...validValues,
+      contentStatus: 'ready',
+      htmlBody: '<div><h1>본문</h1></div>',
+      representativeTitle: '대표 제목',
+      alternativeTitles: ['대안 1', '대안 2', '대안 3', ''],
+      metaDescription: '메타 설명',
+      focusKeyword: '키워드',
+      imagePrompt: '프롬프트',
+      imageAlt: 'ALT',
+    })
+
+    expect(result.success).toBe(false)
+    if (result.success) return
+    expect(result.error.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ path: ['alternativeTitles'] }),
+      ]),
+    )
   })
 })

@@ -37,6 +37,10 @@ const post: PostDetail = {
   title: '경제 브리핑',
   summary: '경제 브리핑 요약',
   html_body: null,
+  image_prompt: null,
+  image_alt: null,
+  image_prompt_version: 1,
+  image_prompt_updated_at: null,
   slug: 'economy-briefing-2026-07-10',
   content_status: 'draft',
   wordpress_url: null,
@@ -128,13 +132,76 @@ describe('PostForm', () => {
     await browserUser.click(screen.getByRole('button', { name: '변경 사항 저장' }))
 
     expect(
-      await screen.findByText('본문을 작성한 후 상태를 변경할 수 있습니다.'),
+      await screen.findByText('발행 준비 또는 발행됨 상태에는 WordPress 본문 HTML이 필요합니다.'),
     ).toBeInTheDocument()
 
     await browserUser.selectOptions(screen.getByLabelText('상태'), 'published')
     await browserUser.type(screen.getByLabelText('발행일'), '2026-07-10')
     await browserUser.click(screen.getByRole('button', { name: '변경 사항 저장' }))
-    expect(screen.getByText('본문을 작성한 후 상태를 변경할 수 있습니다.')).toBeInTheDocument()
+    expect(screen.getByText('발행 준비 또는 발행됨 상태에는 WordPress 본문 HTML이 필요합니다.')).toBeInTheDocument()
+  })
+
+  it('renders HTML, SEO, and image fields on edit', () => {
+    render(
+      <PostForm
+        mode="edit"
+        categories={categories}
+        post={post}
+        isSaving={false}
+        submitError={null}
+        onSubmit={vi.fn().mockResolvedValue(undefined)}
+      />,
+    )
+
+    expect(screen.getByLabelText('HTML 본문')).toBeInTheDocument()
+    expect(screen.getByLabelText('SEO 대표 제목')).toBeInTheDocument()
+    expect(screen.getByLabelText('대안 제목 4')).toBeInTheDocument()
+    expect(screen.getByLabelText('메타 설명')).toBeInTheDocument()
+    expect(screen.getByLabelText('포커스 키워드')).toBeInTheDocument()
+    expect(screen.getByLabelText('이미지 프롬프트')).toBeInTheDocument()
+    expect(screen.getByLabelText('이미지 ALT 문구')).toBeInTheDocument()
+  })
+
+  it('allows a draft to save with empty HTML, SEO, and image fields', async () => {
+    const browserUser = userEvent.setup()
+    const onSubmit = vi.fn().mockResolvedValue(undefined)
+    render(
+      <PostForm
+        mode="edit"
+        categories={categories}
+        post={post}
+        isSaving={false}
+        submitError={null}
+        onSubmit={onSubmit}
+      />,
+    )
+
+    await browserUser.click(screen.getByRole('button', { name: '변경 사항 저장' }))
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({ htmlBody: '', contentStatus: 'draft' }),
+    )
+  })
+
+  it('runs strict validation when a draft contains HTML', async () => {
+    const browserUser = userEvent.setup()
+    const onSubmit = vi.fn().mockResolvedValue(undefined)
+    render(
+      <PostForm
+        mode="edit"
+        categories={categories}
+        post={post}
+        isSaving={false}
+        submitError={null}
+        onSubmit={onSubmit}
+      />,
+    )
+
+    await browserUser.type(screen.getByLabelText('HTML 본문'), '<h1>wrapper 없음</h1>')
+    await browserUser.click(screen.getByRole('button', { name: '변경 사항 저장' }))
+
+    expect(await screen.findByText('HTML을 수정해 주세요')).toBeInTheDocument()
+    expect(screen.getAllByText('최상위 wrapper가 없습니다.').length).toBeGreaterThan(0)
+    expect(onSubmit).not.toHaveBeenCalled()
   })
 
   it('keeps identity fields locked on edit', () => {

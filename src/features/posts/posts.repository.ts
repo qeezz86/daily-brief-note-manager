@@ -5,12 +5,15 @@ import type {
   PostDetail,
   PostInsert,
   PostListItem,
-  PostUpdate,
+  SeoData,
   UpdatePostInput,
 } from './posts.types'
 
 const postDetailFields =
-  'id, category_id, display_id, series_no, briefing_date, published_on, title, summary, html_body, slug, content_status, wordpress_url, created_at, updated_at'
+  'id, category_id, display_id, series_no, briefing_date, published_on, title, summary, html_body, slug, content_status, wordpress_url, image_prompt, image_alt, image_prompt_version, image_prompt_updated_at, created_at, updated_at'
+
+const seoDataFields =
+  'post_id, representative_title, alternative_titles, meta_description, focus_keyword'
 
 interface RepositoryError {
   code?: string
@@ -44,6 +47,17 @@ function throwPostError(error: RepositoryError): never {
   throw new Error('콘텐츠를 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.')
 }
 
+function throwPostEditorError(error: RepositoryError): never {
+  if (error.code === '23505') throwPostError(error)
+  if (error.code === '42501') {
+    throw new Error('수정할 콘텐츠를 찾을 수 없거나 접근 권한이 없습니다.')
+  }
+
+  throw new Error(
+    '콘텐츠 편집 정보를 저장하지 못했습니다. 기존 데이터는 변경되지 않았습니다.',
+  )
+}
+
 export async function getPosts(client: DatabaseClient): Promise<PostListItem[]> {
   const { data, error } = await client
     .from('posts')
@@ -72,6 +86,24 @@ export async function getPostById(
   if (error) {
     if (error.code === '22P02' || error.code === 'PGRST116') return null
     throw new Error('콘텐츠 상세 정보를 불러오지 못했습니다.')
+  }
+
+  return data
+}
+
+export async function getSeoDataByPostId(
+  client: DatabaseClient,
+  postId: string,
+): Promise<SeoData | null> {
+  const { data, error } = await client
+    .from('seo_data')
+    .select(seoDataFields)
+    .eq('post_id', postId)
+    .maybeSingle()
+
+  if (error) {
+    if (error.code === '22P02' || error.code === 'PGRST116') return null
+    throw new Error('SEO 정보를 불러오지 못했습니다.')
   }
 
   return data
@@ -138,22 +170,24 @@ export async function updatePost(
   postId: string,
   input: UpdatePostInput,
 ): Promise<PostDetail> {
-  const update: PostUpdate = {
-    title: input.title,
-    summary: input.summary,
-    slug: input.slug,
-    content_status: input.contentStatus,
-    published_on: input.publishedOn,
-    wordpress_url: input.wordpressUrl,
-  }
-  const { data, error } = await client
-    .from('posts')
-    .update(update)
-    .eq('id', postId)
-    .select(postDetailFields)
-    .maybeSingle()
+  const { data, error } = await client.rpc('save_post_editor', {
+    p_post_id: postId,
+    p_title: input.title,
+    p_summary: input.summary,
+    p_slug: input.slug,
+    p_content_status: input.contentStatus,
+    p_published_on: input.publishedOn,
+    p_wordpress_url: input.wordpressUrl,
+    p_html_body: input.htmlBody,
+    p_image_prompt: input.imagePrompt,
+    p_image_alt: input.imageAlt,
+    p_representative_title: input.representativeTitle,
+    p_alternative_titles: input.alternativeTitles,
+    p_meta_description: input.metaDescription,
+    p_focus_keyword: input.focusKeyword,
+  })
 
-  if (error) throwPostError(error)
+  if (error) throwPostEditorError(error)
   if (!data) throw new Error('수정할 콘텐츠를 찾을 수 없습니다.')
 
   return data

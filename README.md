@@ -2,7 +2,7 @@
 
 Daily Brief Note의 콘텐츠, SEO 정보, 출처, 뉴스 추적 이력과 생성 프롬프트를 관리하기 위한 비공개 웹앱입니다.
 
-현재 저장소는 Phase 2A 단계입니다. 이메일·비밀번호 인증, 보호 라우트, 초기 데이터베이스 migration, RLS, 카테고리 seed와 DB 테스트, 콘텐츠 목록과 기본 정보 생성·상세·수정·논리적 보관을 포함합니다. HTML·SEO·출처 가져오기, 뉴스 추적 UI, 프롬프트 생성기는 아직 구현하지 않았습니다.
+현재 저장소는 Phase 2B-1 단계입니다. 이메일·비밀번호 인증, 보호 라우트, 초기 데이터베이스 migration, RLS, 카테고리 seed와 DB 테스트, 콘텐츠 목록과 기본 정보 생성·상세·수정·논리적 보관, WordPress HTML·SEO·대표 이미지 정보 편집을 포함합니다. 태그·출처 입력, 가져오기, 뉴스 추적 UI, 프롬프트 생성기는 아직 구현하지 않았습니다.
 
 ## 요구 환경
 
@@ -82,6 +82,8 @@ npx supabase gen types typescript --local > src/shared/supabase/database.types.t
 ```
 
 로그인 후 `/content`에서 활성 카테고리와 현재 사용자의 콘텐츠를 조회하고 카테고리·상태·제목·slug로 필터링할 수 있습니다. `/content/new`에서 기본 정보를 생성하고, `/content/:postId`와 `/content/:postId/edit`에서 상세 조회와 수정을 할 수 있습니다. 삭제 대신 상태를 `archived`로 바꾸는 논리적 보관을 사용합니다.
+
+콘텐츠 수정 화면에서는 WordPress HTML 원문, SEO 대표 제목·대안 제목 4개·메타 설명·포커스 키워드, 대표 이미지 프롬프트와 ALT 문구를 입력합니다. HTML은 카테고리 설정의 wrapper를 기준으로 strict validation하며 화면에서 실행하지 않습니다. `ready`와 `published` 전환에는 유효한 HTML, 완성된 SEO, 이미지 프롬프트와 ALT가 필요하고 `published`에는 발행일도 필요합니다. posts와 seo_data는 `save_post_editor` RPC에서 한 트랜잭션으로 저장됩니다.
 
 Playwright 브라우저를 설치한 뒤 E2E 테스트를 실행할 수 있습니다.
 

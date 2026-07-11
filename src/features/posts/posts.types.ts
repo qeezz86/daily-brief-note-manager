@@ -37,11 +37,24 @@ export type PostDetail = Pick<
   | 'title'
   | 'summary'
   | 'html_body'
+  | 'image_prompt'
+  | 'image_alt'
+  | 'image_prompt_version'
+  | 'image_prompt_updated_at'
   | 'slug'
   | 'content_status'
   | 'wordpress_url'
   | 'created_at'
   | 'updated_at'
+>
+
+export type SeoData = Pick<
+  Tables<'seo_data'>,
+  | 'post_id'
+  | 'representative_title'
+  | 'alternative_titles'
+  | 'meta_description'
+  | 'focus_keyword'
 >
 
 export interface CreatePostInput {
@@ -63,6 +76,13 @@ export interface UpdatePostInput {
   contentStatus: ContentStatus
   publishedOn: string | null
   wordpressUrl: string | null
+  htmlBody: string | null
+  representativeTitle: string
+  alternativeTitles: string[]
+  metaDescription: string
+  focusKeyword: string
+  imagePrompt: string | null
+  imageAlt: string | null
 }
 
 export type PostInsert = TablesInsert<'posts'>
