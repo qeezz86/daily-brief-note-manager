@@ -25,6 +25,7 @@ export function AppLayout() {
           <nav className="app-navigation" aria-label="주요 메뉴">
             <NavLink to="/dashboard">대시보드</NavLink>
             <NavLink to="/content">콘텐츠</NavLink>
+            <NavLink to="/news-topics">뉴스 주제</NavLink>
           </nav>
           <div className="app-header__account">
             <span title={user?.email}>{user?.email}</span>

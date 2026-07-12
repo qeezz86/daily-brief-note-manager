@@ -517,9 +517,7 @@ updated_at          timestamptz
 - `closed`: 종료 또는 현재 기준 후속 추적 종료
 - `reopened`: 종료 후 의미 있는 새 진전 발생
 
-`topic_key`는 수동 지정 가능하며 카테고리 내 unique를 권장한다.
-
-DB에서는 `unique (owner_id, category_id, topic_key)`로 강제한다.
+`topic_key`는 영문 소문자·숫자·하이픈으로 수동 지정하고 생성 후 변경하지 않는다. 제목이 바뀌어도 자동 재생성하지 않는다. DB에서는 사용자·카테고리별 `lower(btrim(topic_key))` normalized unique를 강제하며 기존 키를 자동 변경하지 않는다.
 
 예:
 
@@ -528,6 +526,15 @@ semiconductor-export-controls-2026
 korea-base-rate-july-2026
 eu-ai-act-enforcement
 ```
+
+신규 상태는 `active` 또는 `monitoring`만 허용한다. 상태 변경은 일반 수정과 분리하고 다음 전환만 허용한다.
+
+- `active` → `monitoring`, `closed`
+- `monitoring` → `active`, `closed`
+- `closed` → `reopened`
+- `reopened` → `active`, `monitoring`, `closed`
+
+`closed` 전환에는 `closed_reason`이 필수다. 재개 시 기존 `closed_reason`은 마지막 종료 사유로 보존하고 재개 사유는 상태 이력에 기록한다. `transition_news_topic_status` RPC가 소유권과 뉴스 카테고리를 검증한 뒤 상태, 종료 사유와 이력을 원자 저장한다. 뉴스 주제의 물리 삭제 UI는 제공하지 않는다. `news_updates`, `news_followups`와 게시물 연결은 후속 단계에서 구현한다.
 
 ## 7.2 `news_updates`
 

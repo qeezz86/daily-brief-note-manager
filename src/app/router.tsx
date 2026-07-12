@@ -16,6 +16,10 @@ import { ContentCreatePage } from '../pages/ContentCreatePage'
 import { ContentDetailPage } from '../pages/ContentDetailPage'
 import { ContentEditPage } from '../pages/ContentEditPage'
 import { NotFoundPage } from '../pages/NotFoundPage'
+import { NewsTopicsPage } from '../pages/NewsTopicsPage'
+import { NewsTopicCreatePage } from '../pages/NewsTopicCreatePage'
+import { NewsTopicDetailPage } from '../pages/NewsTopicDetailPage'
+import { NewsTopicEditPage } from '../pages/NewsTopicEditPage'
 
 export const routes: RouteObject[] = [
   {
@@ -57,6 +61,10 @@ export const routes: RouteObject[] = [
             path: '/content/:postId/edit',
             element: <ContentEditPage />,
           },
+          { path: '/news-topics', element: <NewsTopicsPage /> },
+          { path: '/news-topics/new', element: <NewsTopicCreatePage /> },
+          { path: '/news-topics/:topicId', element: <NewsTopicDetailPage /> },
+          { path: '/news-topics/:topicId/edit', element: <NewsTopicEditPage /> },
           {
             path: '*',
             element: <NotFoundPage />,

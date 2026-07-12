@@ -122,6 +122,17 @@ describe('authentication foundation', () => {
     ).toBeInTheDocument()
   })
 
+  it('protects the news topic route for unauthenticated users', async () => {
+    const { client } = createMockClient()
+    renderApp(client, '/news-topics')
+    expect(await screen.findByRole('heading', { name: '관리자 로그인' })).toBeInTheDocument()
+  })
+
+  it('shows the configuration error on the news topic route without Supabase', () => {
+    renderApp(null, '/news-topics')
+    expect(screen.getByRole('heading', { name: 'Supabase 연결을 설정해 주세요' })).toBeInTheDocument()
+  })
+
   it('allows an authenticated user to open the dashboard', async () => {
     const { client } = createMockClient({ initialSession: session })
 

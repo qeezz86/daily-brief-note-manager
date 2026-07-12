@@ -341,6 +341,10 @@ AI·정보DB·중국어 학습의 `series_no`는 PostgreSQL RPC 함수로 원자
 
 복합 외래 키 부모용 `UNIQUE (id, owner_id)`를 둔다.
 
+`topic_key`는 새 입력에서 영문 소문자·숫자·하이픈 형식을 사용하며 생성 후 수정하지 않는다. 사용자·카테고리별 `lower(btrim(topic_key))` unique index로 대소문자와 가장자리 공백 우회를 차단하되 기존 값을 자동 변경하지 않는다. 생성 상태는 `active`, `monitoring`만 허용한다.
+
+허용 전환은 `active → monitoring|closed`, `monitoring → active|closed`, `closed → reopened`, `reopened → active|monitoring|closed`다. 같은 상태 저장은 거부한다. `closed`와 `reopened` 전환에는 각각 종료·재개 사유가 필요하다. 재개 후에도 마지막 `closed_reason`을 보존한다. `transition_news_topic_status(topic id, target status, reason)` RPC가 인증 사용자 소유권, 뉴스 카테고리와 전환을 확인하고 주제와 상태 이력을 한 트랜잭션으로 저장한다. 일반 사용자는 상태 이력을 직접 생성·수정·삭제할 수 없다.
+
 ### 7.2 `news_updates`
 
 | 열 | 형식 | 조건 |
@@ -393,6 +397,8 @@ AI·정보DB·중국어 학습의 `series_no`는 PostgreSQL RPC 함수로 원자
 | `changed_at` | timestamptz | 필수 |
 
 주제를 `closed`로 바꿀 때 `closed_reason`과 상태 이력을 함께 저장한다. 종료 후 의미 있는 진전이 생기면 `reopened` 상태와 재개 사유를 기록한다.
+
+Phase 3A-1 UI는 뉴스 주제의 물리 삭제를 지원하지 않는다. `news_updates`, `news_followups`와 게시물-주제 연결은 다음 단계 범위다.
 
 ## 8. 삭제 정책
 

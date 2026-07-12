@@ -726,6 +726,20 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      transition_news_topic_status: {
+        Args: {
+          p_reason?: string
+          p_target_status: string
+          p_topic_id: string
+        }
+        Returns: Database["public"]["Tables"]["news_topics"]["Row"]
+        SetofOptions: {
+          from: "*"
+          to: "news_topics"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       issue_series_no: {
         Args: { p_category_id: string; p_owner_id: string }
         Returns: number

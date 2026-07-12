@@ -2,7 +2,7 @@
 
 Daily Brief Note의 콘텐츠, SEO 정보, 출처, 뉴스 추적 이력과 생성 프롬프트를 관리하기 위한 비공개 웹앱입니다.
 
-현재 저장소는 Phase 2C-2 단계입니다. 이메일·비밀번호 인증, 보호 라우트, 초기 데이터베이스 migration, RLS, 카테고리 seed와 DB 테스트, 콘텐츠 목록과 기본 정보 생성·상세·수정·논리적 보관, WordPress HTML·SEO·대표 이미지 정보·태그·출처와 AI 칼럼·정보DB·중국어 학습 metadata 편집을 포함합니다. 가져오기, 뉴스 추적 UI, 프롬프트 생성기는 아직 구현하지 않았습니다.
+현재 저장소는 Phase 3A-1 단계입니다. 기존 콘텐츠 편집 기능에 더해 뉴스 주제 목록·생성·상세·기본 정보 수정, 상태 변경과 상태 이력 조회를 포함합니다. 가져오기, 뉴스 업데이트·후속 체크리스트, 게시물-주제 연결과 프롬프트 생성기는 아직 구현하지 않았습니다.
 
 ## 요구 환경
 
@@ -82,6 +82,8 @@ npx supabase gen types typescript --local > src/shared/supabase/database.types.t
 ```
 
 로그인 후 `/content`에서 활성 카테고리와 현재 사용자의 콘텐츠를 조회하고 카테고리·상태·제목·slug로 필터링할 수 있습니다. `/content/new`에서 기본 정보를 생성하고, `/content/:postId`와 `/content/:postId/edit`에서 상세 조회와 수정을 할 수 있습니다. 삭제 대신 상태를 `archived`로 바꾸는 논리적 보관을 사용합니다.
+
+`/news-topics`에서는 뉴스 카테고리의 주제를 카테고리·상태·대표 제목·주제 키로 필터링할 수 있습니다. 주제 키는 영문 소문자·숫자·하이픈으로 만들며 생성 후 변경하지 않습니다. 주제 상태는 `active`, `monitoring`, `closed`, `reopened`이고 전용 RPC가 상태·종료 사유·상태 이력을 한 트랜잭션으로 저장합니다. 재개 시 마지막 종료 사유는 보존하고 재개 사유는 상태 이력에 기록합니다. 뉴스 주제의 물리 삭제 UI는 제공하지 않습니다.
 
 콘텐츠 수정 화면에서는 WordPress HTML 원문, SEO 대표 제목·대안 제목 4개·메타 설명·포커스 키워드, 태그, 대표 이미지 프롬프트·ALT 문구와 순서가 있는 출처를 입력합니다. 카테고리 설정의 `content_group`이 `ai`이면 분야·난이도·예상 읽기 시간을, `info_db`이면 여기에 기준일까지 별도로 입력합니다. `ready`와 `published`에서 두 metadata의 분야·난이도·예상 읽기 시간은 필수이며, 난이도 저장값은 `beginner`·`intermediate`·`advanced`, 읽기 시간은 1~600분 정수다. 정보DB 기준일은 nullable이며 경고 안내만 제공한다. 빈 draft metadata는 저장하지 않고 기존 빈 draft metadata는 삭제하지만 archived의 기존 metadata는 보존한다. HTML은 카테고리 설정의 wrapper를 기준으로 strict validation하며 화면에서 실행하지 않습니다. `ready`와 `published` 전환에는 유효한 HTML, 완성된 SEO, 5~8개 태그, 이미지 프롬프트·ALT, 1개 이상의 완전한 출처와 HTML `#sources` 링크 일치가 필요하고 `published`에는 발행일도 필요합니다. `draft`와 기존 `archived` 데이터는 미완성을 허용합니다. AI 칼럼·정보DB·중국어 학습은 각각의 publication bundle RPC에서 posts·SEO·태그·출처·metadata를 한 트랜잭션으로 저장합니다.
 

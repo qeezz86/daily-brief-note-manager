@@ -596,6 +596,60 @@ a {
   background: #eef0ef;
 }
 
+.status-badge--active,
+.status-badge--reopened {
+  border-color: #a9cfbf;
+  color: #17634e;
+  background: #eff8f4;
+}
+
+.status-badge--monitoring {
+  border-color: #d7c783;
+  color: #67570f;
+  background: #fffbea;
+}
+
+.status-badge--closed {
+  color: #68736f;
+  background: #eef0ef;
+}
+
+.topic-transition-form {
+  display: grid;
+  margin-top: 16px;
+  gap: 14px;
+}
+
+.topic-transition-form .primary-button {
+  justify-self: start;
+  margin-top: 0;
+}
+
+.status-history-list {
+  display: grid;
+  margin: 16px 0 0;
+  padding-left: 22px;
+  gap: 14px;
+}
+
+.status-history-list li {
+  padding: 14px;
+  border: 1px solid #d9dfdc;
+  border-radius: 6px;
+}
+
+.status-history-list span {
+  display: block;
+  margin-top: 4px;
+  color: #68736f;
+  font-size: 0.8125rem;
+}
+
+.status-history-list p {
+  margin: 8px 0 0;
+  line-height: 1.6;
+}
+
 .content-card__details {
   display: grid;
   margin: 18px 0 0;
