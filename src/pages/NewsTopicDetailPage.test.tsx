@@ -11,7 +11,8 @@ function mockClient() {
   const category = { select: vi.fn(), eq: vi.fn(), order: vi.fn() }; category.select.mockReturnValue(category); category.eq.mockReturnValue(category); category.order.mockResolvedValue({ data: [{ id: 'economy', content_group: 'news', name: '경제', sort_order: 1, display_id_pattern: null, slug_pattern: 'x', wrapper_class: 'news' }], error: null })
   const detail = { select: vi.fn(), eq: vi.fn(), maybeSingle: vi.fn() }; detail.select.mockReturnValue(detail); detail.eq.mockReturnValue(detail); detail.maybeSingle.mockResolvedValue({ data: topic, error: null })
   const history = { select: vi.fn(), eq: vi.fn(), order: vi.fn() }; history.select.mockReturnValue(history); history.eq.mockReturnValue(history); history.order.mockResolvedValue({ data: [{ id: 'history-1', topic_id: 'topic-1', from_status: 'monitoring', to_status: 'active', reason: '다시 활성 추적', changed_at: '2026-07-02T00:00:00Z' }], error: null })
-  return { from: vi.fn((table: string) => table === 'categories' ? category : table === 'news_status_history' ? history : detail), rpc: vi.fn() } as unknown as DatabaseClient
+  const updates = { select: vi.fn(), eq: vi.fn(), order: vi.fn() }; updates.select.mockReturnValue(updates); updates.eq.mockReturnValue(updates); updates.order.mockResolvedValue({ data: [], error: null })
+  return { from: vi.fn((table: string) => table === 'categories' ? category : table === 'news_status_history' ? history : table === 'news_updates' ? updates : detail), rpc: vi.fn() } as unknown as DatabaseClient
 }
 function renderDetail() { const qc = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } }); return render(<QueryClientProvider client={qc}><MemoryRouter><NewsTopicDetailPageContent client={mockClient()} userId="owner" topicId="topic-1" /></MemoryRouter></QueryClientProvider>) }
 

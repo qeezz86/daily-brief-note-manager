@@ -20,6 +20,8 @@ import {
   useSeoDataQuery,
 } from '../features/posts/posts.queries'
 import { supabase, type DatabaseClient } from '../shared/supabase/client'
+import { usePostNewsUpdatesQuery, useReorderNewsUpdatesMutation } from '../features/newsUpdates/newsUpdates.queries'
+import { newsUpdateTypeLabels, type NewsUpdateType } from '../features/newsUpdates/newsUpdates.types'
 
 interface ContentDetailPageContentProps {
   client?: DatabaseClient | null
@@ -43,6 +45,8 @@ export function ContentDetailPageContent({
   const aiMetadataQuery = useAiMetadataQuery(client, userId, postId)
   const infoDbMetadataQuery = useInfoDbMetadataQuery(client, userId, postId)
   const archiveMutation = useArchivePostMutation(client, userId, postId)
+  const newsUpdatesQuery = usePostNewsUpdatesQuery(client, userId, postId)
+  const reorderMutation = useReorderNewsUpdatesMutation(client, userId, postId)
   const post = postQuery.data
   const seoData = seoQuery.data
   const alternativeTitles = Array.isArray(seoData?.alternative_titles)
@@ -83,7 +87,17 @@ export function ContentDetailPageContent({
     }
   }
 
-  if (postQuery.isPending || seoQuery.isPending || categoriesQuery.isPending || tagsQuery.isPending || sourcesQuery.isPending || chineseMetadataQuery.isPending || aiMetadataQuery.isPending || infoDbMetadataQuery.isPending) {
+  async function moveUpdate(index: number, direction: -1 | 1) {
+    const updates = newsUpdatesQuery.data ?? []
+    const target = index + direction
+    if (target < 0 || target >= updates.length) return
+    const ids = updates.map((item) => item.id)
+    ;[ids[index], ids[target]] = [ids[target], ids[index]]
+    setActionError(null)
+    try { await reorderMutation.mutateAsync(ids) } catch (cause) { setActionError(cause instanceof Error ? cause.message : '뉴스 항목 순서를 저장할 수 없습니다.') }
+  }
+
+  if (postQuery.isPending || seoQuery.isPending || categoriesQuery.isPending || tagsQuery.isPending || sourcesQuery.isPending || chineseMetadataQuery.isPending || aiMetadataQuery.isPending || infoDbMetadataQuery.isPending || newsUpdatesQuery.isPending) {
     return (
       <div className="content-state" role="status">
         <span className="loading-indicator" aria-hidden="true" />
@@ -92,7 +106,7 @@ export function ContentDetailPageContent({
     )
   }
 
-  if (postQuery.isError || seoQuery.isError || categoriesQuery.isError || tagsQuery.isError || sourcesQuery.isError || chineseMetadataQuery.isError || aiMetadataQuery.isError || infoDbMetadataQuery.isError) {
+  if (postQuery.isError || seoQuery.isError || categoriesQuery.isError || tagsQuery.isError || sourcesQuery.isError || chineseMetadataQuery.isError || aiMetadataQuery.isError || infoDbMetadataQuery.isError || newsUpdatesQuery.isError) {
     return (
       <div className="content-state content-state--error" role="alert">
         <h1>콘텐츠를 불러오지 못했습니다</h1>
@@ -151,6 +165,8 @@ export function ContentDetailPageContent({
         <h2 id="post-summary-title">요약</h2>
         <p>{post.summary}</p>
       </section>
+
+      {category?.content_group === 'news' ? <section className="content-detail__section" aria-labelledby="news-items-title"><div className="page-heading-with-actions"><h2 id="news-items-title">뉴스 항목 ({newsUpdatesQuery.data?.length ?? 0}개)</h2><Link className="primary-link primary-link--inline" to={`/content/${post.id}/news-updates/new`}>뉴스 항목 추가</Link></div>{newsUpdatesQuery.data?.length ? <ol className="news-update-list">{newsUpdatesQuery.data.map((item, index, items) => <li key={item.id}><div><strong>{item.item_order}. {item.headline}</strong><span className="status-badge">{newsUpdateTypeLabels[item.update_type as NewsUpdateType] ?? item.update_type}</span></div><p><Link to={`/news-topics/${item.topic.id}`}>{item.topic.canonical_title}</Link></p><p>{item.fact_summary}</p>{item.change_summary ? <p><strong>변화:</strong> {item.change_summary}</p> : null}<p className="field-help">연결 출처 {item.sources.length}개</p><div className="detail-actions"><Link to={`/news-updates/${item.id}`}>상세 보기</Link><Link to={`/news-updates/${item.id}/edit`}>수정</Link><button type="button" disabled={index === 0 || reorderMutation.isPending} onClick={() => void moveUpdate(index, -1)}>위로 이동</button><button type="button" disabled={index === items.length - 1 || reorderMutation.isPending} onClick={() => void moveUpdate(index, 1)}>아래로 이동</button></div></li>)}</ol> : <p className="field-help">등록된 뉴스 항목이 없습니다.</p>}</section> : null}
 
       <section className="content-detail__section" aria-labelledby="completion-title">
         <h2 id="completion-title">콘텐츠 완성 상태</h2>

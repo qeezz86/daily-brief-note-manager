@@ -564,6 +564,10 @@ updated_at             timestamptz
 - `correction`
 - `closure_note`
 
+Phase 3A-2에서는 뉴스 게시물과 같은 카테고리의 뉴스 주제만 연결한다. `item_order`는 게시물별 1부터 연속으로 관리한다. `new`는 이전 업데이트를 허용하지 않고, `follow_up`, `correction`, `closure_note`는 같은 주제의 이전 업데이트와 변경 요약이 필수다. `closure_note`는 현재 상태가 `closed`인 주제에만 생성한다.
+
+생성·수정·순서 변경은 `create_news_update`, `update_news_update`, `reorder_news_updates` RPC에서 원자 처리한다. 업데이트는 게시물에 속한 미연결 출처를 하나 이상 사용한다. 현재 단일 `sources.news_update_id` 구조 때문에 한 출처를 여러 업데이트가 공유할 수 없다. 물리 삭제 UI는 제공하지 않으며 `news_followups`는 다음 단계 범위다.
+
 업데이트 판단 기준:
 
 - 공식 발표

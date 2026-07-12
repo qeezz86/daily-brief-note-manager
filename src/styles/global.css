@@ -9,6 +9,13 @@
   letter-spacing: 0;
 }
 
+.news-update-list { display: grid; gap: 1rem; padding-left: 1.25rem; }
+.news-update-list > li { padding: 1rem; border: 1px solid var(--border-color, #d8dee8); border-radius: .75rem; }
+.news-update-list > li > div:first-child { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem; }
+.checkbox-list { display: grid; gap: .75rem; border: 0; padding: 0; }
+.checkbox-list label { display: flex; align-items: flex-start; gap: .6rem; padding: .75rem; border: 1px solid var(--border-color, #d8dee8); border-radius: .6rem; }
+.checkbox-list input { margin-top: .2rem; }
+
 * {
   box-sizing: border-box;
 }

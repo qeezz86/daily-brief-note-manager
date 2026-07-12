@@ -726,16 +726,38 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      transition_news_topic_status: {
+      create_news_update: {
         Args: {
-          p_reason?: string
-          p_target_status: string
+          p_change_summary?: string
+          p_fact_summary: string
+          p_headline: string
+          p_impact_summary?: string
+          p_importance_summary?: string
+          p_post_id: string
+          p_previous_update_id?: string
+          p_source_ids?: string[]
           p_topic_id: string
+          p_update_type: string
         }
-        Returns: Database["public"]["Tables"]["news_topics"]["Row"]
+        Returns: {
+          change_summary: string | null
+          created_at: string
+          fact_summary: string
+          headline: string
+          id: string
+          impact_summary: string | null
+          importance_summary: string | null
+          item_order: number
+          owner_id: string
+          post_id: string
+          previous_update_id: string | null
+          topic_id: string
+          update_type: string
+          updated_at: string
+        }
         SetofOptions: {
           from: "*"
-          to: "news_topics"
+          to: "news_updates"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -743,6 +765,10 @@ export type Database = {
       issue_series_no: {
         Args: { p_category_id: string; p_owner_id: string }
         Returns: number
+      }
+      reorder_news_updates: {
+        Args: { p_post_id: string; p_update_ids: string[] }
+        Returns: undefined
       }
       save_ai_publication_bundle: {
         Args: {
@@ -1014,6 +1040,112 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "posts"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      save_post_publication_bundle_base: {
+        Args: {
+          p_alternative_titles: string[]
+          p_content_status: string
+          p_focus_keyword: string
+          p_html_body: string
+          p_image_alt: string
+          p_image_prompt: string
+          p_meta_description: string
+          p_post_id: string
+          p_published_on: string
+          p_representative_title: string
+          p_slug: string
+          p_sources: Json
+          p_summary: string
+          p_tags: Json
+          p_title: string
+          p_wordpress_url: string
+        }
+        Returns: {
+          briefing_date: string | null
+          category_id: string
+          content_status: string
+          created_at: string
+          display_id: string | null
+          html_body: string | null
+          id: string
+          image_alt: string | null
+          image_prompt: string | null
+          image_prompt_updated_at: string | null
+          image_prompt_version: number
+          owner_id: string
+          published_at: string | null
+          published_on: string | null
+          series_no: number | null
+          slug: string
+          source_import_type: string
+          summary: string
+          title: string
+          updated_at: string
+          wordpress_url: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "posts"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      transition_news_topic_status: {
+        Args: { p_reason?: string; p_target_status: string; p_topic_id: string }
+        Returns: {
+          canonical_title: string
+          category_id: string
+          closed_reason: string | null
+          created_at: string
+          first_seen_at: string
+          id: string
+          last_seen_at: string
+          owner_id: string
+          status: string
+          topic_key: string
+          topic_summary: string | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "news_topics"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      update_news_update: {
+        Args: {
+          p_change_summary?: string
+          p_fact_summary: string
+          p_headline: string
+          p_impact_summary?: string
+          p_importance_summary?: string
+          p_previous_update_id?: string
+          p_source_ids?: string[]
+          p_update_id: string
+        }
+        Returns: {
+          change_summary: string | null
+          created_at: string
+          fact_summary: string
+          headline: string
+          id: string
+          impact_summary: string | null
+          importance_summary: string | null
+          item_order: number
+          owner_id: string
+          post_id: string
+          previous_update_id: string | null
+          topic_id: string
+          update_type: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "news_updates"
           isOneToOne: true
           isSetofReturn: false
         }

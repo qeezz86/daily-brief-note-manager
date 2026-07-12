@@ -90,6 +90,10 @@ function createClient(postResult: PostDetail | null, tags: PostTag[] = [], sourc
   infoDbMetadataBuilder.select.mockReturnValue(infoDbMetadataBuilder)
   infoDbMetadataBuilder.eq.mockReturnValue(infoDbMetadataBuilder)
   infoDbMetadataBuilder.maybeSingle.mockResolvedValue({ data: infoDbMetadata, error: null })
+  const newsUpdatesBuilder = { select: vi.fn(), eq: vi.fn(), order: vi.fn() }
+  newsUpdatesBuilder.select.mockReturnValue(newsUpdatesBuilder)
+  newsUpdatesBuilder.eq.mockReturnValue(newsUpdatesBuilder)
+  newsUpdatesBuilder.order.mockResolvedValue({ data: [], error: null })
 
   return {
     client: {
@@ -108,6 +112,8 @@ function createClient(postResult: PostDetail | null, tags: PostTag[] = [], sourc
                     ? aiMetadataBuilder
                     : table === 'info_db_metadata'
                       ? infoDbMetadataBuilder
+                      : table === 'news_updates'
+                        ? newsUpdatesBuilder
                   : postBuilder,
       ),
     } as unknown as DatabaseClient,

@@ -368,6 +368,10 @@ AI·정보DB·중국어 학습의 `series_no`는 PostgreSQL RPC 함수로 원자
 
 `previous_update_id`가 있으면 `(previous_update_id, owner_id)`가 `news_updates(id, owner_id)`를 참조한다. `news_updates`는 다른 하위 테이블의 부모가 되므로 복합 외래 키 부모용 `UNIQUE (id, owner_id)`를 둔다.
 
+`item_order`는 1부터 시작하며 `(post_id, item_order)` unique index로 중복을 막는다. 생성 RPC는 같은 게시물 행을 잠그고 다음 순서를 계산한다. `new`는 `previous_update_id`가 null이어야 하며, 나머지 유형은 같은 주제의 접근 가능한 이전 행과 `change_summary`가 필요하다. `closure_note`는 종료된 주제에만 허용한다.
+
+`create_news_update`와 `update_news_update`는 post/topic 소유권·뉴스 카테고리·카테고리 일치·이전 업데이트·출처를 검증하고 업데이트와 `sources.news_update_id`를 한 트랜잭션으로 저장한다. `reorder_news_updates`는 게시물의 모든 업데이트 ID가 정확히 한 번씩 전달된 경우에만 1부터 재부여한다. 일반 사용자의 `news_updates` 직접 INSERT·UPDATE·DELETE와 `sources.news_update_id` 직접 UPDATE는 허용하지 않는다. 한 source는 현재 FK 구조상 한 update에만 연결할 수 있다. 뉴스 업데이트 물리 삭제와 `news_followups` UI는 Phase 3A-2 범위 밖이다.
+
 ### 7.3 `news_followups`
 
 | 열 | 형식 | 조건 |
@@ -398,7 +402,7 @@ AI·정보DB·중국어 학습의 `series_no`는 PostgreSQL RPC 함수로 원자
 
 주제를 `closed`로 바꿀 때 `closed_reason`과 상태 이력을 함께 저장한다. 종료 후 의미 있는 진전이 생기면 `reopened` 상태와 재개 사유를 기록한다.
 
-Phase 3A-1 UI는 뉴스 주제의 물리 삭제를 지원하지 않는다. `news_updates`, `news_followups`와 게시물-주제 연결은 다음 단계 범위다.
+Phase 3A-2 UI는 뉴스 주제와 뉴스 업데이트의 물리 삭제를 지원하지 않는다. `news_followups`는 다음 단계 범위다.
 
 ## 8. 삭제 정책
 
