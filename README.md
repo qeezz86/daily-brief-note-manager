@@ -87,6 +87,8 @@ npx supabase gen types typescript --local > src/shared/supabase/database.types.t
 
 뉴스 게시물 상세에서는 같은 카테고리의 주제에 `new`, `follow_up`, `correction`, `closure_note` 업데이트를 연결합니다. 후속·정정·종료 메모에는 같은 주제의 이전 업데이트와 변경 요약이 필요하고, 모든 업데이트는 기존 게시물 출처를 하나 이상 연결합니다. 생성·수정·순서 변경은 전용 RPC로 원자 처리하며 물리 삭제는 지원하지 않습니다. 현재 `sources.news_update_id` 구조에서는 한 출처가 한 업데이트에만 연결됩니다.
 
+뉴스 업데이트에 연결된 출처는 콘텐츠 편집에서 제목·확인 내용 등 일반 정보를 수정할 수 있지만, 연결된 URL을 제거하려면 먼저 뉴스 항목 수정에서 다른 출처로 연결을 변경해야 합니다. publication bundle 저장이 실패하면 기존 출처 연결과 게시물 변경은 함께 rollback됩니다.
+
 콘텐츠 수정 화면에서는 WordPress HTML 원문, SEO 대표 제목·대안 제목 4개·메타 설명·포커스 키워드, 태그, 대표 이미지 프롬프트·ALT 문구와 순서가 있는 출처를 입력합니다. 카테고리 설정의 `content_group`이 `ai`이면 분야·난이도·예상 읽기 시간을, `info_db`이면 여기에 기준일까지 별도로 입력합니다. `ready`와 `published`에서 두 metadata의 분야·난이도·예상 읽기 시간은 필수이며, 난이도 저장값은 `beginner`·`intermediate`·`advanced`, 읽기 시간은 1~600분 정수다. 정보DB 기준일은 nullable이며 경고 안내만 제공한다. 빈 draft metadata는 저장하지 않고 기존 빈 draft metadata는 삭제하지만 archived의 기존 metadata는 보존한다. HTML은 카테고리 설정의 wrapper를 기준으로 strict validation하며 화면에서 실행하지 않습니다. `ready`와 `published` 전환에는 유효한 HTML, 완성된 SEO, 5~8개 태그, 이미지 프롬프트·ALT, 1개 이상의 완전한 출처와 HTML `#sources` 링크 일치가 필요하고 `published`에는 발행일도 필요합니다. `draft`와 기존 `archived` 데이터는 미완성을 허용합니다. AI 칼럼·정보DB·중국어 학습은 각각의 publication bundle RPC에서 posts·SEO·태그·출처·metadata를 한 트랜잭션으로 저장합니다.
 
 태그는 앞뒤 공백 제거와 내부 연속 공백 축소 후 대소문자를 무시하는 `normalized_name`으로 사용자별 unique를 보장합니다. 카테고리명, `Daily Brief Note`, `DailyBriefNote`, 제목 전체는 태그로 사용할 수 없습니다. 일반 출처의 게시 시각은 nullable입니다. 중국어 학습 `ready`·`published`에는 학습 주제, 프로그램명, 원문 제목·URL·실제 게시 시각, 본편 목록 포함 여부, 확인한 핵심 사실이 필요하며 원문 URL은 정규화 후 출처 URL 중 하나와 일치해야 합니다. `save_chinese_publication_bundle` RPC는 posts·SEO·태그·출처·중국어 metadata를 한 트랜잭션으로 저장합니다.

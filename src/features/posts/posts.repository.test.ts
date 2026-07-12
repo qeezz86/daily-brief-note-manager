@@ -323,6 +323,23 @@ describe('posts repository mutations', () => {
     })).rejects.toThrow('기존 데이터는 변경되지 않았습니다.')
   })
 
+  it('explains how to remove a source linked to a news update', async () => {
+    const client = {
+      rpc: vi.fn().mockResolvedValue({
+        data: null,
+        error: { code: '23514', message: 'NEWS_UPDATE_LINKED_SOURCE_REMOVED' },
+      }),
+    } as unknown as DatabaseClient
+
+    await expect(updatePost(client, 'post-1', {
+      title: '제목', summary: '요약', slug: 'slug', contentStatus: 'draft',
+      publishedOn: null, wordpressUrl: null, htmlBody: null,
+      representativeTitle: '', alternativeTitles: [], metaDescription: '',
+      focusKeyword: '', imagePrompt: null, imageAlt: null,
+      tags: [], sources: [],
+    })).rejects.toThrow('먼저 뉴스 항목에서 연결을 변경해야 삭제할 수 있습니다.')
+  })
+
   it('maps duplicate Chinese original URLs to a clear editor message', async () => {
     const client = {
       rpc: vi.fn().mockResolvedValue({ data: null, error: { code: '23505', message: 'CHINESE_METADATA_ORIGINAL_URL_DUPLICATE' } }),

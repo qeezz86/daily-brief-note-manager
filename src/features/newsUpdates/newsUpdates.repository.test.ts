@@ -15,6 +15,7 @@ describe('newsUpdates repository', () => {
     ['PREVIOUS_REQUIRED', '이전 업데이트가 필요합니다'],
     ['CHANGE_REQUIRED', '변경 내용을 입력해 주세요'],
     ['PREVIOUS_TOPIC_MISMATCH', '같은 뉴스 주제'],
+    ['PREVIOUS_CYCLE', '순환'],
     ['CLOSED_TOPIC_REQUIRED', '종료된 뉴스 주제'],
     ['SOURCE_REQUIRED', '하나 이상의 출처'],
     ['SOURCE_INVALID', '출처를 이 뉴스 항목에 연결'],

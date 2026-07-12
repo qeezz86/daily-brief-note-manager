@@ -70,6 +70,7 @@ function throwPostEditorError(error: RepositoryError): never {
   if (detail.includes('TAG_FORBIDDEN_CATEGORY')) throw new Error('카테고리명은 태그로 사용할 수 없습니다.')
   if (detail.includes('TAG_DUPLICATE')) throw new Error('동일한 태그가 이미 입력되어 있습니다.')
   if (detail.includes('SOURCE_DUPLICATE')) throw new Error('출처 URL이 중복되었습니다.')
+  if (detail.includes('NEWS_UPDATE_LINKED_SOURCE_REMOVED')) throw new Error('뉴스 항목에 연결된 출처는 먼저 뉴스 항목에서 연결을 변경해야 삭제할 수 있습니다.')
   if (detail.includes('SOURCE_REQUIRED') || detail.includes('SOURCE_INCOMPLETE')) throw new Error('출처 정보를 모두 입력해 주세요.')
   if (detail.includes('CHINESE_METADATA_URL_SOURCE_MISMATCH')) throw new Error('중국어 원문 URL과 출처 목록의 URL이 일치하지 않습니다.')
   if (detail.includes('CHINESE_METADATA_URL_INVALID')) throw new Error('공식 CCTV 개별 원문 URL을 입력해 주세요.')

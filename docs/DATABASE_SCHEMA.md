@@ -256,6 +256,8 @@ generic `sources`에는 중국어 전용 프로그램명과 본편 목록 포함
 
 `(post_id, owner_id)`는 `posts(id, owner_id)`를 `ON DELETE CASCADE`로 참조한다. `news_update_id`가 있으면 `(news_update_id, owner_id)`가 `news_updates(id, owner_id)`를 참조한다. 이 nullable 관계는 실제 PostgreSQL migration에서 `ON DELETE SET NULL (news_update_id)`를 사용해 `news_update_id`만 null로 만들고 `owner_id`는 유지한다.
 
+Phase 3A-2 이후 일반 사용자의 source 물리 삭제는 직접 테이블 쓰기가 아니라 publication bundle RPC를 통해 처리한다. 뉴스 업데이트에 연결된 source URL을 제거하려면 먼저 `update_news_update`로 연결을 변경해야 하며, publication bundle은 연결 URL 보존 여부를 확인하고 실패 시 게시물과 source 변경을 함께 rollback한다.
+
 ## 6. 카테고리별 메타데이터
 
 ### 6.1 `ai_metadata`

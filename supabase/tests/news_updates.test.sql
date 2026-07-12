@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(45);
+select plan(53);
 
 insert into auth.users (id, email) values
  ('00000000-0000-0000-0000-000000003a21', 'updates-owner@example.test'),
@@ -54,6 +54,7 @@ select is((select item_order from public.news_updates where headline='종료 메
 select lives_ok($$ select public.update_news_update((select id from public.news_updates where headline='후속 발표'),'후속 수정','수정된 사실','중요','영향','수치 변경',(select id from public.news_updates where headline='첫 발표'),array['3a220000-0000-0000-0000-000000000002','3a220000-0000-0000-0000-000000000004']::uuid[]) $$,'owner updates mutable fields');
 select results_eq($$ select post_id,topic_id,update_type,item_order from public.news_updates where headline='후속 수정' $$,$$ values ('3a200000-0000-0000-0000-000000000001'::uuid,'3a210000-0000-0000-0000-000000000001'::uuid,'follow_up'::text,2) $$,'identity fields unchanged');
 select throws_ok($$ select public.update_news_update((select id from public.news_updates where headline='후속 수정'),'자기 참조','사실',null,null,'변화',(select id from public.news_updates where headline='후속 수정'),array['3a220000-0000-0000-0000-000000000002']::uuid[]) $$,'22023',null::text,'self previous rejected');
+select throws_ok($$ select public.update_news_update((select id from public.news_updates where headline='후속 수정'),'순환 참조','사실',null,null,'변화',(select id from public.news_updates where headline='종료 메모'),array['3a220000-0000-0000-0000-000000000002','3a220000-0000-0000-0000-000000000004']::uuid[]) $$,'22023',null::text,'previous chain cycle rejected');
 select throws_ok($$ select public.update_news_update((select id from public.news_updates where headline='후속 수정'),'실패 수정','사실',null,null,'변화',(select id from public.news_updates where headline='첫 발표'),array['3a220000-0000-0000-0000-000000000003']::uuid[]) $$,'23514',null::text,'another update source rejected');
 select is((select headline from public.news_updates where update_type='follow_up'),'후속 수정','failed update rolls back fields');
 select lives_ok($$ select public.reorder_news_updates('3a200000-0000-0000-0000-000000000001',array[(select id from public.news_updates where headline='종료 메모'),(select id from public.news_updates where headline='후속 수정'),(select id from public.news_updates where headline='첫 발표')]::uuid[]) $$,'reorder succeeds');
@@ -62,6 +63,11 @@ select throws_ok($$ select public.reorder_news_updates('3a200000-0000-0000-0000-
 select throws_ok($$ select public.reorder_news_updates('3a200000-0000-0000-0000-000000000001',array[(select id from public.news_updates where headline='종료 메모'),(select id from public.news_updates where headline='종료 메모'),(select id from public.news_updates where headline='첫 발표')]::uuid[]) $$,'22023',null::text,'duplicate ids rejected');
 select throws_ok($$ select public.reorder_news_updates('3a200000-0000-0000-0000-000000000001',array[(select id from public.news_updates where headline='종료 메모'),(select id from public.news_updates where headline='후속 수정'),'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'::uuid]::uuid[]) $$,'22023',null::text,'foreign ids rejected');
 select results_eq($$ select headline from public.news_updates where post_id='3a200000-0000-0000-0000-000000000001' order by item_order $$,$$ values ('종료 메모'::text),('후속 수정'::text),('첫 발표'::text) $$,'failed reorder preserves order');
+select lives_ok($$ select public.create_news_update('3a200000-0000-0000-0000-000000000002','3a210000-0000-0000-0000-000000000002','new','번들 연결','사실',null,null,null,null,array['3a220000-0000-0000-0000-000000000009']::uuid[]) $$,'publication regression update created');
+select lives_ok($$ select public.save_post_publication_bundle('3a200000-0000-0000-0000-000000000002','경제 2 수정','요약','eco-2','draft',null,null,null,null,null,null,array[]::text[],'',null,'[]'::jsonb,'[{"source_name":"수정 기관","source_title":"수정 자료","source_url":"https://example.com/9","source_published_at":null,"checked_point":"수정 확인","sort_order":0}]'::jsonb) $$,'publication bundle edits linked source fields');
+select ok((select source_title='수정 자료' and news_update_id=(select id from public.news_updates where headline='번들 연결') from public.sources where post_id='3a200000-0000-0000-0000-000000000002'),'publication bundle preserves update link');
+select throws_ok($$ select public.save_post_publication_bundle('3a200000-0000-0000-0000-000000000002','롤백 제목','요약','eco-2','draft',null,null,null,null,null,null,array[]::text[],'',null,'[]'::jsonb,'[{"source_name":"대체 기관","source_title":"대체 자료","source_url":"https://example.com/replaced","source_published_at":null,"checked_point":"대체 확인","sort_order":0}]'::jsonb) $$,'23514',null::text,'publication bundle rejects linked source removal');
+select ok((select source_title='수정 자료' and news_update_id=(select id from public.news_updates where headline='번들 연결') from public.sources where post_id='3a200000-0000-0000-0000-000000000002') and (select title='경제 2 수정' from public.posts where id='3a200000-0000-0000-0000-000000000002'),'failed publication bundle rolls back source link and post fields');
 set local role anon; set local "request.jwt.claims" = '{"role":"anon"}';
 select throws_ok($$ select public.create_news_update('3a200000-0000-0000-0000-000000000001','3a210000-0000-0000-0000-000000000001','new','anon','사실',null,null,null,null,array['3a220000-0000-0000-0000-000000000005']::uuid[]) $$,'42501',null::text,'anon cannot execute');
 set local role authenticated; set local "request.jwt.claims" = '{"role":"authenticated"}';
@@ -72,6 +78,8 @@ select throws_ok($$ update public.news_updates set headline='직접 수정' wher
 select throws_ok($$ delete from public.news_updates where headline='첫 발표' $$,'42501',null::text,'direct delete denied');
 select throws_ok($$ update public.sources set news_update_id=null where id='3a220000-0000-0000-0000-000000000001' $$,'42501',null::text,'direct source relation update denied');
 select throws_ok($$ insert into public.sources(owner_id,post_id,news_update_id,source_name,source_title,source_url,checked_point) values('00000000-0000-0000-0000-000000003a21','3a200000-0000-0000-0000-000000000001',(select id from public.news_updates limit 1),'직접','직접','https://example.com/direct','확인') $$,'42501',null::text,'direct source relation insert denied');
+select lives_ok($$ update public.sources set source_title='일반 필드 수정' where id='3a220000-0000-0000-0000-000000000001' $$,'ordinary source fields remain directly editable');
+select throws_ok($$ delete from public.sources where id='3a220000-0000-0000-0000-000000000001' $$,'42501',null::text,'linked source cannot be deleted directly');
 select ok(has_function_privilege('authenticated','public.save_post_publication_bundle(uuid,text,text,text,text,date,text,text,text,text,text,text[],text,text,jsonb,jsonb)','EXECUTE'),'publication source bundle remains executable');
 select ok((select count(*)=3 from public.news_updates where post_id='3a200000-0000-0000-0000-000000000001'),'all successful updates remain');
 select * from finish();
