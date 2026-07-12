@@ -726,6 +726,33 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_news_followup: {
+        Args: {
+          p_check_text: string
+          p_due_date?: string
+          p_priority?: string
+          p_topic_id: string
+        }
+        Returns: {
+          check_text: string
+          created_at: string
+          due_date: string | null
+          id: string
+          owner_id: string
+          priority: string
+          resolution_note: string | null
+          resolved_at: string | null
+          status: string
+          topic_id: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "news_followups"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       create_news_update: {
         Args: {
           p_change_summary?: string
@@ -769,6 +796,32 @@ export type Database = {
       reorder_news_updates: {
         Args: { p_post_id: string; p_update_ids: string[] }
         Returns: undefined
+      }
+      resolve_news_followup: {
+        Args: {
+          p_followup_id: string
+          p_resolution_note: string
+          p_target_status: string
+        }
+        Returns: {
+          check_text: string
+          created_at: string
+          due_date: string | null
+          id: string
+          owner_id: string
+          priority: string
+          resolution_note: string | null
+          resolved_at: string | null
+          status: string
+          topic_id: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "news_followups"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       save_ai_publication_bundle: {
         Args: {
@@ -1093,6 +1146,55 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      save_post_publication_bundle_with_links_base: {
+        Args: {
+          p_alternative_titles: string[]
+          p_content_status: string
+          p_focus_keyword: string
+          p_html_body: string
+          p_image_alt: string
+          p_image_prompt: string
+          p_meta_description: string
+          p_post_id: string
+          p_published_on: string
+          p_representative_title: string
+          p_slug: string
+          p_sources: Json
+          p_summary: string
+          p_tags: Json
+          p_title: string
+          p_wordpress_url: string
+        }
+        Returns: {
+          briefing_date: string | null
+          category_id: string
+          content_status: string
+          created_at: string
+          display_id: string | null
+          html_body: string | null
+          id: string
+          image_alt: string | null
+          image_prompt: string | null
+          image_prompt_updated_at: string | null
+          image_prompt_version: number
+          owner_id: string
+          published_at: string | null
+          published_on: string | null
+          series_no: number | null
+          slug: string
+          source_import_type: string
+          summary: string
+          title: string
+          updated_at: string
+          wordpress_url: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "posts"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       transition_news_topic_status: {
         Args: { p_reason?: string; p_target_status: string; p_topic_id: string }
         Returns: {
@@ -1112,6 +1214,33 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "news_topics"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      update_news_followup: {
+        Args: {
+          p_check_text: string
+          p_due_date?: string
+          p_followup_id: string
+          p_priority?: string
+        }
+        Returns: {
+          check_text: string
+          created_at: string
+          due_date: string | null
+          id: string
+          owner_id: string
+          priority: string
+          resolution_note: string | null
+          resolved_at: string | null
+          status: string
+          topic_id: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "news_followups"
           isOneToOne: true
           isSetofReturn: false
         }

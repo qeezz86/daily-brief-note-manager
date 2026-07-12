@@ -26,6 +26,7 @@ export function AppLayout() {
             <NavLink to="/dashboard">대시보드</NavLink>
             <NavLink to="/content">콘텐츠</NavLink>
             <NavLink to="/news-topics">뉴스 주제</NavLink>
+            <NavLink to="/news-followups">후속 확인</NavLink>
           </nav>
           <div className="app-header__account">
             <span title={user?.email}>{user?.email}</span>

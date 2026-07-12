@@ -611,6 +611,12 @@ updated_at        timestamptz
 - `normal`
 - `low`
 
+신규 항목은 항상 `pending`으로 생성하며 `pending`에서 `done` 또는 `cancelled`로만 전환한다. 완료·취소에는 trim 후 비어 있지 않은 `resolution_note`가 필요하고 `resolved_at`은 상태 전환 RPC가 DB 현재 시각으로 설정한다. 처리된 항목을 `pending`으로 되돌리는 기능과 물리 삭제는 제공하지 않는다.
+
+`due_date`는 시각을 붙이지 않는 날짜 값이다. `Asia/Seoul` 기준 오늘보다 이전인 `pending` 항목만 마감 초과로 계산하며 이 값은 저장하지 않는다. 정렬은 pending, 마감 초과 pending, `high`·`normal`·`low`, 빠른 마감일, 최근 수정 순이다.
+
+`active`, `monitoring`, `reopened` 뉴스 주제에는 항목을 생성할 수 있다. `closed` 주제에는 신규 생성과 일반 수정을 금지하지만 기존 pending 항목의 완료·취소는 허용한다. 주제를 종료해도 pending 항목을 자동 완료·취소하지 않는다. `create_news_followup`, `update_news_followup`, `resolve_news_followup` RPC가 소유권·뉴스 카테고리·상태를 검증하며 일반 사용자의 직접 INSERT·UPDATE·DELETE는 허용하지 않는다. 다음 단계는 브리핑 프롬프트 생성이다.
+
 ## 7.4 `news_status_history`
 
 주제 상태 변경 이력을 보존한다.

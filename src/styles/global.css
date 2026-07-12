@@ -9,6 +9,26 @@
   letter-spacing: 0;
 }
 
+.followup-list { display: grid; gap: 1rem; padding: 0; list-style: none; }
+.followup-list__item { padding: 1rem; border: 1px solid var(--color-border, #d7dde5); border-radius: .75rem; background: #fff; }
+.followup-list__item--overdue { border-left: .35rem solid #b42318; }
+.followup-list__heading, .followup-actions, .followup-counts { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; }
+.followup-list__heading h3 { flex: 1 1 16rem; margin: 0; }
+.overdue-label { color: #b42318; }
+.followup-metadata, .followup-counts { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: .75rem; margin: 1rem 0; }
+.followup-metadata div, .followup-counts div { min-width: 0; }
+.followup-metadata dt, .followup-counts dt { color: #5b6472; font-size: .85rem; }
+.followup-metadata dd, .followup-counts dd { margin: .2rem 0 0; overflow-wrap: anywhere; }
+.followup-resolution { display: grid; gap: .5rem; margin-top: 1rem; padding: 1rem; border-radius: .5rem; background: #f6f8fa; }
+.followup-resolution textarea { width: 100%; }
+.filter-panel { display: grid; gap: 1rem; margin: 1.25rem 0; padding: 1rem; border: 1px solid #d7dde5; border-radius: .75rem; }
+.checkbox-inline { display: flex; align-items: center; gap: .5rem; }
+
+@media (max-width: 640px) {
+  .followup-actions > a, .followup-actions > button { width: 100%; text-align: center; }
+  .followup-metadata, .followup-counts { grid-template-columns: 1fr 1fr; }
+}
+
 .news-update-list { display: grid; gap: 1rem; padding-left: 1.25rem; }
 .news-update-list > li { padding: 1rem; border: 1px solid var(--border-color, #d8dee8); border-radius: .75rem; }
 .news-update-list > li > div:first-child { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem; }

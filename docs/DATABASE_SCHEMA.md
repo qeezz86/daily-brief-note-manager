@@ -390,6 +390,10 @@ AI·정보DB·중국어 학습의 `series_no`는 PostgreSQL RPC 함수로 원자
 | `created_at` | timestamptz | 필수 |
 | `updated_at` | timestamptz | 필수 |
 
+`create_news_followup`은 소유한 `active`, `monitoring`, `reopened` 뉴스 주제에 `pending` 항목만 생성한다. `update_news_followup`은 pending 항목의 `check_text`, `due_date`, `priority`만 수정하며 closed 주제에서는 차단한다. `resolve_news_followup`은 pending 항목을 `done` 또는 `cancelled`로 전환하면서 필수 해결 메모와 DB 현재 시각의 `resolved_at`을 원자 저장한다. 처리 항목의 reopen과 물리 삭제는 지원하지 않는다.
+
+authenticated 사용자는 `news_followups`를 직접 INSERT·UPDATE·DELETE할 수 없고 자기 행 SELECT만 가능하다. 세 RPC는 고정된 `search_path`를 사용하는 `SECURITY DEFINER` 함수이며 함수 안에서 사용자·주제 소유권과 `content_group = news`를 다시 검증한다. 마감 초과는 저장 컬럼이 아니라 `status = pending`이고 `due_date < (now() at time zone 'Asia/Seoul')::date`인 경우의 계산 값이다. 주제 종료 시 pending 항목은 자동 변경되지 않으며 완료·취소만 가능하다.
+
 ### 7.4 `news_status_history`
 
 | 열 | 형식 | 조건 |
@@ -404,7 +408,7 @@ AI·정보DB·중국어 학습의 `series_no`는 PostgreSQL RPC 함수로 원자
 
 주제를 `closed`로 바꿀 때 `closed_reason`과 상태 이력을 함께 저장한다. 종료 후 의미 있는 진전이 생기면 `reopened` 상태와 재개 사유를 기록한다.
 
-Phase 3A-2 UI는 뉴스 주제와 뉴스 업데이트의 물리 삭제를 지원하지 않는다. `news_followups`는 다음 단계 범위다.
+Phase 3A-3 UI는 뉴스 주제·뉴스 업데이트·후속 확인 항목의 물리 삭제를 지원하지 않는다. 다음 단계는 브리핑 프롬프트 생성이다.
 
 ## 8. 삭제 정책
 

@@ -1,0 +1,24 @@
+import { useMemo, useState } from 'react'
+import { useAuth } from '../features/auth/useAuth'
+import { useActiveCategoriesQuery } from '../features/categories/categories.queries'
+import { filterNewsFollowups } from '../features/newsFollowups/filterNewsFollowups'
+import { NewsFollowupList } from '../features/newsFollowups/NewsFollowupList'
+import { useNewsFollowupsQuery, useResolveNewsFollowupMutation } from '../features/newsFollowups/newsFollowups.queries'
+import { newsFollowupPriorities, newsFollowupPriorityLabels, newsFollowupStatuses, newsFollowupStatusLabels, type NewsFollowup, type NewsFollowupFilters, type ResolveNewsFollowupInput } from '../features/newsFollowups/newsFollowups.types'
+import { supabase, type DatabaseClient } from '../shared/supabase/client'
+
+const emptyFilters: NewsFollowupFilters = { categoryId: '', status: '', priority: '', overdueOnly: false, dueFrom: '', dueTo: '', search: '' }
+export function NewsFollowupsPageContent({ client = supabase, userId }: { client?: DatabaseClient | null; userId: string }) {
+  const listQuery = useNewsFollowupsQuery(client, userId); const categoriesQuery = useActiveCategoriesQuery(client); const mutation = useResolveNewsFollowupMutation(client, userId)
+  const [filters, setFilters] = useState<NewsFollowupFilters>(emptyFilters); const [error, setError] = useState<string | null>(null)
+  const items = useMemo(() => filterNewsFollowups(listQuery.data ?? [], filters), [listQuery.data, filters])
+  if (listQuery.isPending || categoriesQuery.isPending) return <div className="content-state" role="status">후속 확인 목록을 불러오고 있습니다.</div>
+  if (listQuery.isError || categoriesQuery.isError) return <div className="content-state content-state--error" role="alert"><h1>후속 확인 목록을 불러오지 못했습니다</h1><p>잠시 후 다시 시도해 주세요.</p></div>
+  async function resolve(item: NewsFollowup, input: ResolveNewsFollowupInput) { setError(null); try { await mutation.mutateAsync({ id: item.id, topicId: item.topic_id, input }) } catch (cause) { setError(cause instanceof Error ? cause.message : '후속 확인 상태를 변경할 수 없습니다.'); throw cause } }
+  return <section className="content-page"><div className="page-heading-with-actions"><div><p className="dashboard__eyebrow">News follow-ups</p><h1>후속 확인</h1><p>뉴스 주제별 확인 항목과 마감 상태를 관리합니다.</p></div></div>
+    <section className="filter-panel" aria-label="후속 확인 필터"><div className="form-grid"><div className="post-form__field"><label htmlFor="followup-category">카테고리</label><select id="followup-category" value={filters.categoryId} onChange={(e) => setFilters({ ...filters, categoryId: e.target.value })}><option value="">전체</option>{categoriesQuery.data?.filter((c) => c.content_group === 'news').map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div><div className="post-form__field"><label htmlFor="followup-status">상태</label><select id="followup-status" value={filters.status} onChange={(e) => setFilters({ ...filters, status: e.target.value as NewsFollowupFilters['status'] })}><option value="">전체</option>{newsFollowupStatuses.map((v) => <option key={v} value={v}>{newsFollowupStatusLabels[v]}</option>)}</select></div><div className="post-form__field"><label htmlFor="followup-priority-filter">우선순위</label><select id="followup-priority-filter" value={filters.priority} onChange={(e) => setFilters({ ...filters, priority: e.target.value as NewsFollowupFilters['priority'] })}><option value="">전체</option>{newsFollowupPriorities.map((v) => <option key={v} value={v}>{newsFollowupPriorityLabels[v]}</option>)}</select></div><div className="post-form__field"><label htmlFor="followup-search">검색</label><input id="followup-search" value={filters.search} onChange={(e) => setFilters({ ...filters, search: e.target.value })} placeholder="주제 제목 또는 확인 내용" /></div><div className="post-form__field"><label htmlFor="followup-due-from">마감 시작일</label><input id="followup-due-from" type="date" value={filters.dueFrom} onChange={(e) => setFilters({ ...filters, dueFrom: e.target.value })} /></div><div className="post-form__field"><label htmlFor="followup-due-to">마감 종료일</label><input id="followup-due-to" type="date" value={filters.dueTo} onChange={(e) => setFilters({ ...filters, dueTo: e.target.value })} /></div></div><label className="checkbox-inline"><input type="checkbox" checked={filters.overdueOnly} onChange={(e) => setFilters({ ...filters, overdueOnly: e.target.checked })} />마감 초과만 보기</label><button className="secondary-button" type="button" onClick={() => setFilters(emptyFilters)}>전체 초기화</button></section>
+    <p className="field-help">총 {items.length}개 항목</p>{error ? <p className="form-alert" role="alert">{error}</p> : null}<NewsFollowupList items={items} pending={mutation.isPending} onResolve={resolve} />
+  </section>
+}
+export function NewsFollowupsPage() { const { user } = useAuth(); return <NewsFollowupsPageContent userId={user?.id ?? ''} /> }
+

@@ -2,7 +2,7 @@
 
 Daily Brief Note의 콘텐츠, SEO 정보, 출처, 뉴스 추적 이력과 생성 프롬프트를 관리하기 위한 비공개 웹앱입니다.
 
-현재 저장소는 Phase 3A-2 단계입니다. 뉴스 주제 관리에 더해 뉴스 게시물의 개별 업데이트 생성·상세·수정·순서 변경과 게시물-주제 연결을 포함합니다. 가져오기, 후속 체크리스트와 프롬프트 생성기는 아직 구현하지 않았습니다.
+현재 저장소는 Phase 3A-3 단계입니다. 뉴스 주제와 업데이트 관리에 더해 뉴스 주제별 후속 확인 항목의 생성·수정·완료·취소, 마감 초과 확인과 전체 필터 화면을 포함합니다. 가져오기와 브리핑 프롬프트 생성기는 아직 구현하지 않았습니다.
 
 ## 요구 환경
 
@@ -88,6 +88,8 @@ npx supabase gen types typescript --local > src/shared/supabase/database.types.t
 뉴스 게시물 상세에서는 같은 카테고리의 주제에 `new`, `follow_up`, `correction`, `closure_note` 업데이트를 연결합니다. 후속·정정·종료 메모에는 같은 주제의 이전 업데이트와 변경 요약이 필요하고, 모든 업데이트는 기존 게시물 출처를 하나 이상 연결합니다. 생성·수정·순서 변경은 전용 RPC로 원자 처리하며 물리 삭제는 지원하지 않습니다. 현재 `sources.news_update_id` 구조에서는 한 출처가 한 업데이트에만 연결됩니다.
 
 뉴스 업데이트에 연결된 출처는 콘텐츠 편집에서 제목·확인 내용 등 일반 정보를 수정할 수 있지만, 연결된 URL을 제거하려면 먼저 뉴스 항목 수정에서 다른 출처로 연결을 변경해야 합니다. publication bundle 저장이 실패하면 기존 출처 연결과 게시물 변경은 함께 rollback됩니다.
+
+`/news-followups`에서는 상태·우선순위·카테고리·마감일·검색 조건으로 후속 확인 항목을 조회합니다. 신규 항목은 `pending`으로 생성되며 `done` 또는 `cancelled` 처리에는 해결 메모가 필요하고 `resolved_at`은 DB가 자동 기록합니다. 마감 초과는 `Asia/Seoul`의 오늘보다 이른 `pending` 마감일에만 적용됩니다. 종료된 주제에는 새 항목을 추가하거나 일반 내용을 수정할 수 없지만 기존 pending 항목의 완료·취소는 가능하며, 주제 종료 시 자동 처리되지 않습니다. 쓰기는 전용 RPC만 사용하고 물리 삭제와 처리 항목 재개는 지원하지 않습니다. 다음 단계는 저장된 데이터 기반 브리핑 프롬프트 생성입니다.
 
 콘텐츠 수정 화면에서는 WordPress HTML 원문, SEO 대표 제목·대안 제목 4개·메타 설명·포커스 키워드, 태그, 대표 이미지 프롬프트·ALT 문구와 순서가 있는 출처를 입력합니다. 카테고리 설정의 `content_group`이 `ai`이면 분야·난이도·예상 읽기 시간을, `info_db`이면 여기에 기준일까지 별도로 입력합니다. `ready`와 `published`에서 두 metadata의 분야·난이도·예상 읽기 시간은 필수이며, 난이도 저장값은 `beginner`·`intermediate`·`advanced`, 읽기 시간은 1~600분 정수다. 정보DB 기준일은 nullable이며 경고 안내만 제공한다. 빈 draft metadata는 저장하지 않고 기존 빈 draft metadata는 삭제하지만 archived의 기존 metadata는 보존한다. HTML은 카테고리 설정의 wrapper를 기준으로 strict validation하며 화면에서 실행하지 않습니다. `ready`와 `published` 전환에는 유효한 HTML, 완성된 SEO, 5~8개 태그, 이미지 프롬프트·ALT, 1개 이상의 완전한 출처와 HTML `#sources` 링크 일치가 필요하고 `published`에는 발행일도 필요합니다. `draft`와 기존 `archived` 데이터는 미완성을 허용합니다. AI 칼럼·정보DB·중국어 학습은 각각의 publication bundle RPC에서 posts·SEO·태그·출처·metadata를 한 트랜잭션으로 저장합니다.
 

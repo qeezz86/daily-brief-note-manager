@@ -23,6 +23,9 @@ import { NewsTopicEditPage } from '../pages/NewsTopicEditPage'
 import { NewsUpdateCreatePage } from '../pages/NewsUpdateCreatePage'
 import { NewsUpdateDetailPage } from '../pages/NewsUpdateDetailPage'
 import { NewsUpdateEditPage } from '../pages/NewsUpdateEditPage'
+import { NewsFollowupsPage } from '../pages/NewsFollowupsPage'
+import { NewsFollowupCreatePage } from '../pages/NewsFollowupCreatePage'
+import { NewsFollowupEditPage } from '../pages/NewsFollowupEditPage'
 
 export const routes: RouteObject[] = [
   {
@@ -71,6 +74,9 @@ export const routes: RouteObject[] = [
           { path: '/content/:postId/news-updates/new', element: <NewsUpdateCreatePage /> },
           { path: '/news-updates/:updateId', element: <NewsUpdateDetailPage /> },
           { path: '/news-updates/:updateId/edit', element: <NewsUpdateEditPage /> },
+          { path: '/news-followups', element: <NewsFollowupsPage /> },
+          { path: '/news-topics/:topicId/followups/new', element: <NewsFollowupCreatePage /> },
+          { path: '/news-followups/:followupId/edit', element: <NewsFollowupEditPage /> },
           {
             path: '*',
             element: <NotFoundPage />,

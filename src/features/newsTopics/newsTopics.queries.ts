@@ -25,5 +25,5 @@ export function useUpdateNewsTopicMutation(client: DatabaseClient | null, userId
 }
 export function useTransitionNewsTopicMutation(client: DatabaseClient | null, userId: string, topicId: string) {
   const qc = useQueryClient()
-  return useMutation({ mutationFn: (input: TransitionNewsTopicStatusInput) => transitionNewsTopicStatus(requireClient(client), topicId, input), onSuccess: (topic) => { qc.setQueryData(newsTopicQueryKeys.detail(userId, topicId), topic); void qc.invalidateQueries({ queryKey: newsTopicQueryKeys.list(userId) }); void qc.invalidateQueries({ queryKey: newsTopicQueryKeys.history(userId, topicId) }) } })
+  return useMutation({ mutationFn: (input: TransitionNewsTopicStatusInput) => transitionNewsTopicStatus(requireClient(client), topicId, input), onSuccess: (topic) => { qc.setQueryData(newsTopicQueryKeys.detail(userId, topicId), topic); void qc.invalidateQueries({ queryKey: newsTopicQueryKeys.list(userId) }); void qc.invalidateQueries({ queryKey: newsTopicQueryKeys.history(userId, topicId) }); void qc.invalidateQueries({ queryKey: ['news-followups'] }) } })
 }
