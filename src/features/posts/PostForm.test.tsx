@@ -17,6 +17,10 @@ const categories: Category[] = [
     wrapper_class: 'daily-brief-note news-briefing economy',
   },
   {
+    id: 'info-db', content_group: 'info_db', name: '정보DB', sort_order: 70,
+    display_id_pattern: '정보DB-###', slug_pattern: 'info-db-###', wrapper_class: 'daily-brief-note info-db',
+  },
+  {
     id: 'ai-column',
     content_group: 'ai',
     name: 'AI 칼럼',
@@ -67,6 +71,14 @@ function renderCreateForm(onSubmit = vi.fn().mockResolvedValue(undefined)) {
 }
 
 describe('PostForm', () => {
+  it('shows AI and information-DB metadata only for their content groups', () => {
+    render(<PostForm mode="edit" categories={categories} post={{ ...post, category_id: 'ai-column', display_id: 'AI-001', series_no: 1, briefing_date: null }} isSaving={false} submitError={null} onSubmit={vi.fn().mockResolvedValue(undefined)} />)
+    expect(screen.getByRole('group', { name: 'AI 칼럼 정보' })).toBeInTheDocument()
+    expect(screen.queryByRole('group', { name: '정보DB 정보' })).not.toBeInTheDocument()
+    render(<PostForm mode="edit" categories={categories} post={{ ...post, category_id: 'info-db', display_id: '정보DB-001', series_no: 1, briefing_date: null }} isSaving={false} submitError={null} onSubmit={vi.fn().mockResolvedValue(undefined)} />)
+    expect(screen.getByRole('group', { name: '정보DB 정보' })).toBeInTheDocument()
+    expect(screen.getAllByLabelText('기준일')).toHaveLength(1)
+  })
   it('shows Chinese metadata fields only for the Chinese study category', () => {
     render(
       <PostForm mode="edit" categories={categories} post={{ ...post, category_id: 'chinese-study', display_id: null, series_no: 1, briefing_date: null }}

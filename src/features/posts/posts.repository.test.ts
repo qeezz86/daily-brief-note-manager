@@ -269,6 +269,19 @@ describe('posts repository mutations', () => {
     }))
   })
 
+  it('maps AI and information-DB metadata to their atomic RPCs', async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: savedPost, error: null })
+    const client = { rpc } as unknown as DatabaseClient
+    const base = {
+      title: '제목', summary: '요약', slug: 'slug', contentStatus: 'draft' as const, publishedOn: null,
+      wordpressUrl: null, htmlBody: null, representativeTitle: '', alternativeTitles: [], metaDescription: '', focusKeyword: '', imagePrompt: null, imageAlt: null, tags: [], sources: [],
+    }
+    await updatePost(client, 'post-1', { ...base, contentGroup: 'ai', aiMetadata: { fieldName: '생성형 AI', difficulty: 'beginner', estimatedReadMin: 4 } })
+    expect(rpc).toHaveBeenLastCalledWith('save_ai_publication_bundle', expect.objectContaining({ p_ai_metadata: { field_name: '생성형 AI', difficulty: 'beginner', estimated_read_min: 4 } }))
+    await updatePost(client, 'post-1', { ...base, contentGroup: 'info_db', infoDbMetadata: { fieldName: '반도체', difficulty: 'advanced', estimatedReadMin: 9, referenceDate: null } })
+    expect(rpc).toHaveBeenLastCalledWith('save_info_db_publication_bundle', expect.objectContaining({ p_info_db_metadata: { field_name: '반도체', difficulty: 'advanced', estimated_read_min: 9, reference_date: null } }))
+  })
+
   it('loads only explicit SEO fields', async () => {
     const seoData = {
       post_id: 'post-1',

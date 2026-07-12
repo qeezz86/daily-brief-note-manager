@@ -11,7 +11,9 @@ import {
 } from '../features/posts/postFormatters'
 import {
   useArchivePostMutation,
+  useAiMetadataQuery,
   useChineseMetadataQuery,
+  useInfoDbMetadataQuery,
   usePostQuery,
   usePostSourcesQuery,
   usePostTagsQuery,
@@ -38,6 +40,8 @@ export function ContentDetailPageContent({
   const tagsQuery = usePostTagsQuery(client, userId, postId)
   const sourcesQuery = usePostSourcesQuery(client, userId, postId)
   const chineseMetadataQuery = useChineseMetadataQuery(client, userId, postId)
+  const aiMetadataQuery = useAiMetadataQuery(client, userId, postId)
+  const infoDbMetadataQuery = useInfoDbMetadataQuery(client, userId, postId)
   const archiveMutation = useArchivePostMutation(client, userId, postId)
   const post = postQuery.data
   const seoData = seoQuery.data
@@ -53,6 +57,12 @@ export function ContentDetailPageContent({
   const category = categoriesQuery.data?.find(
     (item) => item.id === post?.category_id,
   )
+  const difficultyLabel = (value: string | null | undefined) => {
+    if (value === 'beginner') return '입문'
+    if (value === 'intermediate') return '중급'
+    if (value === 'advanced') return '고급'
+    return value?.trim() || '미등록'
+  }
 
   async function handleArchive() {
     if (!post || post.content_status === 'archived') return
@@ -73,7 +83,7 @@ export function ContentDetailPageContent({
     }
   }
 
-  if (postQuery.isPending || seoQuery.isPending || categoriesQuery.isPending || tagsQuery.isPending || sourcesQuery.isPending || chineseMetadataQuery.isPending) {
+  if (postQuery.isPending || seoQuery.isPending || categoriesQuery.isPending || tagsQuery.isPending || sourcesQuery.isPending || chineseMetadataQuery.isPending || aiMetadataQuery.isPending || infoDbMetadataQuery.isPending) {
     return (
       <div className="content-state" role="status">
         <span className="loading-indicator" aria-hidden="true" />
@@ -82,7 +92,7 @@ export function ContentDetailPageContent({
     )
   }
 
-  if (postQuery.isError || seoQuery.isError || categoriesQuery.isError || tagsQuery.isError || sourcesQuery.isError || chineseMetadataQuery.isError) {
+  if (postQuery.isError || seoQuery.isError || categoriesQuery.isError || tagsQuery.isError || sourcesQuery.isError || chineseMetadataQuery.isError || aiMetadataQuery.isError || infoDbMetadataQuery.isError) {
     return (
       <div className="content-state content-state--error" role="alert">
         <h1>콘텐츠를 불러오지 못했습니다</h1>
@@ -186,6 +196,29 @@ export function ContentDetailPageContent({
             <div className="content-detail__wide"><dt>확인한 핵심 사실</dt><dd>{chineseMetadataQuery.data?.verified_core_fact || '미입력'}</dd></div>
             <div><dt>난이도</dt><dd>{chineseMetadataQuery.data?.difficulty || '미입력'}</dd></div>
             <div className="content-detail__wide"><dt>학습 포인트</dt><dd>{chineseMetadataQuery.data?.learning_points || '미입력'}</dd></div>
+          </dl>
+        </section>
+      ) : null}
+
+      {category?.content_group === 'ai' ? (
+        <section className="content-detail__section" aria-labelledby="ai-metadata-title">
+          <h2 id="ai-metadata-title">AI 칼럼 정보</h2>
+          <dl className="content-detail__metadata content-detail__metadata--nested">
+            <div><dt>분야</dt><dd>{aiMetadataQuery.data?.field_name || '미등록'}</dd></div>
+            <div><dt>난이도</dt><dd>{difficultyLabel(aiMetadataQuery.data?.difficulty)}</dd></div>
+            <div><dt>예상 읽기 시간</dt><dd>{aiMetadataQuery.data?.estimated_read_min ? `${aiMetadataQuery.data.estimated_read_min}분` : '미등록'}</dd></div>
+          </dl>
+        </section>
+      ) : null}
+
+      {category?.content_group === 'info_db' ? (
+        <section className="content-detail__section" aria-labelledby="info-db-metadata-title">
+          <h2 id="info-db-metadata-title">정보DB 정보</h2>
+          <dl className="content-detail__metadata content-detail__metadata--nested">
+            <div><dt>분야</dt><dd>{infoDbMetadataQuery.data?.field_name || '미등록'}</dd></div>
+            <div><dt>난이도</dt><dd>{difficultyLabel(infoDbMetadataQuery.data?.difficulty)}</dd></div>
+            <div><dt>예상 읽기 시간</dt><dd>{infoDbMetadataQuery.data?.estimated_read_min ? `${infoDbMetadataQuery.data.estimated_read_min}분` : '미등록'}</dd></div>
+            <div><dt>기준일</dt><dd>{infoDbMetadataQuery.data?.reference_date || '미등록'}</dd></div>
           </dl>
         </section>
       ) : null}

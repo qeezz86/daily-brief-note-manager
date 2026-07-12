@@ -8,6 +8,10 @@ function htmlToNull(value: string) {
   return value.trim() ? value : null
 }
 
+function positiveIntegerToNull(value: string) {
+  return value.trim() ? Number(value) : null
+}
+
 export function toNullablePostFormValues(values: PostFormValues) {
   return {
     ...values,
@@ -28,6 +32,10 @@ export function toNullablePostFormValues(values: PostFormValues) {
     verifiedCoreFact: emptyToNull(values.verifiedCoreFact),
     difficulty: emptyToNull(values.difficulty),
     learningPoints: emptyToNull(values.learningPoints),
+    fieldName: emptyToNull(values.fieldName),
+    metadataDifficulty: emptyToNull(values.metadataDifficulty),
+    estimatedReadMin: positiveIntegerToNull(values.estimatedReadMin),
+    referenceDate: emptyToNull(values.referenceDate),
     tags: values.tags.map((tag) => tag.trim().replace(/\s+/g, ' ')).filter(Boolean),
     sources: values.sources
       .filter((source) => Object.values(source).some((value) => value.trim()))

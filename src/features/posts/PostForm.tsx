@@ -22,10 +22,16 @@ import {
   contentStatuses,
   type PostDetail,
   type ChineseMetadata,
+  type AiMetadata,
+  type InfoDbMetadata,
   type PostSource,
   type PostTag,
   type SeoData,
 } from './posts.types'
+
+function toMetadataDifficulty(value: string | null | undefined): '' | 'beginner' | 'intermediate' | 'advanced' {
+  return value === 'beginner' || value === 'intermediate' || value === 'advanced' ? value : ''
+}
 
 interface PostFormProps {
   mode: 'create' | 'edit'
@@ -35,6 +41,8 @@ interface PostFormProps {
   postTags?: PostTag[]
   postSources?: PostSource[]
   chineseMetadata?: ChineseMetadata | null
+  aiMetadata?: AiMetadata | null
+  infoDbMetadata?: InfoDbMetadata | null
   isSaving: boolean
   submitError: string | null
   submitSuccess?: string | null
@@ -49,6 +57,8 @@ export function PostForm({
   postTags = [],
   postSources = [],
   chineseMetadata = null,
+  aiMetadata = null,
+  infoDbMetadata = null,
   isSaving,
   submitError,
   submitSuccess = null,
@@ -110,6 +120,10 @@ export function PostForm({
       verifiedCoreFact: chineseMetadata?.verified_core_fact ?? '',
       difficulty: chineseMetadata?.difficulty ?? '',
       learningPoints: chineseMetadata?.learning_points ?? '',
+      fieldName: aiMetadata?.field_name ?? infoDbMetadata?.field_name ?? '',
+      metadataDifficulty: toMetadataDifficulty(aiMetadata?.difficulty ?? infoDbMetadata?.difficulty),
+      estimatedReadMin: String(aiMetadata?.estimated_read_min ?? infoDbMetadata?.estimated_read_min ?? ''),
+      referenceDate: infoDbMetadata?.reference_date ?? '',
     },
   })
   const sourceFields = useFieldArray({ control, name: 'sources' })
@@ -561,6 +575,36 @@ export function PostForm({
                 <label htmlFor="chinese-learning-points">학습 포인트</label>
                 <textarea id="chinese-learning-points" rows={4} {...register('learningPoints')} />
               </div>
+            </fieldset>
+          ) : null}
+
+          {selectedCategory?.content_group === 'ai' || selectedCategory?.content_group === 'info_db' ? (
+            <fieldset className="post-form__section" disabled={disabled}>
+              <legend>{selectedCategory.content_group === 'ai' ? 'AI 칼럼 정보' : '정보DB 정보'}</legend>
+              <div className="post-form__field">
+                <label htmlFor="metadata-field-name">분야</label>
+                <input id="metadata-field-name" type="text" maxLength={100} aria-invalid={Boolean(errors.fieldName)} {...register('fieldName')} />
+                {errors.fieldName ? <p className="field-error">{errors.fieldName.message}</p> : null}
+              </div>
+              <div className="post-form__field">
+                <label htmlFor="metadata-difficulty">난이도</label>
+                <select id="metadata-difficulty" aria-invalid={Boolean(errors.metadataDifficulty)} {...register('metadataDifficulty')}>
+                  <option value="">선택</option><option value="beginner">입문</option><option value="intermediate">중급</option><option value="advanced">고급</option>
+                </select>
+                {errors.metadataDifficulty ? <p className="field-error">{errors.metadataDifficulty.message}</p> : null}
+              </div>
+              <div className="post-form__field">
+                <label htmlFor="metadata-estimated-read-min">예상 읽기 시간(분)</label>
+                <input id="metadata-estimated-read-min" type="number" min="1" max="600" step="1" inputMode="numeric" aria-invalid={Boolean(errors.estimatedReadMin)} {...register('estimatedReadMin')} />
+                {errors.estimatedReadMin ? <p className="field-error">{errors.estimatedReadMin.message}</p> : null}
+              </div>
+              {selectedCategory.content_group === 'info_db' ? (
+                <div className="post-form__field">
+                  <label htmlFor="metadata-reference-date">기준일</label>
+                  <input id="metadata-reference-date" type="date" aria-invalid={Boolean(errors.referenceDate)} {...register('referenceDate')} />
+                  {errors.referenceDate ? <p className="field-error">{errors.referenceDate.message}</p> : <p className="field-help">시간에 따라 변하는 정보의 기준일입니다. 입력하지 않아도 저장할 수 있습니다.</p>}
+                </div>
+              ) : null}
             </fieldset>
           ) : null}
 

@@ -13,6 +13,8 @@ import {
 } from './publicationFields'
 
 const slugPattern = /^(?!-)(?!.*--)[a-z0-9]+(?:-[a-z0-9]+)*$/
+const difficultyValues = ['beginner', 'intermediate', 'advanced'] as const
+const datePattern = /^\d{4}-\d{2}-\d{2}$/
 
 export const postFormSchema = z
   .object({
@@ -69,6 +71,10 @@ export const postFormSchema = z
     verifiedCoreFact: z.string().default(''),
     difficulty: z.string().default(''),
     learningPoints: z.string().default(''),
+    fieldName: z.string().default(''),
+    metadataDifficulty: z.enum(['', ...difficultyValues]).default(''),
+    estimatedReadMin: z.string().default(''),
+    referenceDate: z.string().default(''),
   })
   .superRefine((values, context) => {
     if (values.contentStatus === 'published' && !values.publishedOn) {
@@ -161,6 +167,22 @@ export const postFormSchema = z
       }
     }
 
+    const hasMetadataInput = [values.fieldName, values.metadataDifficulty, values.estimatedReadMin, values.referenceDate]
+      .some((value) => value.trim())
+    if ((values.contentGroup === 'ai' || values.contentGroup === 'info_db') && hasMetadataInput) {
+      if (values.fieldName.trim().length > 100) {
+        context.addIssue({ code: 'custom', message: '분야는 100자 이하로 입력해 주세요.', path: ['fieldName'] })
+      }
+      if (values.estimatedReadMin.trim() && !/^[1-9]\d*$/.test(values.estimatedReadMin)) {
+        context.addIssue({ code: 'custom', message: '예상 읽기 시간은 1 이상의 정수로 입력해 주세요.', path: ['estimatedReadMin'] })
+      } else if (Number(values.estimatedReadMin) > 600) {
+        context.addIssue({ code: 'custom', message: '예상 읽기 시간은 600분 이하로 입력해 주세요.', path: ['estimatedReadMin'] })
+      }
+      if (values.contentGroup === 'info_db' && values.referenceDate.trim() && !datePattern.test(values.referenceDate)) {
+        context.addIssue({ code: 'custom', message: '기준일은 YYYY-MM-DD 형식으로 입력해 주세요.', path: ['referenceDate'] })
+      }
+    }
+
     if (!['ready', 'published'].includes(values.contentStatus)) return
 
     const normalizedTags = values.tags.map(normalizeTag).filter(Boolean)
@@ -196,6 +218,11 @@ export const postFormSchema = z
       if (values.originalUrl.trim() && !completeSources.some((source) => normalizeSourceUrl(source.sourceUrl) === normalizeSourceUrl(values.originalUrl))) {
         context.addIssue({ code: 'custom', message: '중국어 원문 URL과 출처 목록의 URL이 일치하지 않습니다.', path: ['originalUrl'] })
       }
+    }
+    if (values.contentGroup === 'ai' || values.contentGroup === 'info_db') {
+      if (!values.fieldName.trim()) context.addIssue({ code: 'custom', message: '분야를 입력해 주세요.', path: ['fieldName'] })
+      if (!values.metadataDifficulty) context.addIssue({ code: 'custom', message: '난이도를 선택해 주세요.', path: ['metadataDifficulty'] })
+      if (!values.estimatedReadMin.trim()) context.addIssue({ code: 'custom', message: '예상 읽기 시간을 입력해 주세요.', path: ['estimatedReadMin'] })
     }
 
     if (!values.htmlBody.trim()) {

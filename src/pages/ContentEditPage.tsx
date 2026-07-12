@@ -9,6 +9,8 @@ import { toNullablePostFormValues } from '../features/posts/postFormValues'
 import {
   usePostQuery,
   useChineseMetadataQuery,
+  useAiMetadataQuery,
+  useInfoDbMetadataQuery,
   usePostSourcesQuery,
   usePostTagsQuery,
   useSeoDataQuery,
@@ -35,6 +37,8 @@ export function ContentEditPageContent({
   const tagsQuery = usePostTagsQuery(client, userId, postId)
   const sourcesQuery = usePostSourcesQuery(client, userId, postId)
   const chineseMetadataQuery = useChineseMetadataQuery(client, userId, postId)
+  const aiMetadataQuery = useAiMetadataQuery(client, userId, postId)
+  const infoDbMetadataQuery = useInfoDbMetadataQuery(client, userId, postId)
   const updateMutation = useUpdatePostMutation(client, userId, postId)
 
   async function handleSubmit(values: PostFormValues) {
@@ -71,6 +75,14 @@ export function ContentEditPageContent({
           difficulty: normalized.difficulty,
           learningPoints: normalized.learningPoints,
         } : null,
+        aiMetadata: values.contentGroup === 'ai' ? {
+          fieldName: normalized.fieldName, difficulty: normalized.metadataDifficulty,
+          estimatedReadMin: normalized.estimatedReadMin,
+        } : null,
+        infoDbMetadata: values.contentGroup === 'info_db' ? {
+          fieldName: normalized.fieldName, difficulty: normalized.metadataDifficulty,
+          estimatedReadMin: normalized.estimatedReadMin, referenceDate: normalized.referenceDate,
+        } : null,
       })
       setSubmitSuccess('변경 사항을 저장했습니다.')
     } catch (error) {
@@ -82,7 +94,7 @@ export function ContentEditPageContent({
     }
   }
 
-  if (postQuery.isPending || seoQuery.isPending || categoriesQuery.isPending || tagsQuery.isPending || sourcesQuery.isPending || chineseMetadataQuery.isPending) {
+  if (postQuery.isPending || seoQuery.isPending || categoriesQuery.isPending || tagsQuery.isPending || sourcesQuery.isPending || chineseMetadataQuery.isPending || aiMetadataQuery.isPending || infoDbMetadataQuery.isPending) {
     return (
       <div className="content-state" role="status">
         <span className="loading-indicator" aria-hidden="true" />
@@ -91,7 +103,7 @@ export function ContentEditPageContent({
     )
   }
 
-  if (postQuery.isError || seoQuery.isError || categoriesQuery.isError || tagsQuery.isError || sourcesQuery.isError || chineseMetadataQuery.isError) {
+  if (postQuery.isError || seoQuery.isError || categoriesQuery.isError || tagsQuery.isError || sourcesQuery.isError || chineseMetadataQuery.isError || aiMetadataQuery.isError || infoDbMetadataQuery.isError) {
     return (
       <div className="content-state content-state--error" role="alert">
         <h1>콘텐츠를 불러오지 못했습니다</h1>
@@ -129,6 +141,8 @@ export function ContentEditPageContent({
         postTags={tagsQuery.data}
         postSources={sourcesQuery.data}
         chineseMetadata={chineseMetadataQuery.data}
+        aiMetadata={aiMetadataQuery.data}
+        infoDbMetadata={infoDbMetadataQuery.data}
         isSaving={updateMutation.isPending}
         submitError={submitError}
         submitSuccess={submitSuccess}

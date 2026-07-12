@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import type { Category } from '../features/categories/categories.types'
 import type { PostDetail } from '../features/posts/posts.types'
-import type { ChineseMetadata, PostSource, PostTag } from '../features/posts/posts.types'
+import type { AiMetadata, ChineseMetadata, InfoDbMetadata, PostSource, PostTag } from '../features/posts/posts.types'
 import type { DatabaseClient } from '../shared/supabase/client'
 import { ContentDetailPageContent } from './ContentDetailPage'
 
@@ -41,7 +41,7 @@ const post: PostDetail = {
   updated_at: '2026-07-10T02:00:00Z',
 }
 
-function createClient(postResult: PostDetail | null, tags: PostTag[] = [], sources: PostSource[] = [], chineseMetadata: ChineseMetadata | null = null) {
+function createClient(postResult: PostDetail | null, tags: PostTag[] = [], sources: PostSource[] = [], chineseMetadata: ChineseMetadata | null = null, aiMetadata: AiMetadata | null = null, infoDbMetadata: InfoDbMetadata | null = null, activeCategory = category) {
   const categoryBuilder = {
     select: vi.fn(),
     eq: vi.fn(),
@@ -49,7 +49,7 @@ function createClient(postResult: PostDetail | null, tags: PostTag[] = [], sourc
   }
   categoryBuilder.select.mockReturnValue(categoryBuilder)
   categoryBuilder.eq.mockReturnValue(categoryBuilder)
-  categoryBuilder.order.mockResolvedValue({ data: [category], error: null })
+  categoryBuilder.order.mockResolvedValue({ data: [activeCategory], error: null })
 
   const postBuilder = {
     select: vi.fn(),
@@ -82,6 +82,14 @@ function createClient(postResult: PostDetail | null, tags: PostTag[] = [], sourc
   chineseMetadataBuilder.select.mockReturnValue(chineseMetadataBuilder)
   chineseMetadataBuilder.eq.mockReturnValue(chineseMetadataBuilder)
   chineseMetadataBuilder.maybeSingle.mockResolvedValue({ data: chineseMetadata, error: null })
+  const aiMetadataBuilder = { select: vi.fn(), eq: vi.fn(), maybeSingle: vi.fn() }
+  aiMetadataBuilder.select.mockReturnValue(aiMetadataBuilder)
+  aiMetadataBuilder.eq.mockReturnValue(aiMetadataBuilder)
+  aiMetadataBuilder.maybeSingle.mockResolvedValue({ data: aiMetadata, error: null })
+  const infoDbMetadataBuilder = { select: vi.fn(), eq: vi.fn(), maybeSingle: vi.fn() }
+  infoDbMetadataBuilder.select.mockReturnValue(infoDbMetadataBuilder)
+  infoDbMetadataBuilder.eq.mockReturnValue(infoDbMetadataBuilder)
+  infoDbMetadataBuilder.maybeSingle.mockResolvedValue({ data: infoDbMetadata, error: null })
 
   return {
     client: {
@@ -96,7 +104,11 @@ function createClient(postResult: PostDetail | null, tags: PostTag[] = [], sourc
                 ? sourceBuilder
                 : table === 'chinese_metadata'
                   ? chineseMetadataBuilder
-                : postBuilder,
+                  : table === 'ai_metadata'
+                    ? aiMetadataBuilder
+                    : table === 'info_db_metadata'
+                      ? infoDbMetadataBuilder
+                  : postBuilder,
       ),
     } as unknown as DatabaseClient,
     postBuilder,
@@ -200,5 +212,24 @@ describe('ContentDetailPage', () => {
     const link = screen.getByRole('link', { name: chineseMetadata.original_url! })
     expect(link).toHaveAttribute('target', '_blank')
     expect(link).toHaveAttribute('rel', 'noopener noreferrer')
+  })
+
+  it('renders AI and information-DB metadata with Korean difficulty labels and safe fallbacks', async () => {
+    const aiCategory = { ...category, id: 'ai-column', content_group: 'ai' as const, name: 'AI 칼럼' }
+    const aiPost = { ...post, category_id: 'ai-column', title: 'AI 칼럼', slug: 'ai-001' }
+    const { client: aiClient } = createClient(aiPost, [], [], null, { post_id: aiPost.id, field_name: '생성형 AI', difficulty: 'beginner', estimated_read_min: 6 }, null, aiCategory)
+    const { unmount } = renderDetail(aiClient)
+    expect(await screen.findByRole('heading', { name: 'AI 칼럼 정보' })).toBeInTheDocument()
+    expect(screen.getByText('입문')).toBeInTheDocument()
+    expect(screen.getByText('6분')).toBeInTheDocument()
+    unmount()
+
+    const infoCategory = { ...category, id: 'info-db', content_group: 'info_db' as const, name: '정보DB' }
+    const infoPost = { ...post, category_id: 'info-db', title: '정보DB', slug: 'info-db-001' }
+    const { client: infoClient } = createClient(infoPost, [], [], null, null, { post_id: infoPost.id, field_name: null, difficulty: 'legacy', estimated_read_min: null, reference_date: null }, infoCategory)
+    renderDetail(infoClient)
+    expect(await screen.findByRole('heading', { name: '정보DB 정보' })).toBeInTheDocument()
+    expect(screen.getByText('legacy')).toBeInTheDocument()
+    expect(screen.getAllByText('미등록').length).toBeGreaterThan(0)
   })
 })

@@ -139,14 +139,14 @@ export type Database = {
           difficulty?: string | null
           episode_list_included?: boolean | null
           learning_points?: string | null
-          learning_topic?: string
+          learning_topic?: string | null
           original_published_at?: string | null
-          original_title?: string
-          original_url?: string
+          original_title?: string | null
+          original_url?: string | null
           owner_id?: string
           post_id?: string
-          program_name?: string
-          verified_core_fact?: string
+          program_name?: string | null
+          verified_core_fact?: string | null
         }
         Relationships: [
           {
@@ -730,36 +730,9 @@ export type Database = {
         Args: { p_category_id: string; p_owner_id: string }
         Returns: number
       }
-      save_generated_prompt: {
+      save_ai_publication_bundle: {
         Args: {
-          p_actual_post_count: number
-          p_category_id: string
-          p_is_pinned?: boolean
-          p_owner_id: string
-          p_prompt_mode: string
-          p_prompt_text: string
-          p_requested_post_count: number
-        }
-        Returns: {
-          actual_post_count: number
-          category_id: string
-          generated_at: string
-          id: string
-          is_pinned: boolean
-          owner_id: string
-          prompt_mode: string
-          prompt_text: string
-          requested_post_count: number
-        }
-        SetofOptions: {
-          from: "*"
-          to: "generated_prompts"
-          isOneToOne: true
-          isSetofReturn: false
-        }
-      }
-      save_post_editor: {
-        Args: {
+          p_ai_metadata: Json
           p_alternative_titles: string[]
           p_content_status: string
           p_focus_keyword: string
@@ -771,7 +744,9 @@ export type Database = {
           p_published_on: string
           p_representative_title: string
           p_slug: string
+          p_sources: Json
           p_summary: string
+          p_tags: Json
           p_title: string
           p_wordpress_url: string
         }
@@ -822,6 +797,131 @@ export type Database = {
           p_sources: Json
           p_summary: string
           p_tags: Json
+          p_title: string
+          p_wordpress_url: string
+        }
+        Returns: {
+          briefing_date: string | null
+          category_id: string
+          content_status: string
+          created_at: string
+          display_id: string | null
+          html_body: string | null
+          id: string
+          image_alt: string | null
+          image_prompt: string | null
+          image_prompt_updated_at: string | null
+          image_prompt_version: number
+          owner_id: string
+          published_at: string | null
+          published_on: string | null
+          series_no: number | null
+          slug: string
+          source_import_type: string
+          summary: string
+          title: string
+          updated_at: string
+          wordpress_url: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "posts"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      save_generated_prompt: {
+        Args: {
+          p_actual_post_count: number
+          p_category_id: string
+          p_is_pinned?: boolean
+          p_owner_id: string
+          p_prompt_mode: string
+          p_prompt_text: string
+          p_requested_post_count: number
+        }
+        Returns: {
+          actual_post_count: number
+          category_id: string
+          generated_at: string
+          id: string
+          is_pinned: boolean
+          owner_id: string
+          prompt_mode: string
+          prompt_text: string
+          requested_post_count: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "generated_prompts"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      save_info_db_publication_bundle: {
+        Args: {
+          p_alternative_titles: string[]
+          p_content_status: string
+          p_focus_keyword: string
+          p_html_body: string
+          p_image_alt: string
+          p_image_prompt: string
+          p_info_db_metadata: Json
+          p_meta_description: string
+          p_post_id: string
+          p_published_on: string
+          p_representative_title: string
+          p_slug: string
+          p_sources: Json
+          p_summary: string
+          p_tags: Json
+          p_title: string
+          p_wordpress_url: string
+        }
+        Returns: {
+          briefing_date: string | null
+          category_id: string
+          content_status: string
+          created_at: string
+          display_id: string | null
+          html_body: string | null
+          id: string
+          image_alt: string | null
+          image_prompt: string | null
+          image_prompt_updated_at: string | null
+          image_prompt_version: number
+          owner_id: string
+          published_at: string | null
+          published_on: string | null
+          series_no: number | null
+          slug: string
+          source_import_type: string
+          summary: string
+          title: string
+          updated_at: string
+          wordpress_url: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "posts"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      save_post_editor: {
+        Args: {
+          p_alternative_titles: string[]
+          p_content_status: string
+          p_focus_keyword: string
+          p_html_body: string
+          p_image_alt: string
+          p_image_prompt: string
+          p_meta_description: string
+          p_post_id: string
+          p_published_on: string
+          p_representative_title: string
+          p_slug: string
+          p_summary: string
           p_title: string
           p_wordpress_url: string
         }

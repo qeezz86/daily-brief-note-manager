@@ -432,6 +432,10 @@ estimated_read_min  integer nullable
 reference_date      date nullable
 ```
 
+AI 칼럼과 정보DB는 `categories.content_group`으로 UI와 저장 RPC를 분기한다. `draft`에서는 metadata 전체 미입력 또는 부분 입력을 허용하고, 신규 빈 metadata 행은 만들지 않는다. 기존 metadata를 모두 비운 draft는 행을 삭제하며, `archived`는 기존 불완전 metadata를 자동 삭제하지 않는다. `ready`·`published`에서는 `field_name`, `difficulty`, `estimated_read_min`이 필수다. 난이도 저장값은 `beginner`, `intermediate`, `advanced`이고 화면에서는 각각 입문, 중급, 고급으로 표시한다. 예상 읽기 시간은 자동 계산하지 않으며 1~600분 정수만 허용한다. 정보DB `reference_date`는 기준일 기록용 nullable `date`로, 자동 입력하지 않으며 `ready`·`published`에서도 경고만 표시하고 저장을 막지 않는다.
+
+`save_ai_publication_bundle`, `save_info_db_publication_bundle`은 인증 사용자와 게시물 소유권, 해당 `content_group`을 확인한 뒤 `save_post_publication_bundle`을 같은 트랜잭션에서 호출하고 각 metadata를 upsert한다. 두 함수는 AI·정보DB 이외 게시물에 대한 잘못된 metadata 저장을 차단하며 metadata 저장 실패 시 publication bundle 전체를 rollback한다.
+
 ## 6.9 `chinese_metadata`
 
 ```text

@@ -6,6 +6,8 @@ import {
   createPost,
   getPostById,
   getChineseMetadataByPostId,
+  getAiMetadataByPostId,
+  getInfoDbMetadataByPostId,
   getPostSources,
   getPostTags,
   getPosts,
@@ -27,6 +29,8 @@ export const postQueryKeys = {
     [...postQueryKeys.all, 'sources', userId, postId] as const,
   chineseMetadata: (userId: string, postId: string) =>
     [...postQueryKeys.all, 'chinese-metadata', userId, postId] as const,
+  aiMetadata: (userId: string, postId: string) => [...postQueryKeys.all, 'ai-metadata', userId, postId] as const,
+  infoDbMetadata: (userId: string, postId: string) => [...postQueryKeys.all, 'info-db-metadata', userId, postId] as const,
 }
 
 export function usePostTagsQuery(client: DatabaseClient | null, userId: string, postId: string) {
@@ -54,6 +58,14 @@ export function useChineseMetadataQuery(client: DatabaseClient | null, userId: s
     enabled: client !== null && userId !== '' && postId !== '',
     retry: false,
   })
+}
+
+export function useAiMetadataQuery(client: DatabaseClient | null, userId: string, postId: string) {
+  return useQuery({ queryKey: postQueryKeys.aiMetadata(userId, postId), queryFn: () => getAiMetadataByPostId(requireClient(client), postId), enabled: client !== null && userId !== '' && postId !== '', retry: false })
+}
+
+export function useInfoDbMetadataQuery(client: DatabaseClient | null, userId: string, postId: string) {
+  return useQuery({ queryKey: postQueryKeys.infoDbMetadata(userId, postId), queryFn: () => getInfoDbMetadataByPostId(requireClient(client), postId), enabled: client !== null && userId !== '' && postId !== '', retry: false })
 }
 
 export function useSeoDataQuery(
@@ -164,6 +176,8 @@ export function useUpdatePostMutation(
       void queryClient.invalidateQueries({ queryKey: postQueryKeys.tags(userId, postId) })
       void queryClient.invalidateQueries({ queryKey: postQueryKeys.sources(userId, postId) })
       void queryClient.invalidateQueries({ queryKey: postQueryKeys.chineseMetadata(userId, postId) })
+      void queryClient.invalidateQueries({ queryKey: postQueryKeys.aiMetadata(userId, postId) })
+      void queryClient.invalidateQueries({ queryKey: postQueryKeys.infoDbMetadata(userId, postId) })
     },
   })
 }

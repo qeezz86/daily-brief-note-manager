@@ -30,7 +30,32 @@ const validChineseReadyValues = {
   learningTopic: '학습 주제', programName: 'CCTV 뉴스', originalTitle: '원문 제목', originalUrl: 'https://news.cctv.com/a/1', originalPublishedAt: '2026-07-11T12:00', episodeListIncluded: 'true' as const, verifiedCoreFact: '확인한 사실', difficulty: '', learningPoints: '',
 }
 
+const validAiReadyValues = {
+  ...validValues,
+  contentStatus: 'ready' as const,
+  htmlBody: '<div><h1>본문</h1></div>', representativeTitle: '대표',
+  alternativeTitles: ['1', '2', '3', '4'], metaDescription: '설명', focusKeyword: '키워드', imagePrompt: '프롬프트', imageAlt: 'ALT',
+  tags: ['A', 'B', 'C', 'D', 'E'], sources: [{ sourceName: '기관', sourceTitle: '원문', sourceUrl: 'https://example.com/a', sourcePublishedAt: '', checkedPoint: '확인' }],
+  fieldName: '생성형 AI', metadataDifficulty: 'intermediate' as const, estimatedReadMin: '8', referenceDate: '',
+}
+
 describe('postFormSchema', () => {
+  it('allows AI and information DB drafts without metadata', () => {
+    expect(postFormSchema.safeParse({ ...validValues, contentGroup: 'ai' }).success).toBe(true)
+    expect(postFormSchema.safeParse({ ...validValues, categoryId: 'info-db', contentGroup: 'info_db' }).success).toBe(true)
+  })
+
+  it.each(['fieldName', 'metadataDifficulty', 'estimatedReadMin'] as const)('requires %s for ready AI content', (field) => {
+    const result = postFormSchema.safeParse({ ...validAiReadyValues, [field]: '' })
+    expect(result.success).toBe(false)
+    if (!result.success) expect(result.error.issues.map((issue) => issue.path[0])).toContain(field)
+  })
+
+  it('rejects zero and decimal estimated read times while allowing an optional information-DB reference date', () => {
+    expect(postFormSchema.safeParse({ ...validAiReadyValues, estimatedReadMin: '0' }).success).toBe(false)
+    expect(postFormSchema.safeParse({ ...validAiReadyValues, estimatedReadMin: '1.5' }).success).toBe(false)
+    expect(postFormSchema.safeParse({ ...validAiReadyValues, categoryId: 'info-db', contentGroup: 'info_db', referenceDate: '' }).success).toBe(true)
+  })
   it('allows a Chinese draft with no metadata', () => {
     expect(postFormSchema.safeParse({ ...validValues, categoryId: 'chinese-study', contentGroup: 'chinese' }).success).toBe(true)
   })

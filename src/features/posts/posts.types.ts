@@ -88,6 +88,8 @@ export interface UpdatePostInput {
   tags: string[]
   sources: PublicationSourceInput[]
   chineseMetadata?: ChineseMetadataInput | null
+  aiMetadata?: AiMetadataInput | null
+  infoDbMetadata?: InfoDbMetadataInput | null
 }
 
 export type ChineseMetadata = Pick<
@@ -114,6 +116,26 @@ export interface ChineseMetadataInput {
   verifiedCoreFact: string | null
   difficulty: string | null
   learningPoints: string | null
+}
+
+export type AiMetadata = Pick<
+  Tables<'ai_metadata'>,
+  'post_id' | 'field_name' | 'difficulty' | 'estimated_read_min'
+>
+
+export interface AiMetadataInput {
+  fieldName: string | null
+  difficulty: string | null
+  estimatedReadMin: number | null
+}
+
+export type InfoDbMetadata = Pick<
+  Tables<'info_db_metadata'>,
+  'post_id' | 'field_name' | 'difficulty' | 'estimated_read_min' | 'reference_date'
+>
+
+export interface InfoDbMetadataInput extends AiMetadataInput {
+  referenceDate: string | null
 }
 
 export type PostTag = Pick<Tables<'tags'>, 'id' | 'name'>

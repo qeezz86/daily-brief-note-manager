@@ -279,6 +279,8 @@ generic `sources`에는 중국어 전용 프로그램명과 본편 목록 포함
 | `estimated_read_min` | integer | nullable |
 | `reference_date` | date | nullable |
 
+AI·정보DB metadata는 `content_group`에 따라 각각 `save_ai_publication_bundle`, `save_info_db_publication_bundle`으로 저장한다. 두 RPC는 `auth.uid()`와 게시물 소유권을 확인하고 기존 `save_post_publication_bundle`을 같은 트랜잭션에서 재사용한다. `draft`의 신규 빈 metadata 행은 만들지 않으며, 기존 행을 모두 비운 draft는 삭제한다. `archived`에서는 기존 행을 자동 삭제하지 않는다. `ready`·`published`는 `field_name`, `difficulty`, `estimated_read_min`을 요구한다. `difficulty`는 애플리케이션과 RPC에서 `beginner`, `intermediate`, `advanced`로 검증하며 기존 자유 텍스트 데이터와의 충돌을 피하기 위해 DB check constraint는 추가하지 않는다. `estimated_read_min`은 1~600 정수다. `reference_date`는 정보DB의 nullable `date`이며 누락은 저장 차단이 아닌 UI 경고다.
+
 ### 6.3 `chinese_metadata`
 
 | 열 | 형식 | 조건 |

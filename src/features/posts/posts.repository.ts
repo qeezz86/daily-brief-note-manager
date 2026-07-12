@@ -4,6 +4,8 @@ import type {
   CreatePostInput,
   PostDetail,
   ChineseMetadata,
+  AiMetadata,
+  InfoDbMetadata,
   PostInsert,
   PostListItem,
   PostSource,
@@ -20,6 +22,8 @@ const seoDataFields =
 
 const chineseMetadataFields =
   'post_id, learning_topic, program_name, original_title, original_url, original_published_at, episode_list_included, verified_core_fact, difficulty, learning_points'
+const aiMetadataFields = 'post_id, field_name, difficulty, estimated_read_min'
+const infoDbMetadataFields = 'post_id, field_name, difficulty, estimated_read_min, reference_date'
 
 interface RepositoryError {
   code?: string
@@ -71,6 +75,10 @@ function throwPostEditorError(error: RepositoryError): never {
   if (detail.includes('CHINESE_METADATA_URL_INVALID')) throw new Error('공식 CCTV 개별 원문 URL을 입력해 주세요.')
   if (detail.includes('CHINESE_METADATA_REQUIRED')) throw new Error('중국어 학습 정보의 필수 항목을 입력해 주세요.')
   if (detail.includes('CHINESE_METADATA_DATE_INVALID')) throw new Error('올바른 원문 게시·업데이트 시각을 입력해 주세요.')
+  if (detail.includes('AI_METADATA_REQUIRED') || detail.includes('INFO_DB_METADATA_REQUIRED')) throw new Error('카테고리 정보의 필수 항목을 입력해 주세요.')
+  if (detail.includes('AI_METADATA_READ_MIN_INVALID') || detail.includes('INFO_DB_METADATA_READ_MIN_INVALID')) throw new Error('예상 읽기 시간은 1 이상 600 이하의 정수여야 합니다.')
+  if (detail.includes('AI_METADATA_DIFFICULTY_INVALID') || detail.includes('INFO_DB_METADATA_DIFFICULTY_INVALID')) throw new Error('난이도 값이 올바르지 않습니다.')
+  if (detail.includes('INFO_DB_METADATA_DATE_INVALID')) throw new Error('기준일은 YYYY-MM-DD 형식으로 입력해 주세요.')
 
   throw new Error(
     '콘텐츠 편집 정보를 저장하지 못했습니다. 기존 데이터는 변경되지 않았습니다.',
@@ -164,6 +172,24 @@ export async function getChineseMetadataByPostId(
     throw new Error('중국어 학습 정보를 불러오지 못했습니다.')
   }
 
+  return data
+}
+
+export async function getAiMetadataByPostId(client: DatabaseClient, postId: string): Promise<AiMetadata | null> {
+  const { data, error } = await client.from('ai_metadata').select(aiMetadataFields).eq('post_id', postId).maybeSingle()
+  if (error) {
+    if (error.code === '22P02' || error.code === 'PGRST116') return null
+    throw new Error('AI 칼럼 정보를 불러오지 못했습니다.')
+  }
+  return data
+}
+
+export async function getInfoDbMetadataByPostId(client: DatabaseClient, postId: string): Promise<InfoDbMetadata | null> {
+  const { data, error } = await client.from('info_db_metadata').select(infoDbMetadataFields).eq('post_id', postId).maybeSingle()
+  if (error) {
+    if (error.code === '22P02' || error.code === 'PGRST116') return null
+    throw new Error('정보DB 정보를 불러오지 못했습니다.')
+  }
   return data
 }
 
@@ -270,7 +296,26 @@ export async function updatePost(
         learning_points: input.chineseMetadata?.learningPoints ?? null,
       },
     })
-    : await client.rpc('save_post_publication_bundle', payload)
+    : input.contentGroup === 'ai'
+      ? await client.rpc('save_ai_publication_bundle', {
+        ...payload,
+        p_ai_metadata: {
+          field_name: input.aiMetadata?.fieldName ?? null,
+          difficulty: input.aiMetadata?.difficulty ?? null,
+          estimated_read_min: input.aiMetadata?.estimatedReadMin ?? null,
+        },
+      })
+      : input.contentGroup === 'info_db'
+        ? await client.rpc('save_info_db_publication_bundle', {
+          ...payload,
+          p_info_db_metadata: {
+            field_name: input.infoDbMetadata?.fieldName ?? null,
+            difficulty: input.infoDbMetadata?.difficulty ?? null,
+            estimated_read_min: input.infoDbMetadata?.estimatedReadMin ?? null,
+            reference_date: input.infoDbMetadata?.referenceDate ?? null,
+          },
+        })
+        : await client.rpc('save_post_publication_bundle', payload)
 
   if (error) throwPostEditorError(error)
   if (!data) throw new Error('수정할 콘텐츠를 찾을 수 없습니다.')
