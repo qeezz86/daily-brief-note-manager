@@ -55,8 +55,9 @@
 
 `posts`, `seo_data`, `tags`, `post_tags`, `sources`, `ai_metadata`, `info_db_metadata`, `chinese_metadata`, `series_counters`, `news_topics`, `news_updates`, `news_followups`, `news_status_history`, `generated_prompts`에 RLS를 활성화한다.
 
-- 조회·수정·삭제 정책은 `owner_id = auth.uid()`를 조건으로 한다.
-- 생성과 수정의 `WITH CHECK`도 `owner_id = auth.uid()`를 조건으로 한다.
+- 일반 사용자 소유 테이블의 조회·수정·삭제 정책은 `owner_id = auth.uid()`를 조건으로 한다.
+- 일반 테이블 생성과 수정의 `WITH CHECK`도 `owner_id = auth.uid()`를 조건으로 한다.
+- `generated_prompts`는 자기 행 SELECT만 허용하고 저장·pin 변경은 전용 RPC로만 처리하며 직접 INSERT·UPDATE·DELETE는 허용하지 않는다.
 - 복합 외래 키가 부모·자식 소유권 일치를 보장하고, RLS가 현재 인증 사용자와 행의 소유권을 보장한다.
 
 ### 2.3 JSON 입력 키와 DB 컬럼명
@@ -463,6 +464,10 @@ foreign key (news_update_id, owner_id)
 | `requested_post_count` | integer | 사용자가 요청한 최근 글 수 |
 | `actual_post_count` | integer | 실제 사용한 최근 글 수 |
 | `prompt_mode` | text | 프롬프트 모드 |
+| `reference_date` | date | 프롬프트 작성 기준일 |
+| `closed_lookback_days` | integer | 최근 종료 주제 조회 기간, 1~180 |
+| `context_schema_version` | integer | 현재 지원값 `1` |
+| `context_snapshot` | jsonb | 생성 당시의 전체 context snapshot |
 | `prompt_text` | text | 생성한 프롬프트 |
 | `is_pinned` | boolean | 기본값 `false` |
 | `generated_at` | timestamptz | 생성 시각 |
@@ -471,6 +476,12 @@ foreign key (news_update_id, owner_id)
 - `is_pinned = true`인 기록은 30개 계산과 자동 삭제 대상에서 제외한다.
 - 새 기록 저장 후 해당 카테고리의 30개를 초과한 고정되지 않은 오래된 기록을 정리한다.
 - 기록 저장과 오래된 미고정 기록 정리는 PostgreSQL DB 함수가 하나의 트랜잭션에서 처리한다.
+- 고정 해제도 같은 사용자·카테고리의 retention을 같은 트랜잭션에서 다시 적용한다.
+- authenticated 사용자는 자기 행 SELECT만 가능하며 직접 INSERT·UPDATE·DELETE할 수 없다.
+- `save_news_briefing_prompt_run`은 `owner_id`를 입력받지 않고 `auth.uid()`로 결정하며 뉴스·활성 카테고리, 설정 범위, snapshot의 schema/category/reference date와 금지된 최상위 개인정보 필드를 검증한다.
+- `set_news_briefing_prompt_run_pinned`은 소유권을 직접 확인하고 `is_pinned`만 변경한다.
+- `category_id`, `reference_date`, `prompt_mode`, `closed_lookback_days`, `context_schema_version`, `context_snapshot`, `prompt_text`, `generated_at`, `owner_id`는 저장 후 변경하지 않는다.
+- 이력 상세는 현재 데이터를 재조회해 prompt나 snapshot을 재구성하지 않는다.
 - `requested_post_count`에는 사용자가 요청한 최근 글 수를 저장한다.
 - `actual_post_count`에는 실제 프롬프트 컨텍스트에 사용한 발행 글 수를 저장한다.
 - `prompt_text`에는 WordPress HTML 전문, 뉴스 기사 원문, CCTV 원문·전체 자막·전체 번역을 포함하지 않는다.

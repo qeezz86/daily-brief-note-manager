@@ -162,34 +162,46 @@ export type Database = {
         Row: {
           actual_post_count: number
           category_id: string
+          closed_lookback_days: number
+          context_schema_version: number
+          context_snapshot: Json
           generated_at: string
           id: string
           is_pinned: boolean
           owner_id: string
           prompt_mode: string
           prompt_text: string
+          reference_date: string
           requested_post_count: number
         }
         Insert: {
           actual_post_count: number
           category_id: string
+          closed_lookback_days: number
+          context_schema_version: number
+          context_snapshot: Json
           generated_at?: string
           id?: string
           is_pinned?: boolean
           owner_id: string
           prompt_mode?: string
           prompt_text: string
+          reference_date: string
           requested_post_count: number
         }
         Update: {
           actual_post_count?: number
           category_id?: string
+          closed_lookback_days?: number
+          context_schema_version?: number
+          context_snapshot?: Json
           generated_at?: string
           id?: string
           is_pinned?: boolean
           owner_id?: string
           prompt_mode?: string
           prompt_text?: string
+          reference_date?: string
           requested_post_count?: number
         }
         Relationships: [
@@ -933,34 +945,6 @@ export type Database = {
           isSetofReturn: false
         }
       }
-      save_generated_prompt: {
-        Args: {
-          p_actual_post_count: number
-          p_category_id: string
-          p_is_pinned?: boolean
-          p_owner_id: string
-          p_prompt_mode: string
-          p_prompt_text: string
-          p_requested_post_count: number
-        }
-        Returns: {
-          actual_post_count: number
-          category_id: string
-          generated_at: string
-          id: string
-          is_pinned: boolean
-          owner_id: string
-          prompt_mode: string
-          prompt_text: string
-          requested_post_count: number
-        }
-        SetofOptions: {
-          from: "*"
-          to: "generated_prompts"
-          isOneToOne: true
-          isSetofReturn: false
-        }
-      }
       save_info_db_publication_bundle: {
         Args: {
           p_alternative_titles: string[]
@@ -1007,6 +991,38 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "posts"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      save_news_briefing_prompt_run: {
+        Args: {
+          p_category_id: string
+          p_closed_lookback_days: number
+          p_context_schema_version: number
+          p_context_snapshot: Json
+          p_prompt_mode: string
+          p_prompt_text: string
+          p_reference_date: string
+        }
+        Returns: {
+          actual_post_count: number
+          category_id: string
+          closed_lookback_days: number
+          context_schema_version: number
+          context_snapshot: Json
+          generated_at: string
+          id: string
+          is_pinned: boolean
+          owner_id: string
+          prompt_mode: string
+          prompt_text: string
+          reference_date: string
+          requested_post_count: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "generated_prompts"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -1201,6 +1217,30 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "posts"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      set_news_briefing_prompt_run_pinned: {
+        Args: { p_is_pinned: boolean; p_prompt_run_id: string }
+        Returns: {
+          actual_post_count: number
+          category_id: string
+          closed_lookback_days: number
+          context_schema_version: number
+          context_snapshot: Json
+          generated_at: string
+          id: string
+          is_pinned: boolean
+          owner_id: string
+          prompt_mode: string
+          prompt_text: string
+          reference_date: string
+          requested_post_count: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "generated_prompts"
           isOneToOne: true
           isSetofReturn: false
         }

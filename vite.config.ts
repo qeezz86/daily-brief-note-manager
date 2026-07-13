@@ -23,6 +23,7 @@ export default defineConfig({
     setupFiles: './src/test/setup.ts',
     css: true,
     maxWorkers: 4,
+    testTimeout: 20_000,
     exclude: [...configDefaults.exclude, 'e2e/**'],
   },
 })

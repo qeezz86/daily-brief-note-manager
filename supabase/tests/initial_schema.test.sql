@@ -564,14 +564,19 @@ select throws_ok(
 
 select lives_ok(
   $$
-    select public.save_generated_prompt(
-      '00000000-0000-0000-0000-0000000000a1',
+    select public.save_news_briefing_prompt_run(
       'economy',
-      15,
-      10,
+      '2026-07-13',
       'standard',
-      'Prompt ' || sequence_no,
-      false
+      90,
+      1,
+      jsonb_build_object(
+        'schemaVersion', 1,
+        'referenceDate', '2026-07-13',
+        'category', jsonb_build_object('id', 'economy'),
+        'recentPosts', '[]'::jsonb
+      ),
+      'Prompt ' || sequence_no
     )
     from generate_series(1, 31) as sequence_no
   $$,
@@ -580,17 +585,41 @@ select lives_ok(
 
 select lives_ok(
   $$
-    select public.save_generated_prompt(
-      '00000000-0000-0000-0000-0000000000a1',
-      'economy',
-      15,
-      10,
-      'standard',
-      'Pinned prompt',
-      true
+    with saved as (
+      select (public.save_news_briefing_prompt_run(
+        'economy',
+        '2026-07-13',
+        'standard',
+        90,
+        1,
+        jsonb_build_object(
+          'schemaVersion', 1,
+          'referenceDate', '2026-07-13',
+          'category', jsonb_build_object('id', 'economy'),
+          'recentPosts', '[]'::jsonb
+        ),
+        'Pinned prompt'
+      )).id
     )
+    select public.set_news_briefing_prompt_run_pinned(saved.id, true)
+    from saved
   $$,
   'generated prompt storage accepts pinned records'
+);
+
+select public.save_news_briefing_prompt_run(
+  'economy',
+  '2026-07-13',
+  'standard',
+  90,
+  1,
+  jsonb_build_object(
+    'schemaVersion', 1,
+    'referenceDate', '2026-07-13',
+    'category', jsonb_build_object('id', 'economy'),
+    'recentPosts', '[]'::jsonb
+  ),
+  'Prompt refill after pin'
 );
 
 select is(

@@ -38,6 +38,9 @@
 .prompt-json { max-height: 32rem; overflow: auto; padding: 1rem; border-radius: .4rem; background: #17211e; color: #eff8f4; font-size: .8rem; white-space: pre-wrap; overflow-wrap: anywhere; }
 .prompt-panel summary { cursor: pointer; color: #173f35; font-weight: 700; }
 .prompt-panel[open] summary { margin-bottom: 1rem; }
+.prompt-retention-notice { margin-top: 1.25rem; padding: 1rem 1.25rem; border: 1px solid #d7c783; border-radius: .5rem; background: #fffbea; color: #55490f; }
+.prompt-retention-notice p { margin: 0; line-height: 1.6; }
+.prompt-retention-notice p + p { margin-top: .35rem; }
 
 @media (max-width: 640px) {
   .followup-actions > a, .followup-actions > button { width: 100%; text-align: center; }

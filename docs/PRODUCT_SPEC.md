@@ -1062,6 +1062,12 @@ MVP 기본값은 `표준`이다.
 
 Phase 3B-1은 context와 프롬프트를 저장하지 않는다. 생성 이력, snapshot, pin, 자동 정리와 ChatGPT/OpenAI API 호출은 후속 단계다. WordPress HTML 전문, 사용자 이메일, 이미지 프롬프트와 기사 원문은 context에서 제외한다. 제품 전체의 최근 5·10·15개 선택은 후속 프롬프트 단계에서 확장한다.
 
+### 10.4.2 Phase 3B-2 이력·snapshot 구현 범위
+
+Phase 3B-2는 미리보기에 사용한 설정, `schemaVersion = 1` context 전체와 정확한 프롬프트 텍스트를 `generated_prompts`에 저장한다. 설정 변경 후 기존 미리보기는 stale이며 재생성 전 저장할 수 없다. 저장된 프롬프트와 snapshot은 수정하지 않고 현재 게시물·주제·후속 항목 변경으로 다시 만들거나 덮어쓰지 않는다.
+
+이력 목록과 상세는 `/briefing-prompts/history` 아래의 보호 경로에서 제공한다. 사용자·카테고리별 미고정 최근 30개를 보존하고 고정 이력은 한도와 자동 정리에서 제외한다. 고정 해제 시 같은 트랜잭션에서 retention을 다시 적용한다. 저장과 pin 변경은 인증 사용자 소유권을 확인하는 전용 RPC만 사용한다. 외부 AI API 호출과 카테고리별 최종 작성 템플릿은 포함하지 않으며 후자는 Phase 3B-3에서 적용한다.
+
 ## 10.5 프롬프트 예시
 
 ```text
@@ -1127,6 +1133,10 @@ category_id        text
 requested_post_count integer
 actual_post_count  integer
 prompt_mode        text
+reference_date     date
+closed_lookback_days integer
+context_schema_version integer
+context_snapshot   jsonb
 prompt_text        text
 is_pinned          boolean default false
 generated_at       timestamptz
@@ -1134,7 +1144,7 @@ generated_at       timestamptz
 
 사용자·카테고리별 미고정 기록을 최근 30개까지 보존한다. `is_pinned = true`인 기록은 자동 삭제와 30개 계산에서 제외한다. PostgreSQL DB 함수가 기록 저장과 오래된 미고정 기록 정리를 하나의 트랜잭션에서 처리한다.
 
-`requested_post_count`에는 사용자가 요청한 최근 글 수를 저장한다. `actual_post_count`에는 실제 프롬프트에 사용한 글 수를 저장한다. `prompt_text`에는 WordPress HTML 전문, 뉴스 기사 원문, CCTV 원문·전체 자막·전체 번역을 포함하지 않는다.
+`requested_post_count`에는 사용자가 요청한 최근 글 수를 저장한다. `actual_post_count`에는 실제 프롬프트에 사용한 글 수를 저장한다. `context_snapshot`과 `prompt_text`는 생성 당시 값을 보존하며 pin 이외의 직접 수정·삭제를 허용하지 않는다. `prompt_text`에는 WordPress HTML 전문, 뉴스 기사 원문, CCTV 원문·전체 자막·전체 번역을 포함하지 않는다.
 
 ---
 

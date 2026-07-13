@@ -6,5 +6,7 @@ describe('briefing prompt route', () => {
     const authenticated = routes[1]
     const layout = authenticated.children?.[0]
     expect(layout?.children?.some((route) => route.path === '/briefing-prompts')).toBe(true)
+    expect(layout?.children?.some((route) => route.path === '/briefing-prompts/history')).toBe(true)
+    expect(layout?.children?.some((route) => route.path === '/briefing-prompts/history/:runId')).toBe(true)
   })
 })

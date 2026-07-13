@@ -1,5 +1,9 @@
 import { z } from 'zod'
-import type { NewsBriefingPromptContext } from './briefingPrompts.types'
+import type {
+  BriefingPromptRun,
+  NewsBriefingPromptContext,
+  SaveBriefingPromptRunInput,
+} from './briefingPrompts.types'
 
 const dateOnly = z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
 const timestamp = z.string().datetime({ offset: true })
@@ -58,6 +62,21 @@ const contextSchema = z.object({
   }),
 })
 
+const promptRunRowSchema = z.object({
+  id: z.string().uuid(),
+  category_id: z.string().min(1),
+  reference_date: dateOnly,
+  prompt_mode: z.enum(['simple', 'standard', 'detailed']),
+  closed_lookback_days: z.number().int().min(1).max(180),
+  context_schema_version: z.literal(1),
+  context_snapshot: z.unknown(),
+  prompt_text: z.string().refine((value) => value.trim().length > 0),
+  is_pinned: z.boolean(),
+  generated_at: timestamp,
+  requested_post_count: z.number().int().positive(),
+  actual_post_count: z.number().int().nonnegative(),
+})
+
 function uniqueById<T extends { id: string }>(items: T[]): T[] {
   return [...new Map(items.map((item) => [item.id, item])).values()]
 }
@@ -83,4 +102,48 @@ export function parseNewsBriefingPromptContext(value: unknown): NewsBriefingProm
     recentClosedTopics: recentClosedTopics.length,
   }
   return { ...parsed, recentPosts, openTopics, pendingFollowups, recentClosedTopics, counts }
+}
+
+export function parseBriefingPromptRun(value: unknown): BriefingPromptRun {
+  const row = promptRunRowSchema.parse(value)
+  const contextSnapshot = parseNewsBriefingPromptContext(row.context_snapshot)
+  if (
+    contextSnapshot.category.id !== row.category_id
+    || contextSnapshot.referenceDate !== row.reference_date
+    || contextSnapshot.schemaVersion !== row.context_schema_version
+  ) {
+    throw new Error('저장된 프롬프트 snapshot 설정이 일치하지 않습니다.')
+  }
+  return {
+    id: row.id,
+    categoryId: row.category_id,
+    referenceDate: row.reference_date,
+    promptMode: row.prompt_mode,
+    closedLookbackDays: row.closed_lookback_days,
+    contextSchemaVersion: row.context_schema_version,
+    contextSnapshot,
+    promptText: row.prompt_text,
+    isPinned: row.is_pinned,
+    generatedAt: row.generated_at,
+    requestedPostCount: row.requested_post_count,
+    actualPostCount: row.actual_post_count,
+  }
+}
+
+export function validateSaveBriefingPromptRunInput(
+  input: SaveBriefingPromptRunInput,
+): SaveBriefingPromptRunInput {
+  const context = parseNewsBriefingPromptContext(input.context)
+  const promptText = z.string().refine((value) => value.trim().length > 0).parse(input.promptText)
+  if (
+    context.category.id !== input.settings.categoryId
+    || context.referenceDate !== input.settings.referenceDate
+    || context.schemaVersion !== 1
+    || !Number.isInteger(input.settings.closedLookbackDays)
+    || input.settings.closedLookbackDays < 1
+    || input.settings.closedLookbackDays > 180
+  ) {
+    throw new Error('현재 설정과 프롬프트 snapshot이 일치하지 않습니다.')
+  }
+  return { ...input, context, promptText }
 }

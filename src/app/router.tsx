@@ -27,6 +27,8 @@ import { NewsFollowupsPage } from '../pages/NewsFollowupsPage'
 import { NewsFollowupCreatePage } from '../pages/NewsFollowupCreatePage'
 import { NewsFollowupEditPage } from '../pages/NewsFollowupEditPage'
 import { BriefingPromptsPage } from '../pages/BriefingPromptsPage'
+import { BriefingPromptHistoryPage } from '../pages/BriefingPromptHistoryPage'
+import { BriefingPromptRunDetailPage } from '../pages/BriefingPromptRunDetailPage'
 
 export const routes: RouteObject[] = [
   {
@@ -79,6 +81,8 @@ export const routes: RouteObject[] = [
           { path: '/news-topics/:topicId/followups/new', element: <NewsFollowupCreatePage /> },
           { path: '/news-followups/:followupId/edit', element: <NewsFollowupEditPage /> },
           { path: '/briefing-prompts', element: <BriefingPromptsPage /> },
+          { path: '/briefing-prompts/history', element: <BriefingPromptHistoryPage /> },
+          { path: '/briefing-prompts/history/:runId', element: <BriefingPromptRunDetailPage /> },
           {
             path: '*',
             element: <NotFoundPage />,

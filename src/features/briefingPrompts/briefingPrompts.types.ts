@@ -112,3 +112,30 @@ export interface BriefingPromptSettings {
   mode: BriefingPromptMode
   closedLookbackDays: number
 }
+
+export interface SaveBriefingPromptRunInput {
+  settings: BriefingPromptSettings
+  context: NewsBriefingPromptContext
+  promptText: string
+}
+
+export interface BriefingPromptRun {
+  id: string
+  categoryId: string
+  referenceDate: string
+  promptMode: BriefingPromptMode
+  closedLookbackDays: number
+  contextSchemaVersion: 1
+  contextSnapshot: NewsBriefingPromptContext
+  promptText: string
+  isPinned: boolean
+  generatedAt: string
+  requestedPostCount: number
+  actualPostCount: number
+}
+
+export interface BriefingPromptRunFilters {
+  categoryId: string
+  promptMode: BriefingPromptMode | ''
+  pin: 'all' | 'pinned' | 'unpinned'
+}
