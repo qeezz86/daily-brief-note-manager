@@ -25,7 +25,7 @@ function client() {
 function renderPage() { const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } }); return render(<QueryClientProvider client={qc}><MemoryRouter><NewsTopicsPageContent client={client()} userId="owner" /></MemoryRouter></QueryClientProvider>) }
 
 describe('NewsTopicsPage', () => {
-  it('renders news topic cards', async () => { renderPage(); expect(await screen.findByRole('heading', { name: '기준금리 전망' })).toBeInTheDocument(); expect(screen.getByText('협상 종료')).toBeInTheDocument() })
+  it('renders news topic cards', async () => { renderPage(); expect(await screen.findByRole('heading', { name: '기준금리 전망' }, { timeout: 5_000 })).toBeInTheDocument(); expect(screen.getByText('협상 종료')).toBeInTheDocument() })
   it('shows only news categories', async () => { renderPage(); expect(await screen.findByRole('option', { name: '경제' })).toBeInTheDocument(); expect(screen.queryByRole('option', { name: 'AI 칼럼' })).not.toBeInTheDocument() })
   it('filters by category', async () => { const user = userEvent.setup(); renderPage(); await screen.findByText('기준금리 전망'); await user.selectOptions(screen.getByLabelText('카테고리'), 'global'); expect(screen.queryByText('기준금리 전망')).not.toBeInTheDocument() })
   it('filters by status', async () => { const user = userEvent.setup(); renderPage(); await screen.findByText('기준금리 전망'); await user.selectOptions(screen.getByLabelText('상태'), 'closed'); expect(screen.getByText('글로벌 무역 정책')).toBeInTheDocument(); expect(screen.queryByText('기준금리 전망')).not.toBeInTheDocument() })

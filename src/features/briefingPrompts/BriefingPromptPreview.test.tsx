@@ -1,0 +1,16 @@
+import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { buildNewsBriefingPrompt } from './buildBriefingPrompt'
+import { BriefingPromptPreview } from './BriefingPromptPreview'
+import { briefingPromptContextFixture as context } from './briefingPrompts.fixtures'
+
+afterEach(() => vi.restoreAllMocks())
+describe('BriefingPromptPreview', () => {
+  it('renders all aggregate counts', () => { render(<BriefingPromptPreview context={context} prompt="preview" />); expect(screen.getByText('최근 브리핑').nextElementSibling).toHaveTextContent('1'); expect(screen.getByText('마감 초과').nextElementSibling).toHaveTextContent('1') })
+  it('renders recent, open, followup, overdue and closed context in JSON', () => { render(<BriefingPromptPreview context={context} prompt="preview" />); expect(screen.getByText(/최근 경제 브리핑/)).toBeInTheDocument(); expect(screen.getByText(/기준금리/)).toBeInTheDocument(); expect(screen.getByText(/한국은행 의결문 확인/)).toBeInTheDocument(); expect(screen.getByText(/"overdue": true/)).toBeInTheDocument(); expect(screen.getByText(/종료된 정책/)).toBeInTheDocument() })
+  it('copies exactly the preview value', async () => { const user = userEvent.setup(); const writeText = vi.fn().mockResolvedValue(undefined); Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } }); const prompt = buildNewsBriefingPrompt(context, 'standard'); render(<BriefingPromptPreview context={context} prompt={prompt} />); expect(screen.getByLabelText('복사용 프롬프트')).toHaveValue(prompt); await user.click(screen.getByRole('button', { name: '프롬프트 복사' })); expect(writeText).toHaveBeenCalledWith(prompt); expect(await screen.findByText('프롬프트를 복사했습니다.')).toBeInTheDocument() })
+  it('shows prompt copy failure', async () => { const user = userEvent.setup(); Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: vi.fn().mockRejectedValue(new Error('denied')) } }); render(<BriefingPromptPreview context={context} prompt="preview" />); await user.click(screen.getByRole('button', { name: '프롬프트 복사' })); expect(await screen.findByText('프롬프트를 복사하지 못했습니다.')).toBeInTheDocument() })
+  it('copies formatted JSON', async () => { const user = userEvent.setup(); const writeText = vi.fn().mockResolvedValue(undefined); Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } }); render(<BriefingPromptPreview context={context} prompt="preview" />); await user.click(screen.getByRole('button', { name: '구조화 JSON 복사' })); await waitFor(() => expect(writeText).toHaveBeenCalledWith(JSON.stringify(context, null, 2))) })
+  it('shows empty-data warnings', () => { const empty = { ...context, recentPosts: [], openTopics: [], pendingFollowups: [], recentClosedTopics: [], counts: { recentPosts: 0, recentUpdates: 0, openTopics: 0, pendingFollowups: 0, overdueFollowups: 0, recentClosedTopics: 0 } }; render(<BriefingPromptPreview context={empty} prompt="preview" />); expect(screen.getByText('최근 브리핑이 없습니다.')).toBeInTheDocument(); expect(screen.getByText('추적 중인 뉴스 주제가 없습니다.')).toBeInTheDocument(); expect(screen.getByText('미완료 후속 확인 항목이 없습니다.')).toBeInTheDocument(); expect(screen.getByText('조회 기간 내 종료된 주제가 없습니다.')).toBeInTheDocument() })
+})

@@ -24,6 +24,21 @@
 .filter-panel { display: grid; gap: 1rem; margin: 1.25rem 0; padding: 1rem; border: 1px solid #d7dde5; border-radius: .75rem; }
 .checkbox-inline { display: flex; align-items: center; gap: .5rem; }
 
+.prompt-settings { display: grid; margin-top: 1.5rem; gap: 1rem; }
+.prompt-settings > .primary-button { justify-self: end; margin-top: 0; }
+.prompt-results { display: grid; margin-top: 1.5rem; gap: 1rem; }
+.prompt-panel { padding: 1.25rem; border: 1px solid #d9dfdc; border-radius: .5rem; background: #fff; }
+.prompt-panel h2 { margin: 0; font-size: 1rem; }
+.prompt-panel__heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.prompt-counts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .75rem; margin: 1rem 0 0; }
+.prompt-counts div { padding: .75rem; border-radius: .4rem; background: #f4f6f5; }
+.prompt-counts dt { color: #68736f; font-size: .75rem; }
+.prompt-counts dd { margin: .25rem 0 0; color: #173f35; font-size: 1.25rem; font-weight: 750; }
+.prompt-preview { width: 100%; min-height: 32rem; margin-top: 1rem; padding: 1rem; border: 1px solid #bfc9c5; border-radius: .4rem; resize: vertical; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; line-height: 1.55; white-space: pre-wrap; }
+.prompt-json { max-height: 32rem; overflow: auto; padding: 1rem; border-radius: .4rem; background: #17211e; color: #eff8f4; font-size: .8rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+.prompt-panel summary { cursor: pointer; color: #173f35; font-weight: 700; }
+.prompt-panel[open] summary { margin-bottom: 1rem; }
+
 @media (max-width: 640px) {
   .followup-actions > a, .followup-actions > button { width: 100%; text-align: center; }
   .followup-metadata, .followup-counts { grid-template-columns: 1fr 1fr; }
@@ -1158,6 +1173,12 @@ a {
     width: 100%;
     justify-content: center;
   }
+
+  .prompt-settings > .primary-button,
+  .prompt-panel__heading .secondary-button { width: 100%; }
+  .prompt-panel__heading { align-items: stretch; flex-direction: column; }
+  .prompt-counts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .prompt-preview { min-height: 24rem; }
 }
 
 @media (min-width: 720px) {

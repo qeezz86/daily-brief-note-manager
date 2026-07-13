@@ -789,6 +789,16 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      get_news_briefing_prompt_context: {
+        Args: {
+          p_category_id: string
+          p_closed_limit?: number
+          p_closed_lookback_days?: number
+          p_recent_post_limit?: number
+          p_reference_date: string
+        }
+        Returns: Json
+      }
       issue_series_no: {
         Args: { p_category_id: string; p_owner_id: string }
         Returns: number

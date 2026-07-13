@@ -104,6 +104,12 @@ categories
   └─ generated_prompts
 ```
 
+### 3.1 뉴스 브리핑 프롬프트 context RPC
+
+`get_news_briefing_prompt_context(category_id, reference_date, recent_post_limit, closed_lookback_days, closed_limit)`는 인증 사용자의 뉴스 프롬프트용 데이터를 JSONB 하나로 반환하는 읽기 전용 `SECURITY INVOKER` 함수다. `owner_id`는 입력받지 않고 `auth.uid()`와 기존 RLS를 사용한다. 함수 실행 권한은 `authenticated`에만 부여한다.
+
+반환 JSON의 `schemaVersion`은 1이다. 최근 `published` 게시물은 최대 5개, 종료 조회 기간은 1~180일, 종료 주제는 최대 20개로 제한한다. 종료 시각은 `news_status_history`의 기준일 이전 최신 `to_status = closed` 이력이며 현재 상태가 `closed`인 주제만 반환한다. WordPress HTML, 이미지 프롬프트, 사용자 이메일, 소유자 ID와 원문 기사 전문은 반환하지 않는다. 이 RPC는 `generated_prompts`를 포함한 어떤 테이블에도 쓰지 않는다.
+
 ## 4. 카테고리
 
 ### 4.1 `categories`

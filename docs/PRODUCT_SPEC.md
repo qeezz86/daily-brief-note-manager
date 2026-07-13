@@ -1046,6 +1046,22 @@ UI에 다음 모드를 제공할 수 있다.
 
 MVP 기본값은 `표준`이다.
 
+### 10.4.1 Phase 3B-1 집계·미리보기 구현 범위
+
+- 보호 경로: `/briefing-prompts`
+- 작성 기준일: `Asia/Seoul` 날짜-only 값
+- 모드: 간단·표준·상세, 기본 표준
+- 이번 단계의 최근 게시물 범위: `published` 최대 5개
+- 추적 주제: `active`, `monitoring`, `reopened`
+- 후속 확인: 선택 카테고리의 `pending`
+- 종료 주제: 기준일로부터 기본 90일, 최대 180일, 최신 20개
+- context JSON: `schemaVersion = 1`
+- 프롬프트와 구조화 JSON을 미리보기 후 plain text로 복사
+
+간단 모드는 최근 브리핑 핵심과 high 또는 overdue 후속 항목, 종료 주제 핵심을 제공한다. 표준 모드는 최근 게시물의 뉴스 항목과 모든 추적 주제·pending 후속·최근 종료 주제를 제공한다. 상세 모드는 표준 정보에 중요성·영향·변화 요약과 최신 주제 업데이트 세부 내용을 더한다.
+
+Phase 3B-1은 context와 프롬프트를 저장하지 않는다. 생성 이력, snapshot, pin, 자동 정리와 ChatGPT/OpenAI API 호출은 후속 단계다. WordPress HTML 전문, 사용자 이메일, 이미지 프롬프트와 기사 원문은 context에서 제외한다. 제품 전체의 최근 5·10·15개 선택은 후속 프롬프트 단계에서 확장한다.
+
 ## 10.5 프롬프트 예시
 
 ```text
