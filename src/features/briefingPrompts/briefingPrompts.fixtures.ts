@@ -2,6 +2,7 @@ import type { BriefingPromptRun, NewsBriefingPromptContext } from './briefingPro
 
 export const briefingPromptContextFixture: NewsBriefingPromptContext = {
   schemaVersion: 1,
+  promptTemplateVersion: 1,
   referenceDate: '2026-07-13',
   category: { id: 'economy', name: '경제', code: 'ECO', wrapperClass: 'daily-brief-note news-briefing economy', displayIdPattern: '#YYYY-MM-DD-ECO', slugPattern: 'economy-briefing-YYYY-MM-DD' },
   recentPosts: [{
@@ -21,6 +22,7 @@ export const briefingPromptRunFixture: BriefingPromptRun = {
   promptMode: 'standard',
   closedLookbackDays: 90,
   contextSchemaVersion: 1,
+  promptTemplateVersion: 1,
   contextSnapshot: briefingPromptContextFixture,
   promptText: '[BEGIN_DAILY_BRIEF_NOTE_PROMPT]\n작업: 경제 뉴스 브리핑 작성\n[END_DAILY_BRIEF_NOTE_PROMPT]',
   isPinned: false,

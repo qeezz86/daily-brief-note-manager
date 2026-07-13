@@ -2,7 +2,7 @@
 
 Daily Brief Note의 콘텐츠, SEO 정보, 출처, 뉴스 추적 이력과 생성 프롬프트를 관리하기 위한 비공개 웹앱입니다.
 
-현재 저장소는 Phase 3B-2 단계입니다. `/briefing-prompts`에서 뉴스 카테고리와 기준일, 간단·표준·상세 모드를 선택해 프롬프트와 context JSON을 미리보고, 생성 당시의 설정·정확한 프롬프트·context snapshot을 이력으로 저장할 수 있습니다. 외부 AI API 호출은 하지 않습니다.
+현재 저장소는 Phase 3B-3 단계입니다. `/briefing-prompts`에서 뉴스 카테고리와 기준일, 간단·표준·상세 모드를 선택하면 카테고리별 조사 범위·출처 우선순위·작성 검증, SEO·WordPress HTML·이미지 출력 규칙을 적용한 프롬프트와 context JSON을 미리볼 수 있습니다. 생성 당시의 설정·정확한 프롬프트·context snapshot과 template version을 이력으로 저장하며 외부 AI API는 호출하지 않습니다.
 
 ## 요구 환경
 
@@ -93,7 +93,9 @@ npx supabase gen types typescript --local > src/shared/supabase/database.types.t
 
 `/briefing-prompts`에서는 활성 뉴스 카테고리만 선택할 수 있습니다. 읽기 전용 `get_news_briefing_prompt_context` RPC가 현재 사용자 데이터에서 기준일 이전의 발행 게시물 최대 5개, 해당 뉴스 업데이트, `active`·`monitoring`·`reopened` 주제, pending 후속 항목과 최근 종료 주제 최대 20개를 결정적 순서로 집계합니다. 종료 조회 기간은 기본 90일, 최대 180일입니다. context schema version은 1이며 WordPress HTML 전문, 이미지 프롬프트, 사용자 이메일과 원문 기사 전문은 포함하지 않습니다. 미리보기 설정이 바뀌면 stale로 표시되어 재생성 전에는 저장할 수 없습니다.
 
-`/briefing-prompts/history`와 상세 경로에서는 저장 당시 설정, 정확한 프롬프트와 context snapshot을 조회·복사하고 고정 상태를 변경합니다. 프롬프트와 snapshot은 저장 후 수정할 수 없고 현재 뉴스 데이터가 바뀌어도 과거 이력은 다시 생성되지 않습니다. 사용자·카테고리별 미고정 최근 30개를 보존하며 고정 이력은 한도와 자동 정리에서 제외됩니다. 오래된 이력을 고정 해제하면 같은 카테고리의 retention이 다시 적용됩니다. 쓰기는 전용 RPC만 사용하며 외부 AI API는 호출하지 않습니다. 카테고리별 실제 최종 작성 템플릿 적용은 Phase 3B-3 범위입니다.
+`/briefing-prompts/history`와 상세 경로에서는 저장 당시 설정, 정확한 프롬프트와 context snapshot을 조회·복사하고 고정 상태를 변경합니다. 새 snapshot에는 `promptTemplateVersion`을 선택 필드로 기록하고 상세 화면에서 적용 버전을 표시합니다. 버전이 없던 과거 이력도 안전하게 표시하며, 현재 category rules로 과거 prompt text를 다시 생성하지 않습니다. 프롬프트와 snapshot은 저장 후 수정할 수 없고 현재 뉴스 데이터가 바뀌어도 과거 이력은 변하지 않습니다. 사용자·카테고리별 미고정 최근 30개를 보존하며 고정 이력은 한도와 자동 정리에서 제외됩니다. 오래된 이력을 고정 해제하면 같은 카테고리의 retention이 다시 적용됩니다. 쓰기는 전용 RPC만 사용하며 외부 AI API는 호출하지 않습니다.
+
+카테고리별 결정적 작성 규칙은 `src/features/briefingPrompts/categoryPromptRules.ts`에 category ID를 key로 두고 관리합니다. 경제·국제·과학기술·사회·환경·에너지의 조사 범위, 출처 우선순위와 검증 지침만 구조화하며 wrapper class, briefing ID pattern과 slug pattern은 DB category 설정을 사용합니다. 프롬프트 화면의 적용 규칙 영역에서 선택 템플릿, wrapper, ID·slug 예시와 template version을 확인할 수 있습니다. Phase 3B-4에서는 생성된 응답의 prompt 규칙 준수 검증을 강화합니다.
 
 콘텐츠 수정 화면에서는 WordPress HTML 원문, SEO 대표 제목·대안 제목 4개·메타 설명·포커스 키워드, 태그, 대표 이미지 프롬프트·ALT 문구와 순서가 있는 출처를 입력합니다. 카테고리 설정의 `content_group`이 `ai`이면 분야·난이도·예상 읽기 시간을, `info_db`이면 여기에 기준일까지 별도로 입력합니다. `ready`와 `published`에서 두 metadata의 분야·난이도·예상 읽기 시간은 필수이며, 난이도 저장값은 `beginner`·`intermediate`·`advanced`, 읽기 시간은 1~600분 정수다. 정보DB 기준일은 nullable이며 경고 안내만 제공한다. 빈 draft metadata는 저장하지 않고 기존 빈 draft metadata는 삭제하지만 archived의 기존 metadata는 보존한다. HTML은 카테고리 설정의 wrapper를 기준으로 strict validation하며 화면에서 실행하지 않습니다. `ready`와 `published` 전환에는 유효한 HTML, 완성된 SEO, 5~8개 태그, 이미지 프롬프트·ALT, 1개 이상의 완전한 출처와 HTML `#sources` 링크 일치가 필요하고 `published`에는 발행일도 필요합니다. `draft`와 기존 `archived` 데이터는 미완성을 허용합니다. AI 칼럼·정보DB·중국어 학습은 각각의 publication bundle RPC에서 posts·SEO·태그·출처·metadata를 한 트랜잭션으로 저장합니다.
 

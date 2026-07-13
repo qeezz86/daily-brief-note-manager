@@ -34,7 +34,9 @@ describe('BriefingPromptRunDetailPage', () => {
     const { client } = detailClient(); renderPage(client)
     expect(await screen.findByRole('textbox', { name: '저장된 프롬프트' })).toHaveValue(run.promptText)
     expect(screen.getByText(/"referenceDate": "2026-07-13"/)).toBeInTheDocument()
-    expect(screen.getByText('v1')).toBeInTheDocument(); expect(screen.getByText(/게시물 1 · 뉴스 항목 1/)).toBeInTheDocument()
+    expect(screen.getByText('Context schema').nextElementSibling).toHaveTextContent('v1')
+    expect(screen.getByText('Template version').nextElementSibling).toHaveTextContent('v1')
+    expect(screen.getByText(/게시물 1 · 뉴스 항목 1/)).toBeInTheDocument()
     expect(client.rpc).not.toHaveBeenCalledWith('get_news_briefing_prompt_context', expect.anything())
   })
   it('copies the exact saved prompt and JSON', async () => {
@@ -51,5 +53,12 @@ describe('BriefingPromptRunDetailPage', () => {
     const user = userEvent.setup(); renderPage(detailClient({ pinError: true }).client); await screen.findByRole('textbox', { name: '저장된 프롬프트' }); await user.click(screen.getByRole('button', { name: '고정' })); expect(await screen.findByText('프롬프트 고정 상태를 변경하지 못했습니다.')).toBeInTheDocument(); expect(screen.queryByText('private SQL')).not.toBeInTheDocument()
   })
   it('uses the same not-found state for missing or inaccessible runs', async () => { renderPage(detailClient({ found: false }).client); expect(await screen.findByRole('heading', { name: '프롬프트 이력을 찾을 수 없습니다' })).toBeInTheDocument() })
+  it('shows a safe label for a legacy run without a template version', async () => {
+    const legacyRun = { ...run, promptTemplateVersion: null, contextSnapshot: { ...run.contextSnapshot, promptTemplateVersion: undefined } }
+    const builder = { select: vi.fn(), eq: vi.fn(), maybeSingle: vi.fn() }
+    builder.select.mockReturnValue(builder); builder.eq.mockReturnValue(builder); builder.maybeSingle.mockResolvedValue({ data: briefingPromptRunRow(legacyRun), error: null })
+    renderPage({ from: vi.fn(() => builder), rpc: vi.fn() } as unknown as DatabaseClient)
+    expect((await screen.findByText('Template version')).nextElementSibling).toHaveTextContent('기록 없음 (이전 이력)')
+  })
   it('shows the Supabase configuration state', () => { renderPage(null); expect(screen.getByRole('heading', { name: 'Supabase 연결이 설정되지 않았습니다' })).toBeInTheDocument() })
 })

@@ -13,10 +13,22 @@ describe('briefing prompt context schema', () => {
 
 describe('saved briefing prompt schema', () => {
   it('parses a saved immutable snapshot', () => expect(parseBriefingPromptRun(briefingPromptRunRow())).toEqual(run))
+  it('safely parses a legacy run without a prompt template version', () => {
+    const legacyContext = { ...context }
+    delete legacyContext.promptTemplateVersion
+    const parsed = parseBriefingPromptRun({ ...briefingPromptRunRow(), context_snapshot: legacyContext })
+    expect(parsed.promptTemplateVersion).toBeNull()
+    expect(parsed.contextSnapshot).not.toHaveProperty('promptTemplateVersion')
+  })
   it('rejects a row and snapshot category mismatch', () => expect(() => parseBriefingPromptRun({ ...briefingPromptRunRow(), category_id: 'global' })).toThrow('snapshot 설정'))
   it('keeps prompt bytes while validating save input', () => {
     const promptText = '  exact prompt\n'
     expect(validateSaveBriefingPromptRunInput({ settings: { categoryId: 'economy', referenceDate: '2026-07-13', mode: 'standard', closedLookbackDays: 90 }, context, promptText }).promptText).toBe(promptText)
   })
   it('rejects stale save settings', () => expect(() => validateSaveBriefingPromptRunInput({ settings: { categoryId: 'global', referenceDate: '2026-07-13', mode: 'standard', closedLookbackDays: 90 }, context, promptText: 'x' })).toThrow('일치하지 않습니다'))
+  it('rejects saving a new snapshot without the current prompt template version', () => {
+    const legacyContext = { ...context }
+    delete legacyContext.promptTemplateVersion
+    expect(() => validateSaveBriefingPromptRunInput({ settings: { categoryId: 'economy', referenceDate: '2026-07-13', mode: 'standard', closedLookbackDays: 90 }, context: legacyContext, promptText: 'x' })).toThrow('일치하지 않습니다')
+  })
 })

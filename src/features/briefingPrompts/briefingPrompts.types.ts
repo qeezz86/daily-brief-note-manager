@@ -97,6 +97,7 @@ export interface BriefingPromptCounts {
 
 export interface NewsBriefingPromptContext {
   schemaVersion: 1
+  promptTemplateVersion?: number
   referenceDate: string
   category: BriefingPromptCategory
   recentPosts: BriefingPromptPost[]
@@ -126,6 +127,7 @@ export interface BriefingPromptRun {
   promptMode: BriefingPromptMode
   closedLookbackDays: number
   contextSchemaVersion: 1
+  promptTemplateVersion: number | null
   contextSnapshot: NewsBriefingPromptContext
   promptText: string
   isPinned: boolean

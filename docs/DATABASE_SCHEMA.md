@@ -485,6 +485,7 @@ foreign key (news_update_id, owner_id)
 - `requested_post_count`에는 사용자가 요청한 최근 글 수를 저장한다.
 - `actual_post_count`에는 실제 프롬프트 컨텍스트에 사용한 발행 글 수를 저장한다.
 - `prompt_text`에는 WordPress HTML 전문, 뉴스 기사 원문, CCTV 원문·전체 자막·전체 번역을 포함하지 않는다.
+- Phase 3B-3부터 새 `context_snapshot`은 기존 `schemaVersion = 1`과 호환되는 선택 필드 `promptTemplateVersion = 1`을 포함한다. 과거 snapshot에는 이 필드가 없을 수 있으며 별도 DB column이나 migration은 사용하지 않는다.
 
 ## 11. 인덱스와 중복 검사 기준
 

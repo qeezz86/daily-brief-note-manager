@@ -4,6 +4,7 @@ import type {
   NewsBriefingPromptContext,
   SaveBriefingPromptRunInput,
 } from './briefingPrompts.types'
+import { PROMPT_TEMPLATE_VERSION } from './categoryPromptRules'
 
 const dateOnly = z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
 const timestamp = z.string().datetime({ offset: true })
@@ -30,6 +31,7 @@ const latestUpdateSchema = z.object({
 
 const contextSchema = z.object({
   schemaVersion: z.literal(1),
+  promptTemplateVersion: z.number().int().positive().optional(),
   referenceDate: dateOnly,
   category: z.object({
     id: z.string(), name: z.string(), code: z.string(), wrapperClass: z.string(),
@@ -121,6 +123,7 @@ export function parseBriefingPromptRun(value: unknown): BriefingPromptRun {
     promptMode: row.prompt_mode,
     closedLookbackDays: row.closed_lookback_days,
     contextSchemaVersion: row.context_schema_version,
+    promptTemplateVersion: contextSnapshot.promptTemplateVersion ?? null,
     contextSnapshot,
     promptText: row.prompt_text,
     isPinned: row.is_pinned,
@@ -139,6 +142,7 @@ export function validateSaveBriefingPromptRunInput(
     context.category.id !== input.settings.categoryId
     || context.referenceDate !== input.settings.referenceDate
     || context.schemaVersion !== 1
+    || context.promptTemplateVersion !== PROMPT_TEMPLATE_VERSION
     || !Number.isInteger(input.settings.closedLookbackDays)
     || input.settings.closedLookbackDays < 1
     || input.settings.closedLookbackDays > 180

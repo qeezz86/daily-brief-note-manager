@@ -67,6 +67,7 @@ export function BriefingPromptRunDetailPageContent({
       <div><dt>생성 시각</dt><dd>{formatPromptRunDateTime(run.generatedAt)}</dd></div>
       <div><dt>고정 상태</dt><dd>{run.isPinned ? '고정' : '미고정'}</dd></div>
       <div><dt>Context schema</dt><dd>v{run.contextSchemaVersion}</dd></div>
+      <div><dt>Template version</dt><dd>{run.promptTemplateVersion === null ? '기록 없음 (이전 이력)' : `v${run.promptTemplateVersion}`}</dd></div>
       <div><dt>저장 당시 집계</dt><dd>게시물 {run.contextSnapshot.counts.recentPosts} · 뉴스 항목 {run.contextSnapshot.counts.recentUpdates} · 추적 {run.contextSnapshot.counts.openTopics} · 후속 {run.contextSnapshot.counts.pendingFollowups} · 종료 {run.contextSnapshot.counts.recentClosedTopics}</dd></div>
     </dl>
     <div className="detail-actions"><button className="primary-button" type="button" disabled={pinMutation.isPending} onClick={() => void togglePin()}>{pinMutation.isPending ? '변경 중' : run.isPinned ? '고정 해제' : '고정'}</button></div>
