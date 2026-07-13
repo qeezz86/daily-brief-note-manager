@@ -106,6 +106,9 @@ export function validateWordPressHtml(
   if (normalizedHtml.includes('```')) {
     errors.push('HTML 본문에 Markdown 코드 펜스가 포함되어 있습니다.')
   }
+  if (/^\s{0,3}(?:#{1,6}\s|[-*+]\s|>\s)/m.test(normalizedHtml)) {
+    errors.push('HTML 본문에 Markdown 문법이 혼합되어 있습니다.')
+  }
 
   if (!hasClosedFinalWrapperDiv(normalizedHtml)) {
     errors.push('마지막 wrapper div가 닫혀 있지 않습니다.')

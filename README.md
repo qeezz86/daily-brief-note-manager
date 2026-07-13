@@ -2,7 +2,7 @@
 
 Daily Brief Note의 콘텐츠, SEO 정보, 출처, 뉴스 추적 이력과 생성 프롬프트를 관리하기 위한 비공개 웹앱입니다.
 
-현재 저장소는 Phase 3B-4 단계입니다. `/briefing-prompts`에서 뉴스 카테고리와 기준일, 간단·표준·상세 모드를 선택하면 카테고리별 조사 범위·출처 우선순위·작성 검증, SEO·WordPress HTML·이미지 출력 규칙을 적용한 프롬프트와 context JSON을 미리볼 수 있습니다. 생성된 프롬프트는 구조·출력 순서·카테고리 규칙·context coverage·결정적 중복·후속/정정/종료 관계·개인정보/내부 ID·저작권/출처 지침을 validation version 1로 결정적으로 검증합니다. 생성 당시의 설정·정확한 프롬프트·context snapshot, template version과 검증 요약을 이력으로 저장하며 외부 AI API는 호출하지 않습니다.
+현재 저장소는 Phase 4A-1 단계입니다. `/imports`에서 `format: "daily-brief-note-content-import"`, `schemaVersion: 1`, `posts`를 필수 최상위 필드로 사용하는 공식 콘텐츠 Import bundle의 JSON 파일 또는 JSON text를 선택해 실제 저장 전 read-only Dry Run을 수행할 수 있습니다. Bundle·공통 필드·카테고리 metadata·HTML·SEO·태그·출처를 검증하고 파일 내부 및 현재 인증 사용자의 DB exact duplicate를 확인합니다. 결과는 항목별 `ready`, `warning`, `invalid`, `duplicate`로 표시하고 HTML 원문을 제외한 JSON으로 복사할 수 있습니다. 실제 Import 저장과 이력, 부분 성공, rollback은 포함하지 않습니다.
 
 ## 요구 환경
 
@@ -98,6 +98,8 @@ npx supabase gen types typescript --local > src/shared/supabase/database.types.t
 카테고리별 결정적 작성 규칙은 `src/features/briefingPrompts/categoryPromptRules.ts`에 category ID를 key로 두고 관리합니다. 경제·국제·과학기술·사회·환경·에너지의 조사 범위, 출처 우선순위와 검증 지침만 구조화하며 wrapper class, briefing ID pattern과 slug pattern은 DB category 설정을 사용합니다. 프롬프트 화면의 적용 규칙 영역에서 선택 템플릿, wrapper, ID·slug 예시와 template version을 확인할 수 있습니다.
 
 Phase 3B-4 검증 결과는 `valid`, `warning`, `invalid`를 구분합니다. 오류가 있거나 설정 변경으로 미리보기가 stale이면 프롬프트 저장과 복사를 차단하며 JSON 복사는 디버깅 목적으로 유지합니다. 데이터 부재, 간단 모드의 정상적인 상세 생략, exact headline 중복, 과도한 길이 같은 경고는 확인 후 저장·복사를 허용합니다. 새 snapshot에는 `promptValidationVersion`과 오류 없는 validation summary만 선택적으로 저장합니다. 과거 이력은 현재 규칙으로 재검증하지 않으며 저장 당시 summary가 없으면 이전 이력으로 표시합니다. AI 의미 유사도, 외부 기사 비교와 실제 뉴스 사실 검증은 수행하지 않습니다.
+
+`/imports`는 UTF-8 `.json` 파일과 직접 붙여넣은 JSON 중 마지막으로 선택한 한 입력만 사용합니다. 파일 제한은 20 MB, 게시물 제한은 2,000개이며 BOM, 과도한 중첩·문자열, prototype pollution 키를 차단합니다. 외부 JSON은 camelCase와 strict 최상위 schema를 사용하며 format 없는 legacy bundle, 다른 format, 지원하지 않는 schema version을 허용하지 않습니다. `validationMode` 기본값은 `strict`이고 기존 WordPress 글은 명시적으로 `legacy`를 사용할 수 있지만 script, iframe, event handler와 `javascript:` URL 같은 보안 오류는 두 모드 모두 차단합니다. DB exact duplicate 후보는 trim·빈 값 제외·중복 제거 후 100개씩 RLS 범위의 순차 batch query로 확인합니다. 조회 상태는 `complete`, `partial`, `unavailable`이며 complete가 아니어도 Dry Run 구조 검증은 계속하고 경고를 남깁니다. 전체 백업의 `data` schema 또는 backup format은 콘텐츠 Import bundle과 다르므로 이 화면에서 받지 않습니다.
 
 콘텐츠 수정 화면에서는 WordPress HTML 원문, SEO 대표 제목·대안 제목 4개·메타 설명·포커스 키워드, 태그, 대표 이미지 프롬프트·ALT 문구와 순서가 있는 출처를 입력합니다. 카테고리 설정의 `content_group`이 `ai`이면 분야·난이도·예상 읽기 시간을, `info_db`이면 여기에 기준일까지 별도로 입력합니다. `ready`와 `published`에서 두 metadata의 분야·난이도·예상 읽기 시간은 필수이며, 난이도 저장값은 `beginner`·`intermediate`·`advanced`, 읽기 시간은 1~600분 정수다. 정보DB 기준일은 nullable이며 경고 안내만 제공한다. 빈 draft metadata는 저장하지 않고 기존 빈 draft metadata는 삭제하지만 archived의 기존 metadata는 보존한다. HTML은 카테고리 설정의 wrapper를 기준으로 strict validation하며 화면에서 실행하지 않습니다. `ready`와 `published` 전환에는 유효한 HTML, 완성된 SEO, 5~8개 태그, 이미지 프롬프트·ALT, 1개 이상의 완전한 출처와 HTML `#sources` 링크 일치가 필요하고 `published`에는 발행일도 필요합니다. `draft`와 기존 `archived` 데이터는 미완성을 허용합니다. AI 칼럼·정보DB·중국어 학습은 각각의 publication bundle RPC에서 posts·SEO·태그·출처·metadata를 한 트랜잭션으로 저장합니다.
 

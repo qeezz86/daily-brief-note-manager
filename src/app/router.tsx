@@ -29,6 +29,7 @@ import { NewsFollowupEditPage } from '../pages/NewsFollowupEditPage'
 import { BriefingPromptsPage } from '../pages/BriefingPromptsPage'
 import { BriefingPromptHistoryPage } from '../pages/BriefingPromptHistoryPage'
 import { BriefingPromptRunDetailPage } from '../pages/BriefingPromptRunDetailPage'
+import { ImportPage } from '../pages/ImportPage'
 
 export const routes: RouteObject[] = [
   {
@@ -61,6 +62,14 @@ export const routes: RouteObject[] = [
           {
             path: '/content/new',
             element: <ContentCreatePage />,
+          },
+          {
+            path: '/imports',
+            element: <ImportPage />,
+          },
+          {
+            path: '/imports/new',
+            element: <ImportPage />,
           },
           {
             path: '/content/:postId',

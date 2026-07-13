@@ -48,6 +48,85 @@ MVP에서는 다음을 하지 않는다.
 - `manual_entry`
 - `json_import`
 
+### 3.1 Phase 4A-1 게시물 Import bundle
+
+Phase 4A-1의 공식 콘텐츠 Import 식별자는 `daily-brief-note-content-import`, schema version은 정수 `1`이다. 외부 JSON은 camelCase만 사용하며 다음 strict 최상위 구조를 사용한다.
+
+```json
+{
+  "format": "daily-brief-note-content-import",
+  "schemaVersion": 1,
+  "exportedAt": "2026-07-13T00:00:00Z",
+  "source": "manual-export",
+  "validationMode": "strict",
+  "posts": []
+}
+```
+
+- `format`: 필수. `daily-brief-note-content-import`만 지원하며 누락된 legacy bundle과 다른 format은 허용하지 않는다.
+- `schemaVersion`: 필수. 현재는 `1`만 지원하며 다른 version을 추측 변환하지 않는다. v1 필드의 의미는 이후 변경하지 않고 비호환 변경은 v2에서만 수행한다.
+- `posts`: 필수이며 비어 있지 않은 배열이다. 최대 2,000개다.
+- `exportedAt`, `source`: 선택 필드다.
+- `validationMode`: 선택 필드이며 `strict` 또는 `legacy`다. 생략하면 `strict`다.
+- 위에 정의한 필드 외의 최상위 필드는 strict schema 오류다.
+- 별도의 begin/end marker는 게시물 JSON 파일에 사용하지 않는다. Section marker는 5절의 ChatGPT 구조화 응답에만 적용한다.
+
+게시물 object는 다음 camelCase 구조를 사용한다.
+
+```json
+{
+  "externalKey": "economy-2026-07-13",
+  "categoryId": "economy",
+  "title": "제목",
+  "summary": "요약",
+  "slug": "economy-briefing-2026-07-13",
+  "status": "published",
+  "briefingDate": "2026-07-13",
+  "publishedOn": "2026-07-13",
+  "publishedAt": null,
+  "displayId": "#2026-07-13-ECO",
+  "seriesNo": null,
+  "wordpressUrl": null,
+  "htmlBody": "<div class=\"daily-brief-note news-briefing economy\">...</div>",
+  "seo": {
+    "representativeTitle": "대표 제목",
+    "alternativeTitles": ["대안 1", "대안 2", "대안 3", "대안 4"],
+    "metaDescription": "메타 설명",
+    "focusKeyword": "포커스 키워드"
+  },
+  "image": { "prompt": "대표 이미지 프롬프트", "alt": "이미지 ALT" },
+  "tags": ["태그1", "태그2", "태그3", "태그4", "태그5"],
+  "sources": [{
+    "sourceName": "기관명",
+    "sourceTitle": "자료 제목",
+    "sourceUrl": "https://example.com/article",
+    "sourcePublishedAt": null,
+    "checkedPoint": "확인한 핵심 내용"
+  }],
+  "metadata": null,
+  "newsTracking": { "topicKey": "stable-topic-key", "updates": [], "followups": [] }
+}
+```
+
+카테고리별 `metadata`는 다음을 사용한다.
+
+- AI: `fieldName`, `difficulty`, `estimatedReadMin`
+- 정보DB: AI 필드와 nullable `referenceDate`
+- 중국어 학습: `learningTopic`, `programName`, `originalTitle`, `originalUrl`, `originalPublishedAt`, `episodeListIncluded`, `verifiedCoreFact`, 선택 `difficulty`, `learningPoints`
+- 뉴스: `metadata`는 `null`로 두며 추적 구조가 있으면 `newsTracking`에서 구조만 검증한다. post와 topic을 같은 entity로 취급하지 않으며 Phase 4A-1은 topic/update/followup을 저장하지 않는다.
+
+뉴스는 `briefingDate`와 카테고리 설정의 `displayId`를 사용하고 `seriesNo`를 사용하지 않는다. AI·정보DB·중국어 학습은 `seriesNo`를 사용한다. 중국어 학습은 `displayId`를 사용하지 않는다. 카테고리 wrapper, display ID와 slug는 현재 category 설정으로 검증하며 과거 레코드를 다시 쓰지 않는다.
+
+파일은 UTF-8 `.json`만 허용하고 BOM을 제거한다. 최대 크기는 20 MB다. `__proto__`, `constructor`, `prototype`, 30단계를 넘는 중첩과 5 MB를 넘는 단일 문자열을 차단한다. HTML은 실행하거나 기본 화면에 렌더링하지 않는다.
+
+`strict`는 신규 입력의 전체 template class 정책을 적용한다. `legacy`는 미등록 class와 inline style을 경고로 낮출 수 있지만 script, iframe, event handler, `javascript:` URL, wrapper·h1 누락과 닫히지 않은 wrapper 같은 치명적·보안 오류는 차단한다. strict validation을 비활성화하지 않는다.
+
+Dry Run 상태는 `ready`, `warning`, `invalid`, `duplicate`다. 결과는 영구 저장하지 않으며 실제 INSERT·UPDATE·DELETE, 자동 수정, 외부 URL fetch와 AI 의미 중복 판정을 수행하지 않는다. DB exact duplicate 후보는 slug, WordPress URL, 뉴스의 category·briefing date unique key, category·series number, 뉴스 topic key, 중국어 normalized original URL처럼 실제 DB unique 정책에 정의된 값만 사용한다. 문자열 후보는 trim하고 빈 값과 중복을 제거한 뒤 최대 100개씩 RLS 범위의 제한 projection batch query로 순차 조회한다. item별 N+1 query, `select('*')`, `owner_id` 입력과 무제한 `Promise.all`은 사용하지 않는다.
+
+DB 중복 조회 상태는 `complete`, `partial`, `unavailable`로 유지한다. 하나의 chunk라도 실패하면 `complete`가 아니며, 성공한 chunk 결과는 결정적으로 병합한다. Phase 4A-1 Dry Run은 `partial`에 `DB_DUPLICATE_CHECK_PARTIAL`, `unavailable`에 `DB_DUPLICATE_CHECK_UNAVAILABLE` warning을 표시하고 구조 검증을 계속한다. 이후 실제 Import 단계는 이 상태가 `complete`가 아니면 저장을 차단할 수 있다.
+
+13절의 전체 백업 schema는 최상위 `data` 아래에 관계형 배열을 두는 복구 전용 형식이다. 최상위 `data`가 있거나 `format`이 backup bundle을 식별하면 `BACKUP_BUNDLE_NOT_SUPPORTED`로 차단한다. 게시물 Import bundle의 최상위 `posts`와 다르며 실제 복구는 Phase 4A-2 이후 범위다.
+
 ## 4. 기존 WordPress 글 수동 가져오기
 
 ### 4.1 입력 항목

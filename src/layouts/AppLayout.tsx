@@ -25,6 +25,7 @@ export function AppLayout() {
           <nav className="app-navigation" aria-label="주요 메뉴">
             <NavLink to="/dashboard">대시보드</NavLink>
             <NavLink to="/content">콘텐츠</NavLink>
+            <NavLink to="/imports">콘텐츠 가져오기</NavLink>
             <NavLink to="/news-topics">뉴스 주제</NavLink>
             <NavLink to="/news-followups">후속 확인</NavLink>
             <NavLink to="/briefing-prompts">브리핑 프롬프트</NavLink>

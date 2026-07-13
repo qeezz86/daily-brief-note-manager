@@ -2,18 +2,23 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
-import { describe, expect, it, vi } from 'vitest'
+import { afterAll, describe, expect, it, vi } from 'vitest'
 import type { Category } from '../features/categories/categories.types'
 import { getSeoulDate } from '../features/briefingPrompts/briefingPromptDates'
 import { briefingPromptContextFixture as context, briefingPromptRunRow } from '../features/briefingPrompts/briefingPrompts.fixtures'
 import type { DatabaseClient } from '../shared/supabase/client'
 import { BriefingPromptsPageContent } from './BriefingPromptsPage'
 
+vi.hoisted(() => vi.setSystemTime(new Date('2026-07-13T03:00:00.000Z')))
+
 const categories: Category[] = [
   { id: 'economy', content_group: 'news', name: '경제', sort_order: 1, display_id_pattern: '#YYYY-MM-DD-ECO', slug_pattern: 'economy-briefing-YYYY-MM-DD', wrapper_class: 'daily-brief-note news-briefing economy' },
   { id: 'global', content_group: 'news', name: '국제', sort_order: 2, display_id_pattern: '#YYYY-MM-DD-GLO', slug_pattern: 'global-briefing-YYYY-MM-DD', wrapper_class: 'daily-brief-note news-briefing global' },
   { id: 'ai-column', content_group: 'ai', name: 'AI 칼럼', sort_order: 2, display_id_pattern: 'AI-###', slug_pattern: 'ai-###', wrapper_class: 'daily-brief-note ai-column' },
 ]
+
+afterAll(() => vi.useRealTimers())
+
 function createClient(data = context, saveError: { message: string } | null = null, categoryData = categories) {
   const builder = { select: vi.fn(), eq: vi.fn(), order: vi.fn() }
   builder.select.mockReturnValue(builder); builder.eq.mockReturnValue(builder); builder.order.mockResolvedValue({ data: categoryData, error: null })
