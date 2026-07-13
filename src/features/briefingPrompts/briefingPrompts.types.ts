@@ -63,6 +63,7 @@ export interface BriefingPromptOpenTopic {
 
 export interface BriefingPromptFollowup {
   id: string
+  status?: 'pending' | 'done' | 'cancelled'
   checkText: string
   priority: 'high' | 'normal' | 'low'
   dueDate: string | null
@@ -74,6 +75,7 @@ export interface BriefingPromptFollowup {
 
 export interface BriefingPromptClosedTopic {
   id: string
+  status?: 'active' | 'monitoring' | 'closed' | 'reopened'
   topicKey: string
   canonicalTitle: string
   topicSummary: string | null
@@ -84,6 +86,13 @@ export interface BriefingPromptClosedTopic {
     factSummary: string
     changeSummary: string | null
   } | null
+}
+
+export interface BriefingPromptValidationSnapshotSummary {
+  status: 'valid' | 'warning'
+  errorCount: 0
+  warningCount: number
+  checkCount: number
 }
 
 export interface BriefingPromptCounts {
@@ -98,6 +107,8 @@ export interface BriefingPromptCounts {
 export interface NewsBriefingPromptContext {
   schemaVersion: 1
   promptTemplateVersion?: number
+  promptValidationVersion?: 1
+  promptValidationSummary?: BriefingPromptValidationSnapshotSummary
   referenceDate: string
   category: BriefingPromptCategory
   recentPosts: BriefingPromptPost[]
@@ -128,6 +139,8 @@ export interface BriefingPromptRun {
   closedLookbackDays: number
   contextSchemaVersion: 1
   promptTemplateVersion: number | null
+  promptValidationVersion: 1 | null
+  promptValidationSummary: BriefingPromptValidationSnapshotSummary | null
   contextSnapshot: NewsBriefingPromptContext
   promptText: string
   isPinned: boolean

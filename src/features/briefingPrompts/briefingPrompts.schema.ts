@@ -5,6 +5,11 @@ import type {
   SaveBriefingPromptRunInput,
 } from './briefingPrompts.types'
 import { PROMPT_TEMPLATE_VERSION } from './categoryPromptRules'
+import { validateBriefingPrompt } from './validateBriefingPrompt'
+import {
+  BRIEFING_PROMPT_VALIDATION_VERSION,
+  summarizeBriefingPromptValidation,
+} from './briefingPromptValidation.types'
 
 const dateOnly = z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
 const timestamp = z.string().datetime({ offset: true })
@@ -32,6 +37,13 @@ const latestUpdateSchema = z.object({
 const contextSchema = z.object({
   schemaVersion: z.literal(1),
   promptTemplateVersion: z.number().int().positive().optional(),
+  promptValidationVersion: z.literal(1).optional(),
+  promptValidationSummary: z.object({
+    status: z.enum(['valid', 'warning']),
+    errorCount: z.literal(0),
+    warningCount: z.number().int().nonnegative(),
+    checkCount: z.number().int().nonnegative(),
+  }).optional(),
   referenceDate: dateOnly,
   category: z.object({
     id: z.string(), name: z.string(), code: z.string(), wrapperClass: z.string(),
@@ -48,12 +60,12 @@ const contextSchema = z.object({
     latestUpdate: latestUpdateSchema.nullable().catch(null),
   })),
   pendingFollowups: safeArray(z.object({
-    id: z.string().uuid(), checkText: z.string(), priority: z.enum(['high', 'normal', 'low']),
+    id: z.string().uuid(), status: z.enum(['pending', 'done', 'cancelled']).optional(), checkText: z.string(), priority: z.enum(['high', 'normal', 'low']),
     dueDate: dateOnly.nullable().catch(null), overdue: z.boolean(), topicId: z.string().uuid(),
     topicKey: z.string(), topicTitle: z.string(),
   })),
   recentClosedTopics: safeArray(z.object({
-    id: z.string().uuid(), topicKey: z.string(), canonicalTitle: z.string(),
+    id: z.string().uuid(), status: z.enum(['active', 'monitoring', 'closed', 'reopened']).optional(), topicKey: z.string(), canonicalTitle: z.string(),
     topicSummary: nullableText, closedReason: nullableText, closedAt: timestamp,
     closureNote: z.object({ headline: z.string(), factSummary: z.string(), changeSummary: nullableText }).nullable().catch(null),
   })),
@@ -79,31 +91,20 @@ const promptRunRowSchema = z.object({
   actual_post_count: z.number().int().nonnegative(),
 })
 
-function uniqueById<T extends { id: string }>(items: T[]): T[] {
-  return [...new Map(items.map((item) => [item.id, item])).values()]
-}
-
 export function parseNewsBriefingPromptContext(value: unknown): NewsBriefingPromptContext {
   const parsed = contextSchema.parse(value)
-  const recentPosts = uniqueById(parsed.recentPosts)
-    .map((post) => ({ ...post, updates: uniqueById(post.updates).sort((a, b) => a.itemOrder - b.itemOrder || a.id.localeCompare(b.id)) }))
+  const recentPosts = parsed.recentPosts
+    .map((post) => ({ ...post, updates: [...post.updates].sort((a, b) => a.itemOrder - b.itemOrder || a.id.localeCompare(b.id)) }))
+    .sort((a, b) => b.publishedOn.localeCompare(a.publishedOn) || a.id.localeCompare(b.id))
   const openOrder = { reopened: 0, active: 1, monitoring: 2 }
-  const openTopics = uniqueById(parsed.openTopics).sort((a, b) =>
+  const openTopics = [...parsed.openTopics].sort((a, b) =>
     openOrder[a.status] - openOrder[b.status] || b.lastSeenAt.localeCompare(a.lastSeenAt) || a.topicKey.localeCompare(b.topicKey))
   const priorityOrder = { high: 0, normal: 1, low: 2 }
-  const pendingFollowups = uniqueById(parsed.pendingFollowups).sort((a, b) =>
+  const pendingFollowups = [...parsed.pendingFollowups].sort((a, b) =>
     Number(b.overdue) - Number(a.overdue) || priorityOrder[a.priority] - priorityOrder[b.priority] ||
     (a.dueDate === b.dueDate ? a.id.localeCompare(b.id) : a.dueDate === null ? 1 : b.dueDate === null ? -1 : a.dueDate.localeCompare(b.dueDate)))
-  const recentClosedTopics = uniqueById(parsed.recentClosedTopics).sort((a, b) => b.closedAt.localeCompare(a.closedAt) || a.id.localeCompare(b.id))
-  const counts = {
-    recentPosts: recentPosts.length,
-    recentUpdates: recentPosts.reduce((sum, post) => sum + post.updates.length, 0),
-    openTopics: openTopics.length,
-    pendingFollowups: pendingFollowups.length,
-    overdueFollowups: pendingFollowups.filter((item) => item.overdue).length,
-    recentClosedTopics: recentClosedTopics.length,
-  }
-  return { ...parsed, recentPosts, openTopics, pendingFollowups, recentClosedTopics, counts }
+  const recentClosedTopics = [...parsed.recentClosedTopics].sort((a, b) => b.closedAt.localeCompare(a.closedAt) || a.id.localeCompare(b.id))
+  return { ...parsed, recentPosts, openTopics, pendingFollowups, recentClosedTopics }
 }
 
 export function parseBriefingPromptRun(value: unknown): BriefingPromptRun {
@@ -124,6 +125,8 @@ export function parseBriefingPromptRun(value: unknown): BriefingPromptRun {
     closedLookbackDays: row.closed_lookback_days,
     contextSchemaVersion: row.context_schema_version,
     promptTemplateVersion: contextSnapshot.promptTemplateVersion ?? null,
+    promptValidationVersion: contextSnapshot.promptValidationVersion ?? null,
+    promptValidationSummary: contextSnapshot.promptValidationSummary ?? null,
     contextSnapshot,
     promptText: row.prompt_text,
     isPinned: row.is_pinned,
@@ -148,6 +151,21 @@ export function validateSaveBriefingPromptRunInput(
     || input.settings.closedLookbackDays > 180
   ) {
     throw new Error('현재 설정과 프롬프트 snapshot이 일치하지 않습니다.')
+  }
+  const validation = validateBriefingPrompt({
+    promptText,
+    context,
+    mode: input.settings.mode,
+    settings: input.settings,
+    promptTemplateVersion: PROMPT_TEMPLATE_VERSION,
+  })
+  const expectedSummary = summarizeBriefingPromptValidation(validation)
+  if (
+    !expectedSummary
+    || context.promptValidationVersion !== BRIEFING_PROMPT_VALIDATION_VERSION
+    || JSON.stringify(context.promptValidationSummary) !== JSON.stringify(expectedSummary)
+  ) {
+    throw new Error('프롬프트 검증 오류가 있거나 검증 요약이 일치하지 않습니다.')
   }
   return { ...input, context, promptText }
 }

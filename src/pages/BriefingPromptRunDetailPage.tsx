@@ -57,6 +57,7 @@ export function BriefingPromptRunDetailPageContent({
   const run = query.data
   if (!run) return <div className="content-state content-state--error" role="alert"><h1>프롬프트 이력을 찾을 수 없습니다</h1><p>삭제되었거나 접근 권한이 없는 이력입니다.</p><Link to="/briefing-prompts/history">이력 목록으로</Link></div>
   const json = JSON.stringify(run.contextSnapshot, null, 2)
+  const validationStatus = run.promptValidationSummary?.status === 'warning' ? '경고 있음' : '유효'
   return <article className="content-detail" aria-labelledby="prompt-run-title">
     <div className="page-heading-with-actions"><div><p className="dashboard__eyebrow">Saved prompt</p><h1 id="prompt-run-title">{run.contextSnapshot.category.name} 프롬프트 이력</h1><p>저장 당시 snapshot만 표시하며 현재 뉴스 데이터로 다시 생성하지 않습니다.</p></div><Link className="secondary-button" to="/briefing-prompts/history">이력 목록으로</Link></div>
     <dl className="content-detail__metadata">
@@ -68,6 +69,7 @@ export function BriefingPromptRunDetailPageContent({
       <div><dt>고정 상태</dt><dd>{run.isPinned ? '고정' : '미고정'}</dd></div>
       <div><dt>Context schema</dt><dd>v{run.contextSchemaVersion}</dd></div>
       <div><dt>Template version</dt><dd>{run.promptTemplateVersion === null ? '기록 없음 (이전 이력)' : `v${run.promptTemplateVersion}`}</dd></div>
+      <div><dt>저장 당시 검증</dt><dd>{run.promptValidationVersion === null || !run.promptValidationSummary ? '검증 기록 없음 (이전 이력)' : `${validationStatus} · v${run.promptValidationVersion} · 경고 ${run.promptValidationSummary.warningCount} · 통과 ${run.promptValidationSummary.checkCount}`}</dd></div>
       <div><dt>저장 당시 집계</dt><dd>게시물 {run.contextSnapshot.counts.recentPosts} · 뉴스 항목 {run.contextSnapshot.counts.recentUpdates} · 추적 {run.contextSnapshot.counts.openTopics} · 후속 {run.contextSnapshot.counts.pendingFollowups} · 종료 {run.contextSnapshot.counts.recentClosedTopics}</dd></div>
     </dl>
     <div className="detail-actions"><button className="primary-button" type="button" disabled={pinMutation.isPending} onClick={() => void togglePin()}>{pinMutation.isPending ? '변경 중' : run.isPinned ? '고정 해제' : '고정'}</button></div>

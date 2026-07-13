@@ -36,13 +36,14 @@ describe('BriefingPromptRunDetailPage', () => {
     expect(screen.getByText(/"referenceDate": "2026-07-13"/)).toBeInTheDocument()
     expect(screen.getByText('Context schema').nextElementSibling).toHaveTextContent('v1')
     expect(screen.getByText('Template version').nextElementSibling).toHaveTextContent('v1')
+    expect(screen.getByText('저장 당시 검증').nextElementSibling).toHaveTextContent('유효 · v1')
     expect(screen.getByText(/게시물 1 · 뉴스 항목 1/)).toBeInTheDocument()
     expect(client.rpc).not.toHaveBeenCalledWith('get_news_briefing_prompt_context', expect.anything())
   })
   it('copies the exact saved prompt and JSON', async () => {
     const user = userEvent.setup(); const writeText = vi.fn().mockResolvedValue(undefined); Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } }); renderPage(); await screen.findByRole('textbox', { name: '저장된 프롬프트' })
     await user.click(screen.getByRole('button', { name: '프롬프트 복사' })); expect(writeText).toHaveBeenCalledWith(run.promptText)
-    await user.click(screen.getByRole('button', { name: 'Context JSON 복사' })); expect(writeText).toHaveBeenCalledWith(JSON.stringify(run.contextSnapshot, null, 2))
+    await user.click(screen.getByRole('button', { name: 'Context JSON 복사' })); expect(JSON.parse(writeText.mock.calls.at(-1)?.[0] as string)).toEqual(run.contextSnapshot)
   })
   it('pins and unpins through the RPC', async () => {
     const user = userEvent.setup(); const { client, rpc } = detailClient(); renderPage(client); await screen.findByRole('textbox', { name: '저장된 프롬프트' })
@@ -59,6 +60,14 @@ describe('BriefingPromptRunDetailPage', () => {
     builder.select.mockReturnValue(builder); builder.eq.mockReturnValue(builder); builder.maybeSingle.mockResolvedValue({ data: briefingPromptRunRow(legacyRun), error: null })
     renderPage({ from: vi.fn(() => builder), rpc: vi.fn() } as unknown as DatabaseClient)
     expect((await screen.findByText('Template version')).nextElementSibling).toHaveTextContent('기록 없음 (이전 이력)')
+  })
+  it('shows a safe label for a legacy run without validation information', async () => {
+    const legacyContext = { ...run.contextSnapshot, promptValidationVersion: undefined, promptValidationSummary: undefined }
+    const legacyRun = { ...run, promptValidationVersion: null, promptValidationSummary: null, contextSnapshot: legacyContext }
+    const builder = { select: vi.fn(), eq: vi.fn(), maybeSingle: vi.fn() }
+    builder.select.mockReturnValue(builder); builder.eq.mockReturnValue(builder); builder.maybeSingle.mockResolvedValue({ data: briefingPromptRunRow(legacyRun), error: null })
+    renderPage({ from: vi.fn(() => builder), rpc: vi.fn() } as unknown as DatabaseClient)
+    expect((await screen.findByText('저장 당시 검증')).nextElementSibling).toHaveTextContent('검증 기록 없음 (이전 이력)')
   })
   it('shows the Supabase configuration state', () => { renderPage(null); expect(screen.getByRole('heading', { name: 'Supabase 연결이 설정되지 않았습니다' })).toBeInTheDocument() })
 })

@@ -38,6 +38,25 @@
 .prompt-json { max-height: 32rem; overflow: auto; padding: 1rem; border-radius: .4rem; background: #17211e; color: #eff8f4; font-size: .8rem; white-space: pre-wrap; overflow-wrap: anywhere; }
 .prompt-panel summary { cursor: pointer; color: #173f35; font-weight: 700; }
 .prompt-panel[open] summary { margin-bottom: 1rem; }
+.prompt-validation { border-left-width: .35rem; }
+.prompt-validation--valid { border-left-color: #2d7a5f; }
+.prompt-validation--warning, .prompt-validation--stale { border-left-color: #a57b12; }
+.prompt-validation--invalid { border-left-color: #b13b3b; }
+.prompt-validation__status { margin: .35rem 0 0; font-weight: 750; }
+.prompt-validation__summary { display: flex; gap: .65rem; margin: 0; }
+.prompt-validation__summary div { min-width: 4rem; padding: .55rem .7rem; border-radius: .4rem; background: #f4f6f5; text-align: center; }
+.prompt-validation__summary dt { color: #68736f; font-size: .72rem; }
+.prompt-validation__summary dd { margin: .2rem 0 0; font-weight: 750; }
+.prompt-validation__groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: 1rem; margin-top: 1rem; }
+.prompt-validation__groups section { padding: .85rem; border-radius: .4rem; background: #f7f9f8; }
+.prompt-validation__groups h3 { margin: 0; font-size: .9rem; }
+.prompt-validation__groups ul { margin: .65rem 0 0; padding-left: 1.2rem; }
+.prompt-validation__issue { margin-top: .35rem; line-height: 1.45; }
+.prompt-validation__issue--error strong { color: #9d2626; }
+.prompt-validation__issue--warning strong { color: #80600b; }
+.prompt-validation__issue--check strong { color: #276b54; }
+.prompt-validation__detail { color: #68736f; font-size: .8rem; }
+.prompt-validation__guidance { color: #6d560e; }
 .prompt-retention-notice { margin-top: 1.25rem; padding: 1rem 1.25rem; border: 1px solid #d7c783; border-radius: .5rem; background: #fffbea; color: #55490f; }
 .prompt-retention-notice p { margin: 0; line-height: 1.6; }
 .prompt-retention-notice p + p { margin-top: .35rem; }
@@ -1180,6 +1199,8 @@ a {
   .prompt-settings > .primary-button,
   .prompt-panel__heading .secondary-button { width: 100%; }
   .prompt-panel__heading { align-items: stretch; flex-direction: column; }
+  .prompt-validation__summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; }
+  .prompt-validation__summary div { min-width: 0; }
   .prompt-counts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .prompt-preview { min-height: 24rem; }
 }

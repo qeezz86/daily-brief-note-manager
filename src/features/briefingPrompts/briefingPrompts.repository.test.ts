@@ -2,6 +2,9 @@ import { describe, expect, it, vi } from 'vitest'
 import type { DatabaseClient } from '../../shared/supabase/client'
 import { getNewsBriefingPromptContext, getPromptRunById, listPromptRuns, savePromptRun, setPromptRunPinned } from './briefingPrompts.repository'
 import { briefingPromptContextFixture as context, briefingPromptRunFixture as run, briefingPromptRunRow } from './briefingPrompts.fixtures'
+import { buildNewsBriefingPrompt } from './buildBriefingPrompt'
+import { validateBriefingPrompt } from './validateBriefingPrompt'
+import { summarizeBriefingPromptValidation } from './briefingPromptValidation.types'
 
 const settings = { categoryId: 'economy', referenceDate: '2026-07-13', mode: 'standard' as const, closedLookbackDays: 90 }
 describe('briefing prompt repository', () => {
@@ -28,13 +31,18 @@ describe('briefing prompt history repository', () => {
   })
   it('saves the exact preview and snapshot through the dedicated RPC', async () => {
     const rpc = vi.fn().mockResolvedValue({ data: briefingPromptRunRow(), error: null })
-    const promptText = run.promptText
-    await expect(savePromptRun({ rpc } as unknown as DatabaseClient, { settings, context, promptText })).resolves.toEqual(run)
-    expect(rpc).toHaveBeenCalledWith('save_news_briefing_prompt_run', expect.objectContaining({ p_context_snapshot: context, p_prompt_text: promptText, p_category_id: 'economy', p_reference_date: '2026-07-13', p_prompt_mode: 'standard', p_closed_lookback_days: 90 }))
+    const promptText = buildNewsBriefingPrompt(context, 'standard')
+    const validation = validateBriefingPrompt({ promptText, context, mode: 'standard', settings, promptTemplateVersion: 1 })
+    const snapshot = { ...context, promptValidationVersion: 1 as const, promptValidationSummary: summarizeBriefingPromptValidation(validation) ?? undefined }
+    await expect(savePromptRun({ rpc } as unknown as DatabaseClient, { settings, context: snapshot, promptText })).resolves.toEqual(run)
+    expect(rpc).toHaveBeenCalledWith('save_news_briefing_prompt_run', expect.objectContaining({ p_context_snapshot: snapshot, p_prompt_text: promptText, p_category_id: 'economy', p_reference_date: '2026-07-13', p_prompt_mode: 'standard', p_closed_lookback_days: 90 }))
   })
   it('does not expose RPC error details', async () => {
     const client = { rpc: vi.fn().mockResolvedValue({ data: null, error: { message: 'private SQL' } }) } as unknown as DatabaseClient
-    await expect(savePromptRun(client, { settings, context, promptText: run.promptText })).rejects.toThrow('저장하지 못했습니다')
+    const promptText = buildNewsBriefingPrompt(context, 'standard')
+    const validation = validateBriefingPrompt({ promptText, context, mode: 'standard', settings, promptTemplateVersion: 1 })
+    const snapshot = { ...context, promptValidationVersion: 1 as const, promptValidationSummary: summarizeBriefingPromptValidation(validation) ?? undefined }
+    await expect(savePromptRun(client, { settings, context: snapshot, promptText })).rejects.toThrow('저장하지 못했습니다')
     await expect(setPromptRunPinned(client, run.id, true)).rejects.toThrow('변경하지 못했습니다')
   })
   it('pins only through the dedicated RPC', async () => {
