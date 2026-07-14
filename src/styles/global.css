@@ -109,10 +109,25 @@
 .import-issue code, .import-issue small { color: #68736f; overflow-wrap: anywhere; }
 .import-json-preview { max-height: 24rem; overflow: auto; padding: 1rem; border-radius: .4rem; color: #eff8f4; background: #17211e; font-size: .78rem; white-space: pre-wrap; overflow-wrap: anywhere; }
 .import-result-json { width: 100%; min-height: 20rem; margin-top: 1rem; padding: 1rem; border: 1px solid #bfc9c5; border-radius: .4rem; }
+.import-check, .import-selection-actions label { display: inline-flex; min-height: 44px; align-items: center; gap: .45rem; color: #34403c; font-size: .82rem; }
+.import-selection-summary, .import-progress-counts { display: flex; margin: 1rem 0; gap: .6rem; flex-wrap: wrap; align-items: center; }
+.import-selection-summary span, .import-progress-counts span { padding: .4rem .65rem; border-radius: 999px; color: #46534f; background: #f0f4f2; font-size: .78rem; }
+.import-selection-list, .import-execution-list { display: grid; margin: 0; padding: 0; gap: .65rem; list-style: none; }
+.import-selection-list > li, .import-execution-list > li { display: flex; min-width: 0; padding: .85rem; border: 1px solid #d9dfdc; border-radius: .45rem; align-items: center; justify-content: space-between; gap: 1rem; }
+.import-selection-list > li > div:first-child, .import-execution-list > li > div:first-child { display: grid; min-width: 0; gap: .3rem; }
+.import-selection-list small, .import-execution-list small { color: #68736f; }
+.import-selection-actions { display: flex; gap: .75rem; flex-wrap: wrap; }
+.import-execution-actions { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.import-execution-actions p { margin: .35rem 0 0; color: #68736f; }
+.import-panel progress { width: 100%; height: .9rem; accent-color: #2d7a5f; }
+.import-execution-list p { margin: 0; color: #68736f; font-size: .82rem; }
 
 @media (max-width: 640px) {
   .followup-actions > a, .followup-actions > button { width: 100%; text-align: center; }
   .followup-metadata, .followup-counts { grid-template-columns: 1fr 1fr; }
+  .import-selection-list > li, .import-execution-list > li, .import-execution-actions { align-items: stretch; flex-direction: column; }
+  .import-selection-actions { justify-content: space-between; }
+  .import-execution-actions > .primary-button, .import-execution-list .secondary-button { width: 100%; text-align: center; }
 }
 
 .news-update-list { display: grid; gap: 1rem; padding-left: 1.25rem; }

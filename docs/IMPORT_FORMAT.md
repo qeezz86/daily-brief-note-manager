@@ -123,7 +123,21 @@ Phase 4A-1의 공식 콘텐츠 Import 식별자는 `daily-brief-note-content-imp
 
 Dry Run 상태는 `ready`, `warning`, `invalid`, `duplicate`다. 결과는 영구 저장하지 않으며 실제 INSERT·UPDATE·DELETE, 자동 수정, 외부 URL fetch와 AI 의미 중복 판정을 수행하지 않는다. DB exact duplicate 후보는 slug, WordPress URL, 뉴스의 category·briefing date unique key, category·series number, 뉴스 topic key, 중국어 normalized original URL처럼 실제 DB unique 정책에 정의된 값만 사용한다. 문자열 후보는 trim하고 빈 값과 중복을 제거한 뒤 최대 100개씩 RLS 범위의 제한 projection batch query로 순차 조회한다. item별 N+1 query, `select('*')`, `owner_id` 입력과 무제한 `Promise.all`은 사용하지 않는다.
 
-DB 중복 조회 상태는 `complete`, `partial`, `unavailable`로 유지한다. 하나의 chunk라도 실패하면 `complete`가 아니며, 성공한 chunk 결과는 결정적으로 병합한다. Phase 4A-1 Dry Run은 `partial`에 `DB_DUPLICATE_CHECK_PARTIAL`, `unavailable`에 `DB_DUPLICATE_CHECK_UNAVAILABLE` warning을 표시하고 구조 검증을 계속한다. 이후 실제 Import 단계는 이 상태가 `complete`가 아니면 저장을 차단할 수 있다.
+DB 중복 조회 상태는 `complete`, `partial`, `unavailable`로 유지한다. 하나의 chunk라도 실패하면 `complete`가 아니며, 성공한 chunk 결과는 결정적으로 병합한다. Phase 4A-1 Dry Run은 `partial`에 `DB_DUPLICATE_CHECK_PARTIAL`, `unavailable`에 `DB_DUPLICATE_CHECK_UNAVAILABLE` warning을 표시하고 구조 검증을 계속한다. 실제 Import는 이 상태가 `complete`가 아니면 저장을 차단한다.
+
+### 3.2 Phase 4A-2 실제 게시물 Import
+
+- `ready`는 기본 선택하고 `warning`은 개별 경고 승인 후 선택한다.
+- `invalid`와 `duplicate`는 저장할 수 없다.
+- warning 승인과 선택은 현재 입력·Dry Run·카테고리 설정에만 유효하다.
+- DB duplicate 조회가 `complete`일 때만 실제 Import할 수 있다.
+- 실행 직전 선택 항목의 unique 후보를 다시 batch 조회하고 새 exact duplicate를 제외한다.
+- 각 게시물은 별도의 `import_content_post` transaction으로 저장하므로 일부 성공할 수 있다.
+- 한 항목 실패는 그 항목의 post·metadata·tag·source·counter 변경을 모두 rollback하지만 이미 성공한 다른 항목은 자동 rollback하지 않는다.
+- 기존 게시물을 수정·덮어쓰기·upsert하거나 slug/series/날짜를 자동 변경하지 않는다.
+- camelCase Import item은 프런트 저장 계층에서 허용된 snake_case RPC payload로 명시적으로 매핑하며 owner·내부 ID·생성/수정 시각과 `newsTracking`을 전달하지 않는다.
+- 뉴스 topic·update·followup은 Phase 4A-3, 영구 job 이력·resume·retry는 Phase 4A-4 범위다.
+- 현재 세션 결과는 HTML 원문, 인증 정보, raw DB 오류와 constraint 이름을 포함하지 않으며 새로고침하면 사라질 수 있다.
 
 13절의 전체 백업 schema는 최상위 `data` 아래에 관계형 배열을 두는 복구 전용 형식이다. 최상위 `data`가 있거나 `format`이 backup bundle을 식별하면 `BACKUP_BUNDLE_NOT_SUPPORTED`로 차단한다. 게시물 Import bundle의 최상위 `posts`와 다르며 실제 복구는 Phase 4A-2 이후 범위다.
 

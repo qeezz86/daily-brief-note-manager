@@ -811,6 +811,11 @@ export type Database = {
         }
         Returns: Json
       }
+      import_content_post: { Args: { p_item: Json }; Returns: Json }
+      import_payload_has_forbidden_key: {
+        Args: { p_value: Json }
+        Returns: boolean
+      }
       issue_series_no: {
         Args: { p_category_id: string; p_owner_id: string }
         Returns: number

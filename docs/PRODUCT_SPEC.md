@@ -1302,6 +1302,16 @@ Dry Run은 bundle, 공통 게시물 필드, 현재 category 설정, category met
 
 Phase 4A-1은 INSERT·UPDATE·DELETE, Import job/이력, 실제 Import, partial commit, rollback, upsert, 자동 수정, 백업 복구, 외부 URL fetch, WordPress API/WXR, ZIP과 AI 의미 중복 판정을 포함하지 않는다. 실제 반영은 Phase 4A-2 이후 별도 단계다.
 
+### 12.5.2 Phase 4A-2 검증 완료 게시물 실제 Import
+
+Dry Run의 `ready`는 기본 선택하고 `warning`은 현재 화면 세션에서 사용자가 경고를 명시적으로 승인한 뒤 선택한다. `invalid`와 `duplicate`는 선택하지 못한다. DB duplicate 조회가 `complete`가 아니거나 입력·카테고리 설정 변경으로 결과가 stale이면 실제 Import를 차단한다.
+
+실행 버튼을 누르면 선택 항목의 exact duplicate 후보를 DB에서 다시 조회한다. 새 중복은 제외하고 남은 항목 수, ready 수, 승인 warning 수, 성공 항목 자동 rollback 불가, 기존 게시물 미수정, 뉴스 추적 미저장을 최종 확인한다. 항목은 무제한 병렬 실행 없이 입력 순서대로 하나씩 처리하며 한 항목 실패 후 다음 항목을 계속한다. 인증·연결·RPC/schema·권한 오류는 남은 실행을 중단할 수 있다.
+
+`import_content_post(jsonb)`는 인증 사용자의 `auth.uid()`를 owner로 사용하고 게시물 한 건의 post, HTML·SEO·이미지 metadata, category metadata, 태그·관계, 순서가 있는 출처와 필요한 series counter 상향 동기화를 하나의 transaction으로 저장한다. 기존 publication bundle 검증을 재사용하며 unique race는 DB constraint와 안전한 Import 오류 코드로 차단한다. overwrite·upsert·기존 게시물 UPDATE·전체 bundle transaction/rollback은 지원하지 않는다.
+
+뉴스 post의 briefing metadata는 저장하지만 `newsTracking`의 topic·update·followup은 Phase 4A-3에서 저장한다. 실행 결과는 현재 프런트 세션에만 보존하고 영구 job 이력, resume와 retry queue는 Phase 4A-4에서 구현한다.
+
 - 입력 모드 선택
   - ChatGPT 전체 응답
   - WordPress HTML

@@ -213,6 +213,8 @@ unique 조건:
 
 `save_post_publication_bundle` 함수는 현재 인증 사용자가 소유한 post만 잠근 뒤 기본 편집 필드, WordPress HTML, 대표 이미지 정보, `seo_data`, `post_tags`, `sources`를 하나의 트랜잭션에서 처리한다. 함수는 `SECURITY DEFINER`와 빈 `search_path`를 사용하고 소유권을 직접 확인하며 authenticated에만 실행 권한을 부여한다. `ready`·`published`에는 비어 있지 않은 HTML, 완성된 SEO, 5~8개 태그, 이미지 프롬프트·ALT, 완전한 출처 1개 이상과 HTML `#sources` URL 일치가 필요하고 `published`에는 `published_on`도 필요하다. 애플리케이션은 DOMParser로 출처 anchor를 검증하고 DB 함수도 필수 상태 조건을 재검증한다.
 
+`import_content_post(p_item jsonb)`는 Phase 4A-2의 게시물 한 건 Import 전용 `SECURITY DEFINER` 함수다. owner와 내부 ID·timestamp는 입력받지 않고 `auth.uid()`를 사용하며 authenticated만 실행할 수 있다. 함수는 활성 category, 상태, category별 briefing/series/display ID/slug 설정, metadata 종류, 금지 내부 키와 HTML 보안 패턴을 확인한 뒤 post를 만들고 기존 `save_post_publication_bundle`, `save_chinese_publication_bundle`, `save_ai_publication_bundle`, `save_info_db_publication_bundle` 중 하나를 같은 transaction에서 호출한다. 비뉴스의 명시적 `series_no`는 `series_counters.last_issued_no = greatest(existing, imported)` 의미로 원자적으로 상향 동기화한다. unique 충돌은 기존 행을 수정하지 않고 안전한 `IMPORT_DUPLICATE_*` 오류로 반환한다. 뉴스 topic·update·followup과 영구 Import job 행은 만들지 않는다.
+
 이미지 프롬프트가 실제로 변경되면 DB trigger가 `image_prompt_version`을 1 증가시키고 `image_prompt_updated_at`을 갱신한다. 동일한 프롬프트를 다시 저장할 때는 버전과 변경 시각을 증가시키지 않는다.
 
 ### 5.3 `tags`
