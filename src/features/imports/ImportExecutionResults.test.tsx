@@ -5,22 +5,22 @@ import { describe, expect, it, vi } from 'vitest'
 import { ImportExecutionResults } from './ImportExecutionResults'
 
 const result = {
-  startedAt: '2026-07-14T00:00:00Z', completedAt: '2026-07-14T00:01:00Z', total: 2, imported: 1, failed: 1, skipped: 0,
+  startedAt: '2026-07-14T00:00:00Z', completedAt: '2026-07-14T00:01:00Z', total: 2, imported: 1, failed: 1, skipped: 0, trackingImported: 1, trackingFailed: 0, trackingNotPresent: 0,
   items: [
-    { externalKey: 'one', title: '성공 글', categoryId: 'economy', status: 'imported' as const, postId: '00000000-0000-0000-0000-000000000001', postPath: '/content/00000000-0000-0000-0000-000000000001' },
-    { externalKey: 'two', title: '실패 글', categoryId: 'economy', status: 'failed' as const, errorCode: 'IMPORT_DUPLICATE_SLUG', message: '중복입니다.' },
+    { externalKey: 'one', title: '성공 글', categoryId: 'economy', status: 'imported' as const, contentStatus: 'imported' as const, trackingStatus: 'imported' as const, postId: '00000000-0000-0000-0000-000000000001', postPath: '/content/00000000-0000-0000-0000-000000000001' },
+    { externalKey: 'two', title: '실패 글', categoryId: 'economy', status: 'failed' as const, contentStatus: 'failed' as const, trackingStatus: 'not_applicable' as const, errorCode: 'IMPORT_DUPLICATE_SLUG', message: '중복입니다.' },
   ],
 }
 
 describe('ImportExecutionResults', () => {
   it('shows counts and a created-post detail link', () => {
     render(<MemoryRouter><ImportExecutionResults result={result} onCopyAll={vi.fn()} onCopyFailures={vi.fn()} copyMessage={null} /></MemoryRouter>)
-    expect(screen.getByText(/성공 1 · 실패 1/)).toBeInTheDocument()
+    expect(screen.getByText(/콘텐츠 성공 1 · 콘텐츠 실패 1/)).toBeInTheDocument()
     expect(screen.getByRole('link', { name: '생성된 게시물 열기' })).toHaveAttribute('href', result.items[0].postPath)
   })
   it('filters successful and failed items', async () => {
     const user = userEvent.setup(); render(<MemoryRouter><ImportExecutionResults result={result} onCopyAll={vi.fn()} onCopyFailures={vi.fn()} copyMessage={null} /></MemoryRouter>)
-    await user.click(screen.getByRole('button', { name: '실패 항목만 보기' }))
+    await user.click(screen.getByRole('button', { name: '콘텐츠 실패' }))
     expect(screen.queryByText('성공 글')).not.toBeInTheDocument(); expect(screen.getByText('실패 글')).toBeInTheDocument()
   })
   it('exposes both result copy actions', async () => {
@@ -31,7 +31,7 @@ describe('ImportExecutionResults', () => {
   })
   it('filters successful items independently', async () => {
     const user = userEvent.setup(); render(<MemoryRouter><ImportExecutionResults result={result} onCopyAll={vi.fn()} onCopyFailures={vi.fn()} copyMessage={null} /></MemoryRouter>)
-    await user.click(screen.getByRole('button', { name: '성공 항목만 보기' })); expect(screen.getByText('성공 글')).toBeInTheDocument(); expect(screen.queryByText('실패 글')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: '콘텐츠 성공' })); expect(screen.getByText('성공 글')).toBeInTheDocument(); expect(screen.queryByText('실패 글')).not.toBeInTheDocument()
   })
   it('renders the clipboard status message', () => {
     render(<MemoryRouter><ImportExecutionResults result={result} onCopyAll={vi.fn()} onCopyFailures={vi.fn()} copyMessage="복사 완료" /></MemoryRouter>)

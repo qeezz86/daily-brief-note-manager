@@ -59,10 +59,15 @@ export function detectInternalDuplicates(
     const originalUrl = metadata && typeof metadata.originalUrl === 'string' ? metadata.originalUrl : ''
     return originalUrl ? normalizeSourceUrl(originalUrl).toLocaleLowerCase('en-US') : ''
   }, 'DUPLICATE_CHINESE_ORIGINAL_URL', '파일 안에서 중국어 원문 URL이 중복되었습니다.', 'metadata.originalUrl')
-  duplicateByKey(posts, items, (post) => {
-    const topicKey = post.newsTracking?.topicKey
-    return topicKey ? `${post.categoryId}|${normalizedText(topicKey)}` : ''
-  }, 'REPEATED_NEWS_TOPIC_KEY', '여러 게시물이 같은 뉴스 주제 키를 참조합니다. 후속 단계에서 기존 주제 재사용 여부를 확인하세요.', 'newsTracking.topicKey', 'warning')
+  const topicOwners = new Map<string, number[]>()
+  posts.forEach((post, index) => post.newsTracking?.topics.forEach((topic) => {
+    const key = `${post.categoryId}|${normalizedText(topic.topicKey)}`
+    topicOwners.set(key, [...(topicOwners.get(key) ?? []), index])
+  }))
+  topicOwners.forEach((indexes, key) => {
+    if (indexes.length < 2) return
+    indexes.forEach((index) => addIssue(items[index], { code: 'REPEATED_NEWS_TOPIC_KEY', severity: 'warning', message: '여러 게시물이 같은 뉴스 주제 키를 참조합니다. 기존 주제 재사용 여부를 확인하세요.', path: 'newsTracking.topics', itemIndex: index, relatedValue: key }))
+  })
   duplicateByKey(posts, items, (post) => {
     const title = normalizedText(post.title)
     return title && post.categoryId && post.publishedOn

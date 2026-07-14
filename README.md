@@ -2,7 +2,7 @@
 
 Daily Brief Note의 콘텐츠, SEO 정보, 출처, 뉴스 추적 이력과 생성 프롬프트를 관리하기 위한 비공개 웹앱입니다.
 
-현재 저장소는 Phase 4A-2 단계입니다. `/imports`에서 공식 schema version 1 콘텐츠 Import bundle을 Dry Run한 뒤 `ready` 항목과 사용자가 경고를 명시적으로 승인한 `warning` 항목을 선택해 실제 저장할 수 있습니다. `invalid`·`duplicate`는 선택할 수 없고 DB exact duplicate 조회가 `complete`일 때만 실행됩니다. 실행 직전 선택 항목의 중복을 다시 조회하며, 한 게시물의 공통 필드·HTML·SEO·이미지 prompt/ALT·카테고리 metadata·태그·출처와 series counter를 `import_content_post` RPC 한 transaction으로 저장합니다. 항목은 순차 실행되어 일부 성공할 수 있으며 전체 bundle rollback, overwrite·upsert, 뉴스 추적 저장, 영구 job 이력·resume·retry는 지원하지 않습니다.
+현재 저장소는 Phase 4A-3 단계입니다. `/imports`에서 공식 schema version 1 콘텐츠 Import bundle을 Dry Run한 뒤 `ready` 항목과 사용자가 경고를 명시적으로 승인한 `warning` 항목을 선택해 실제 저장할 수 있습니다. `invalid`·`duplicate`는 선택할 수 없고 DB exact duplicate 조회가 `complete`일 때만 실행됩니다. 한 게시물의 콘텐츠 bundle은 `import_content_post`, 뉴스 tracking은 이어지는 `import_news_tracking_for_post`의 별도 transaction으로 순차 저장합니다. tracking 실패 시 이미 생성된 콘텐츠는 유지되고 다음 항목을 계속하며, 영구 job 이력·resume·retry·완전한 재실행 idempotency는 Phase 4A-4까지 지원하지 않습니다.
 
 ## 요구 환경
 

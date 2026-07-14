@@ -215,6 +215,8 @@ unique 조건:
 
 `import_content_post(p_item jsonb)`는 Phase 4A-2의 게시물 한 건 Import 전용 `SECURITY DEFINER` 함수다. owner와 내부 ID·timestamp는 입력받지 않고 `auth.uid()`를 사용하며 authenticated만 실행할 수 있다. 함수는 활성 category, 상태, category별 briefing/series/display ID/slug 설정, metadata 종류, 금지 내부 키와 HTML 보안 패턴을 확인한 뒤 post를 만들고 기존 `save_post_publication_bundle`, `save_chinese_publication_bundle`, `save_ai_publication_bundle`, `save_info_db_publication_bundle` 중 하나를 같은 transaction에서 호출한다. 비뉴스의 명시적 `series_no`는 `series_counters.last_issued_no = greatest(existing, imported)` 의미로 원자적으로 상향 동기화한다. unique 충돌은 기존 행을 수정하지 않고 안전한 `IMPORT_DUPLICATE_*` 오류로 반환한다. 뉴스 topic·update·followup과 영구 Import job 행은 만들지 않는다.
 
+`import_news_tracking_for_post(p_post_id uuid, p_tracking jsonb)`는 Phase 4A-3의 뉴스 게시물 한 건 tracking Import 전용 `SECURITY DEFINER` 함수다. `auth.uid()` 소유 post를 잠그고 post에서 category를 결정한 뒤 topic 생성 또는 정확한 key의 기존 topic 재사용, 초기 상태 이력, update graph, 1-based source order 연결과 followup을 하나의 transaction으로 저장한다. owner, category, 내부 UUID와 생성·수정 시각은 입력받지 않는다. 기존 topic의 제목·요약·상태·종료 사유는 변경하지 않으며 충돌하면 전체 tracking transaction을 rollback한다. 같은 payload 내부의 `update_external_key`만 previous 참조에 사용할 수 있고 missing/self/cycle/cross-topic 참조를 차단한다. post에 update가 이미 있거나 source가 연결돼 있으면 덮어쓰지 않는다. 이 transaction 실패는 앞서 완료된 `import_content_post` transaction의 post·SEO·태그·출처를 삭제하거나 변경하지 않는다.
+
 이미지 프롬프트가 실제로 변경되면 DB trigger가 `image_prompt_version`을 1 증가시키고 `image_prompt_updated_at`을 갱신한다. 동일한 프롬프트를 다시 저장할 때는 버전과 변경 시각을 증가시키지 않는다.
 
 ### 5.3 `tags`

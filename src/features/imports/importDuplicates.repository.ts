@@ -12,7 +12,7 @@ import type {
 
 const postProjection = 'category_id, title, slug, display_id, series_no, briefing_date, published_on, wordpress_url'
 const chineseProjection = 'original_url, posts!inner(title, category_id, published_on)'
-const newsTopicProjection = 'category_id, topic_key, canonical_title'
+const newsTopicProjection = 'category_id, topic_key, canonical_title, topic_summary, status, closed_reason'
 
 interface ChunkQueryResponse<TRow> {
   data: TRow[] | null
@@ -45,6 +45,9 @@ interface NewsTopicRow {
   category_id: string
   topic_key: string
   canonical_title: string
+  topic_summary: string | null
+  status: ExistingNewsTopic['status']
+  closed_reason: string | null
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -82,7 +85,9 @@ export function collectImportDuplicateCandidates(input: unknown): ImportDuplicat
       (value) => normalizeSourceUrl(value).toLocaleLowerCase('en-US'),
     ),
     newsTopicKeys: uniqueTrimmedStrings(
-      newsTracking.map((value) => value?.topicKey),
+      newsTracking.flatMap((value) => Array.isArray(value?.topics)
+        ? value.topics.map((topic) => asRecord(topic)?.topicKey)
+        : []),
       (value) => value.trim().toLocaleLowerCase('en-US'),
     ),
   }
@@ -205,6 +210,9 @@ export async function getImportDuplicateReferenceData(
       categoryId: topic.category_id,
       topicKey: topic.topic_key,
       canonicalTitle: topic.canonical_title,
+      topicSummary: topic.topic_summary,
+      status: topic.status,
+      closedReason: topic.closed_reason,
     }))
 
   return {

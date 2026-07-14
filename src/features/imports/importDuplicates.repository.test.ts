@@ -35,9 +35,9 @@ function createClient(resolve: (call: QueryCall, index: number) => { data: unkno
 describe('collectImportDuplicateCandidates', () => {
   it('후보를 trim하고 빈 값과 중복을 제거한다', () => {
     const result = collectImportDuplicateCandidates({ posts: [
-      { slug: ' same ', wordpressUrl: ' ', briefingDate: ' 2026-07-13 ', seriesNo: 7, metadata: { originalUrl: ' HTTPS://NEWS.CCTV.COM/a/#part ' }, newsTracking: { topicKey: ' Topic-Key ' } },
-      { slug: 'same', wordpressUrl: ' https://example.com/post ', briefingDate: '2026-07-13', seriesNo: 7, metadata: { originalUrl: 'https://news.cctv.com/a' }, newsTracking: { topicKey: 'topic-key' } },
-      { slug: '', wordpressUrl: '', briefingDate: '', seriesNo: null, metadata: { originalUrl: '' }, newsTracking: { topicKey: '' } },
+      { slug: ' same ', wordpressUrl: ' ', briefingDate: ' 2026-07-13 ', seriesNo: 7, metadata: { originalUrl: ' HTTPS://NEWS.CCTV.COM/a/#part ' }, newsTracking: { topics: [{ topicKey: ' Topic-Key ' }] } },
+      { slug: 'same', wordpressUrl: ' https://example.com/post ', briefingDate: '2026-07-13', seriesNo: 7, metadata: { originalUrl: 'https://news.cctv.com/a' }, newsTracking: { topics: [{ topicKey: 'topic-key' }] } },
+      { slug: '', wordpressUrl: '', briefingDate: '', seriesNo: null, metadata: { originalUrl: '' }, newsTracking: { topics: [{ topicKey: '' }] } },
     ] })
     expect(result).toEqual({
       slugs: ['same'],

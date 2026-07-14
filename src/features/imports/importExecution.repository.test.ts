@@ -6,6 +6,7 @@ import { validNewsPost } from './imports.fixtures'
 
 const post = (id: string) => ({ postId: id, title: id, categoryId: 'economy', status: 'draft', slug: id, displayId: null, publishedOn: null, wordpressUrl: null })
 const candidates = ['one', 'two', 'three'].map((clientKey) => ({ clientKey, title: clientKey, categoryId: 'economy', rawItem: { clientKey } }))
+const trackingResult = { postId: '00000000-0000-0000-0000-000000000001', topicCount: 1, reusedTopicCount: 0, createdTopicCount: 1, updateCount: 1, followupCount: 0, sourceLinkCount: 1 }
 
 describe('executeSelectedImports', () => {
   it('executes RPC calls sequentially and preserves input order', async () => {
@@ -41,14 +42,14 @@ describe('executeSelectedImports', () => {
   it('reports progress without exposing raw input', async () => {
     const progress = vi.fn()
     await executeSelectedImports(candidates.slice(0, 1), async () => post('00000000-0000-0000-0000-000000000001'), progress)
-    expect(progress).toHaveBeenLastCalledWith({ completed: 1, total: 1, currentTitle: null, imported: 1, failed: 0, skipped: 0 })
+    expect(progress).toHaveBeenLastCalledWith({ completed: 1, total: 1, currentTitle: null, imported: 1, failed: 0, skipped: 0, trackingImported: 0, trackingFailed: 0 })
   })
   it('returns an empty completed result for no candidates', async () => {
     const result = await executeSelectedImports([], vi.fn())
     expect(result).toMatchObject({ total: 0, imported: 0, failed: 0, skipped: 0, items: [] }); expect(result.completedAt).toBeTruthy()
   })
   it('merges preflight skipped rows in original selection order', async () => {
-    const skipped = [{ externalKey: 'two', title: 'two', categoryId: 'economy', status: 'skipped' as const, errorCode: 'IMPORT_DUPLICATE_PREFLIGHT' }]
+    const skipped = [{ externalKey: 'two', title: 'two', categoryId: 'economy', status: 'skipped' as const, contentStatus: 'skipped' as const, trackingStatus: 'not_applicable' as const, errorCode: 'IMPORT_DUPLICATE_PREFLIGHT' }]
     const result = await executeSelectedImports([candidates[0], candidates[2]], async () => post('11111111-1111-4111-8111-111111111111'), undefined, skipped, ['one', 'two', 'three'])
     expect(result.items.map((item) => item.externalKey)).toEqual(['one', 'two', 'three']); expect(result.skipped).toBe(1)
   })
@@ -59,6 +60,32 @@ describe('executeSelectedImports', () => {
   it('uses app-local detail paths only for successful rows', async () => {
     const result = await executeSelectedImports(candidates.slice(0, 1), async () => post('11111111-1111-4111-8111-111111111111'))
     expect(result.items[0].postPath).toBe('/content/11111111-1111-4111-8111-111111111111')
+  })
+  it('imports tracking only after news content succeeds', async () => {
+    const news = [{ ...candidates[0], isNews: true, rawItem: { newsTracking: { topics: [] } } }]
+    const trackingImporter = vi.fn().mockResolvedValue(trackingResult)
+    const result = await executeSelectedImports(news, async () => post(trackingResult.postId), undefined, [], ['one'], trackingImporter)
+    expect(trackingImporter).toHaveBeenCalledWith(trackingResult.postId, { topics: [] })
+    expect(result.items[0]).toMatchObject({ contentStatus: 'imported', trackingStatus: 'imported', createdTopicCount: 1 })
+  })
+  it('marks news without tracking as not present and never calls tracking RPC', async () => {
+    const trackingImporter = vi.fn()
+    const result = await executeSelectedImports([{ ...candidates[0], isNews: true }], async () => post(trackingResult.postId), undefined, [], ['one'], trackingImporter)
+    expect(trackingImporter).not.toHaveBeenCalled()
+    expect(result.items[0].trackingStatus).toBe('not_present')
+  })
+  it('keeps content success and continues after an item tracking failure', async () => {
+    const news = candidates.slice(0, 2).map((candidate) => ({ ...candidate, isNews: true, rawItem: { newsTracking: {} } }))
+    const trackingImporter = vi.fn().mockRejectedValueOnce(new SafeImportError('IMPORT_TRACKING_INVALID_FOLLOWUP', 'invalid')).mockResolvedValueOnce(trackingResult)
+    const result = await executeSelectedImports(news, async () => post(trackingResult.postId), undefined, [], ['one', 'two'], trackingImporter)
+    expect(result.items.map((item) => [item.contentStatus, item.trackingStatus])).toEqual([['imported', 'failed'], ['imported', 'imported']])
+    expect(result.trackingFailed).toBe(1)
+  })
+  it('does not call tracking when content import fails', async () => {
+    const trackingImporter = vi.fn()
+    const result = await executeSelectedImports([{ ...candidates[0], isNews: true, rawItem: { newsTracking: {} } }], async () => { throw new SafeImportError('IMPORT_DUPLICATE_SLUG', 'duplicate') }, undefined, [], ['one'], trackingImporter)
+    expect(trackingImporter).not.toHaveBeenCalled()
+    expect(result.items[0]).toMatchObject({ contentStatus: 'failed', trackingStatus: 'not_applicable' })
   })
 })
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { emptyImportReferenceData, importCategories, validImportBundle, validNewsPost } from './imports.fixtures'
+import { emptyImportReferenceData, importCategories, validImportBundle, validNewsPost, validNewsTracking } from './imports.fixtures'
 import type { ImportPost } from './importValidation.types'
 import { validateImportBundle } from './validateImportBundle'
 
@@ -33,6 +33,10 @@ describe('validateImportBundle bundle 검증', () => {
 })
 
 describe('공통 게시물 검증', () => {
+  const invalidTopicTracking = validNewsTracking()
+  invalidTopicTracking.topics[0].topicKey = 'BAD KEY'
+  const emptyUpdatesTracking = validNewsTracking()
+  emptyUpdatesTracking.updates = []
   it.each([
     [{ title: '' }, 'POST_TITLE_REQUIRED'],
     [{ summary: '' }, 'POST_SUMMARY_REQUIRED'],
@@ -48,8 +52,8 @@ describe('공통 게시물 검증', () => {
     [{ seriesNo: 1 }, 'NEWS_SERIES_NOT_ALLOWED'],
     [{ displayId: '#BAD' }, 'NEWS_DISPLAY_ID_INVALID'],
     [{ slug: 'economy-other' }, 'POST_SLUG_PATTERN_MISMATCH'],
-    [{ newsTracking: { topicKey: 'BAD KEY', updates: [{}] } }, 'NEWS_TOPIC_KEY_INVALID'],
-    [{ newsTracking: { topicKey: 'economy-core', updates: [] } }, 'NEWS_UPDATES_REQUIRED'],
+    [{ newsTracking: invalidTopicTracking }, 'NEWS_TOPIC_KEY_INVALID'],
+    [{ newsTracking: emptyUpdatesTracking }, 'NEWS_UPDATES_REQUIRED'],
   ])('필드 오류를 판정한다 %#', (changes, code) => expect(codes(withPost(changes as Partial<ImportPost>))).toContain(code))
   it('draft는 빈 HTML과 SEO를 허용한다', () => {
     const post = validNewsPost({ status: 'draft', htmlBody: null, seo: undefined, image: undefined, tags: [], sources: [], newsTracking: null })

@@ -8,6 +8,7 @@ import { importCategories, validImportBundle } from '../features/imports/imports
 import { ImportPageContent } from './ImportPage'
 
 const importContentPostMock = vi.hoisted(() => vi.fn())
+const importNewsTrackingMock = vi.hoisted(() => vi.fn())
 const duplicateLookupMock = vi.hoisted(() => vi.fn())
 
 vi.mock('../features/imports/importDuplicates.queries', () => ({
@@ -23,6 +24,7 @@ vi.mock('../features/imports/importExecution.repository', async (importOriginal)
   const actual = await importOriginal<typeof import('../features/imports/importExecution.repository')>()
   return { ...actual, importContentPost: importContentPostMock }
 })
+vi.mock('../features/imports/importTracking.repository', () => ({ importNewsTrackingForPost: importNewsTrackingMock }))
 
 const client = {} as DatabaseClient
 const validText = JSON.stringify(validImportBundle())
@@ -44,6 +46,7 @@ describe('ImportPageContent', () => {
   beforeEach(() => {
     duplicateLookupMock.mockReset().mockResolvedValue({ databaseCheck: 'complete', referenceData: { posts: [], chineseUrls: [], newsTopics: [], existingTagKeys: [] } })
     importContentPostMock.mockReset().mockResolvedValue({ postId: '00000000-0000-0000-0000-000000000001', title: '경제 핵심 뉴스', categoryId: 'economy', status: 'published', slug: 'economy-briefing-2026-07-12', displayId: '#2026-07-12-ECO', publishedOn: '2026-07-12', wordpressUrl: null })
+    importNewsTrackingMock.mockReset().mockResolvedValue({ postId: '00000000-0000-0000-0000-000000000001', topicCount: 1, reusedTopicCount: 0, createdTopicCount: 1, updateCount: 1, followupCount: 0, sourceLinkCount: 1 })
     vi.spyOn(window, 'confirm').mockReturnValue(true)
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: vi.fn().mockResolvedValue(undefined) } })
   })
@@ -51,7 +54,7 @@ describe('ImportPageContent', () => {
   it('Dry Run 안내와 입력 방식을 렌더링한다', () => {
     renderPage()
     expect(screen.getByRole('heading', { name: '콘텐츠 가져오기' })).toBeInTheDocument()
-    expect(screen.getByText('Phase 4A-2')).toBeInTheDocument()
+    expect(screen.getByText('Phase 4A-3')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '선택 항목 Import' })).not.toBeInTheDocument()
   })
 
@@ -155,8 +158,9 @@ describe('ImportPageContent', () => {
 
   it('직전 중복 재검사 후 성공 결과와 게시물 링크를 표시한다', async () => {
     const rendered = renderPage(); const invalidate = vi.spyOn(rendered.queryClient, 'invalidateQueries'); const user = await switchToTextAndValidate(); await user.click(await screen.findByRole('button', { name: '선택 항목 Import' }))
-    expect(await screen.findByText(/Import 완료: 성공 1/)).toBeInTheDocument()
+    expect(await screen.findByText(/Import 완료: 콘텐츠 성공 1/)).toBeInTheDocument()
     expect(importContentPostMock).toHaveBeenCalledTimes(1)
+    expect(importNewsTrackingMock).toHaveBeenCalledTimes(1)
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['posts'] })
     expect(screen.getByRole('link', { name: '생성된 게시물 열기' })).toHaveAttribute('href', '/content/00000000-0000-0000-0000-000000000001')
   })
@@ -197,15 +201,15 @@ describe('ImportPageContent', () => {
   it('확인 dialog에 rollback·기존 글·뉴스 추적 안내를 표시한다', async () => {
     vi.mocked(window.confirm).mockReturnValue(false)
     renderPage(); const user = await switchToTextAndValidate(); await user.click(await screen.findByRole('button', { name: '선택 항목 Import' }))
-    expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('자동 rollback할 수 없습니다'))
-    expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('기존 게시물은 수정하거나 덮어쓰지 않습니다'))
-    expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('Phase 4A-3'))
+    expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('별도 transaction'))
+    expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('tracking 실패 시 생성된 콘텐츠는 유지'))
+    expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('Phase 4A-4'))
   })
 
   it('현재 세션 결과 복사에서 내부 post ID를 제외한다', async () => {
     const writeText = vi.fn().mockResolvedValue(undefined)
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } })
-    renderPage(); const user = await switchToTextAndValidate(); await user.click(await screen.findByRole('button', { name: '선택 항목 Import' })); await screen.findByText(/Import 완료: 성공 1/)
+    renderPage(); const user = await switchToTextAndValidate(); await user.click(await screen.findByRole('button', { name: '선택 항목 Import' })); await screen.findByText(/Import 완료: 콘텐츠 성공 1/)
     await user.click(screen.getByRole('button', { name: '결과 복사' }))
     const copied = writeText.mock.calls.at(-1)?.[0] ?? ''
     expect(copied).not.toContain('postId'); expect(copied).not.toContain('00000000-0000-0000-0000-000000000001')

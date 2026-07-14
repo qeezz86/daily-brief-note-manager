@@ -32,16 +32,27 @@ export interface ImportedPostResult {
 }
 
 export type ImportExecutionItemStatus = 'imported' | 'failed' | 'skipped'
+export type ImportTrackingStatus = 'not_applicable' | 'not_present' | 'imported' | 'failed'
 
 export interface ImportExecutionItemResult {
   externalKey: string
   title: string
   categoryId: string
   status: ImportExecutionItemStatus
+  contentStatus: ImportExecutionItemStatus
+  trackingStatus: ImportTrackingStatus
   postId?: string
   postPath?: string
   errorCode?: string
   message?: string
+  topicCount?: number
+  reusedTopicCount?: number
+  createdTopicCount?: number
+  updateCount?: number
+  followupCount?: number
+  sourceLinkCount?: number
+  trackingErrorCode?: string
+  trackingMessage?: string
 }
 
 export interface ImportExecutionResult {
@@ -51,6 +62,9 @@ export interface ImportExecutionResult {
   imported: number
   failed: number
   skipped: number
+  trackingImported: number
+  trackingFailed: number
+  trackingNotPresent: number
   items: ImportExecutionItemResult[]
 }
 
@@ -59,6 +73,7 @@ export interface ImportExecutionCandidate {
   title: string
   categoryId: string
   rawItem: unknown
+  isNews?: boolean
 }
 
 export interface ImportProgressState {
@@ -68,6 +83,8 @@ export interface ImportProgressState {
   imported: number
   failed: number
   skipped: number
+  trackingImported: number
+  trackingFailed: number
 }
 
 export class SafeImportError extends Error {

@@ -812,6 +812,10 @@ export type Database = {
         Returns: Json
       }
       import_content_post: { Args: { p_item: Json }; Returns: Json }
+      import_news_tracking_for_post: {
+        Args: { p_post_id: string; p_tracking: Json }
+        Returns: Json
+      }
       import_payload_has_forbidden_key: {
         Args: { p_value: Json }
         Returns: boolean

@@ -104,7 +104,11 @@ Phase 4A-1의 공식 콘텐츠 Import 식별자는 `daily-brief-note-content-imp
     "checkedPoint": "확인한 핵심 내용"
   }],
   "metadata": null,
-  "newsTracking": { "topicKey": "stable-topic-key", "updates": [], "followups": [] }
+  "newsTracking": {
+    "topics": [{ "topicExternalKey": "stable-topic-ref", "topicKey": "stable-topic-key", "canonicalTitle": "대표 주제", "topicSummary": null, "status": "active", "closedReason": null, "firstSeenAt": "2026-07-13", "lastSeenAt": "2026-07-13" }],
+    "updates": [{ "updateExternalKey": "stable-update-1", "topicExternalKey": "stable-topic-ref", "updateType": "new", "headline": "뉴스 제목", "factSummary": "사실 요약", "importanceSummary": null, "impactSummary": null, "changeSummary": null, "previousUpdateExternalKey": null, "itemOrder": 1, "sourceOrders": [1] }],
+    "followups": []
+  }
 }
 ```
 
@@ -140,6 +144,60 @@ DB 중복 조회 상태는 `complete`, `partial`, `unavailable`로 유지한다.
 - 현재 세션 결과는 HTML 원문, 인증 정보, raw DB 오류와 constraint 이름을 포함하지 않으며 새로고침하면 사라질 수 있다.
 
 13절의 전체 백업 schema는 최상위 `data` 아래에 관계형 배열을 두는 복구 전용 형식이다. 최상위 `data`가 있거나 `format`이 backup bundle을 식별하면 `BACKUP_BUNDLE_NOT_SUPPORTED`로 차단한다. 게시물 Import bundle의 최상위 `posts`와 다르며 실제 복구는 Phase 4A-2 이후 범위다.
+
+### 3.3 Phase 4A-3 뉴스 tracking
+
+뉴스 게시물의 선택 `newsTracking`은 다음 camelCase 구조를 사용한다. 비뉴스 게시물에 이 필드가 있으면 format 오류다.
+
+```json
+{
+  "topics": [{
+    "topicExternalKey": "rate-policy-topic",
+    "topicKey": "rate-policy",
+    "canonicalTitle": "기준금리 정책",
+    "topicSummary": "기준금리 결정과 후속 영향",
+    "status": "active",
+    "closedReason": null,
+    "firstSeenAt": "2026-07-01",
+    "lastSeenAt": "2026-07-14"
+  }],
+  "updates": [{
+    "updateExternalKey": "rate-policy-update-1",
+    "topicExternalKey": "rate-policy-topic",
+    "updateType": "new",
+    "headline": "기준금리 결정",
+    "factSummary": "확인된 핵심 사실",
+    "importanceSummary": "중요성",
+    "impactSummary": "영향",
+    "changeSummary": null,
+    "previousUpdateExternalKey": null,
+    "itemOrder": 1,
+    "sourceOrders": [1]
+  }],
+  "followups": [{
+    "followupExternalKey": "rate-policy-followup-1",
+    "topicExternalKey": "rate-policy-topic",
+    "checkText": "다음 의결문 확인",
+    "priority": "high",
+    "dueDate": "2026-08-01",
+    "status": "pending",
+    "resolutionNote": null,
+    "resolvedAt": null
+  }]
+}
+```
+
+- `topics`, `updates`는 1개 이상, `followups`는 빈 배열을 허용한다.
+- 모든 external key는 영문 소문자·숫자·단일 하이픈 형식이며 payload 안에서 종류별로 중복할 수 없다.
+- topic 상태는 `active`, `monitoring`, `closed`, `reopened`다. 신규 `reopened` topic은 허용하지 않고 `closed`에는 `closedReason`이 필요하다.
+- 기존 topic은 현재 사용자·post category·정확한 `topicKey`로만 재사용한다. 제목·요약·상태·종료 사유 충돌은 오류이며 기존 행을 수정하지 않는다.
+- update type은 `new`, `follow_up`, `correction`, `closure_note`다. `new` 외에는 같은 payload의 `previousUpdateExternalKey`와 `changeSummary`가 필요하다. headline이나 DB UUID로 previous를 찾지 않는다.
+- previous는 같은 topic이어야 하며 누락, 자기 참조, 순환 참조를 차단한다. 입력 배열 순서와 무관하게 graph를 검증한다.
+- `itemOrder`는 1부터 시작하는 빈 구간 없는 양의 정수이며 중복이나 자동 재작성은 허용하지 않는다.
+- `sourceOrders`는 게시물 `sources` 배열의 1-based 순서다. 같은 source를 여러 update에서 참조하거나 존재하지 않는 순서를 사용할 수 없다.
+- followup priority는 `high`, `normal`, `low`, status는 `pending`, `done`, `cancelled`다. pending에는 처리 정보가 없어야 하고 done/cancelled에는 `resolutionNote`와 timezone offset이 있는 `resolvedAt`이 필요하다. closed topic에는 pending을 만들 수 없다.
+- `topicId`, `updateId`, `followupId`, `sourceId`, `ownerId`, 생성·수정 시각은 입력할 수 없다.
+- 콘텐츠와 tracking은 별도 transaction이다. tracking 실패 시 콘텐츠는 유지된다. 영구 job, resume, retry와 완전한 재실행 idempotency는 Phase 4A-4 범위다.
 
 ## 4. 기존 WordPress 글 수동 가져오기
 

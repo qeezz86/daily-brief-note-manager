@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { validImportBundle, validNewsPost, emptyImportReferenceData } from './imports.fixtures'
+import { validImportBundle, validNewsPost, validNewsTracking, emptyImportReferenceData } from './imports.fixtures'
 import { validateImportBundle } from './validateImportBundle'
 import { defaultImportSelection, importItemClientKey, isImportItemAllowed } from './importSelection'
 
 describe('import selection policy', () => {
   it('selects ready items by default and leaves warnings unselected', () => {
-    const result = validateImportBundle(validImportBundle([validNewsPost(), validNewsPost({ externalKey: 'warning', title: '경고 경제 뉴스', slug: 'economy-briefing-2026-07-13', briefingDate: '2026-07-13', publishedOn: '2026-07-13', displayId: '#2026-07-13-ECO', wordpressUrl: 'https://example.org/economy-2026-07-13', newsTracking: { topicKey: 'warning-topic', updates: [{}], followups: [] }, seo: { ...validNewsPost().seo!, metaDescription: 'short' } })]), emptyImportReferenceData)
+    const result = validateImportBundle(validImportBundle([validNewsPost(), validNewsPost({ externalKey: 'warning', title: '경고 경제 뉴스', slug: 'economy-briefing-2026-07-13', briefingDate: '2026-07-13', publishedOn: '2026-07-13', displayId: '#2026-07-13-ECO', wordpressUrl: 'https://example.org/economy-2026-07-13', newsTracking: validNewsTracking('warning-topic'), seo: { ...validNewsPost().seo!, metaDescription: 'short' } })]), emptyImportReferenceData)
     const selection = defaultImportSelection(result.items)
     expect(selection.has(importItemClientKey(result.items[0]))).toBe(true)
     expect(selection.has(importItemClientKey(result.items[1]))).toBe(false)

@@ -11,6 +11,8 @@ import {
 } from '../posts/publicationFields'
 import { contentStatuses } from '../posts/posts.types'
 import { detectInternalDuplicates } from './detectInternalDuplicates'
+import { importNewsTrackingSchema } from './importTracking.schema'
+import { validateImportTrackingGraph } from './validateImportTrackingGraph'
 import {
   CONTENT_IMPORT_FORMAT,
   CONTENT_IMPORT_SCHEMA_VERSION,
@@ -97,6 +99,7 @@ function emptyPreview(index: number) {
     tags: [],
     sources: [],
     metadata: null,
+    newsTracking: { present: false, topicCount: 0, updateCount: 0, followupCount: 0 },
     htmlBody: { present: false, length: 0, checksum: null },
   }
 }
@@ -106,7 +109,7 @@ function coercePost(value: unknown): ImportPost {
   const seo = asRecord(record.seo)
   const image = asRecord(record.image)
   const metadata = asRecord(record.metadata)
-  const newsTracking = asRecord(record.newsTracking)
+  const newsTracking = importNewsTrackingSchema.safeParse(record.newsTracking)
   const sources = Array.isArray(record.sources) ? record.sources.map((source) => {
     const row = asRecord(source) ?? {}
     return {
@@ -141,11 +144,7 @@ function coercePost(value: unknown): ImportPost {
     tags: Array.isArray(record.tags) ? record.tags.filter((tag): tag is string => typeof tag === 'string') : [],
     sources,
     metadata,
-    newsTracking: newsTracking ? {
-      topicKey: nullableString(newsTracking.topicKey),
-      updates: Array.isArray(newsTracking.updates) ? newsTracking.updates : undefined,
-      followups: Array.isArray(newsTracking.followups) ? newsTracking.followups : undefined,
-    } : null,
+    newsTracking: newsTracking.success ? newsTracking.data : null,
   }
 }
 
@@ -206,10 +205,22 @@ function validateItem(
       if (post.seriesNo !== null && post.seriesNo !== undefined) addIssue(issues, issue('NEWS_SERIES_NOT_ALLOWED', 'error', '뉴스에는 시리즈 번호를 사용할 수 없습니다.', path('seriesNo'), index))
       const expectedDisplayId = category.displayIdPattern && post.briefingDate ? applyCategoryPattern(category.displayIdPattern, { date: post.briefingDate }) : null
       if (expectedDisplayId && post.displayId !== expectedDisplayId) addIssue(issues, issue('NEWS_DISPLAY_ID_INVALID', 'error', '표시 ID가 카테고리 설정과 일치하지 않습니다.', path('displayId'), index, expectedDisplayId))
-      if (isCompleteStatus && !(post.newsTracking?.updates?.length)) addIssue(issues, issue('NEWS_UPDATES_REQUIRED', 'error', '발행 준비 또는 발행됨 뉴스에는 뉴스 항목이 1개 이상 필요합니다.', path('newsTracking.updates'), index))
-      if (post.newsTracking?.topicKey && !topicKeyPattern.test(post.newsTracking.topicKey)) addIssue(issues, issue('NEWS_TOPIC_KEY_INVALID', 'error', '뉴스 주제 키는 영문 소문자·숫자·단일 하이픈 형식이어야 합니다.', path('newsTracking.topicKey'), index))
-      if (post.newsTracking) addIssue(issues, issue('NEWS_TRACKING_READ_ONLY', 'info', '뉴스 추적 구조는 검증만 하며 이번 단계에서 저장하지 않습니다.', path('newsTracking'), index))
+      if (rawRecord.newsTracking != null) {
+        const parsedTracking = importNewsTrackingSchema.safeParse(rawRecord.newsTracking)
+        if (!parsedTracking.success) parsedTracking.error.issues.forEach((trackingIssue) => addIssue(issues, issue(
+          trackingIssue.path.at(-1) === 'topicKey' ? 'NEWS_TOPIC_KEY_INVALID' : 'IMPORT_TRACKING_INVALID_PAYLOAD', 'error', trackingIssue.message,
+          path(`newsTracking.${trackingIssue.path.join('.')}`), index,
+        )))
+        else validateImportTrackingGraph(parsedTracking.data).forEach((graphIssue) => addIssue(issues, issue(
+          graphIssue.code, 'error', graphIssue.message, path(`newsTracking.${graphIssue.path}`), index,
+        )))
+      }
+      if (isCompleteStatus && !(post.newsTracking?.updates.length)) addIssue(issues, issue('NEWS_UPDATES_REQUIRED', 'error', '발행 준비 또는 발행됨 뉴스에는 뉴스 항목이 1개 이상 필요합니다.', path('newsTracking.updates'), index))
+      post.newsTracking?.topics.forEach((topic, topicIndex) => {
+        if (!topicKeyPattern.test(topic.topicKey)) addIssue(issues, issue('NEWS_TOPIC_KEY_INVALID', 'error', '뉴스 주제 키는 영문 소문자·숫자·단일 하이픈 형식이어야 합니다.', path(`newsTracking.topics[${topicIndex}].topicKey`), index))
+      })
     } else {
+      if (rawRecord.newsTracking != null) addIssue(issues, issue('IMPORT_TRACKING_NOT_NEWS', 'error', '비뉴스 게시물에는 newsTracking을 포함할 수 없습니다.', path('newsTracking'), index))
       if (!Number.isInteger(post.seriesNo) || Number(post.seriesNo) < 1) addIssue(issues, issue('SERIES_NO_REQUIRED', 'error', '이 카테고리에는 1 이상의 정수 seriesNo가 필요합니다.', path('seriesNo'), index))
       if (category.contentGroup === 'chinese' && post.displayId) addIssue(issues, issue('CHINESE_DISPLAY_ID_NOT_ALLOWED', 'error', '중국어 학습에는 표시 ID를 사용할 수 없습니다.', path('displayId'), index))
       const expectedDisplayId = category.displayIdPattern && post.seriesNo ? applyCategoryPattern(category.displayIdPattern, { seriesNo: post.seriesNo }) : null
@@ -276,6 +287,7 @@ function validateItem(
     seriesNo: post.seriesNo ?? null, wordpressUrl: post.wordpressUrl ? normalizeSourceUrl(post.wordpressUrl) : null,
     tags: (post.tags ?? []).map((tag) => ({ name: normalizeTag(tag), comparisonKey: tagComparisonKey(tag) })),
     sources: sources.map((source) => ({ sourceUrl: source.sourceUrl, normalizedUrl: normalizeSourceUrl(source.sourceUrl) })), metadata: post.metadata ?? null,
+    newsTracking: { present: Boolean(post.newsTracking), topicCount: post.newsTracking?.topics.length ?? 0, updateCount: post.newsTracking?.updates.length ?? 0, followupCount: post.newsTracking?.followups.length ?? 0 },
     htmlBody: { present: Boolean(htmlBody.trim()), length: htmlBody.length, checksum: htmlBody ? checksum(htmlBody) : null },
   }
   const result: ImportItemValidationResult = { index, externalKey: normalizedPreview.externalKey, title: normalizedPreview.title || `항목 ${index + 1}`, categoryId: normalizedPreview.categoryId, publishedOn: normalizedPreview.publishedOn, status: 'ready', issues, normalizedPreview }
@@ -305,9 +317,21 @@ function applyExistingDuplicates(items: ImportItemValidationResult[], posts: Imp
     const normalizedOriginalUrl = normalizeSourceUrl(originalUrl).toLocaleLowerCase('en-US')
     const chineseMatch = originalUrl ? referenceData.chineseUrls.find((candidate) => normalizeSourceUrl(candidate.originalUrl).toLocaleLowerCase('en-US') === normalizedOriginalUrl) : undefined
     if (chineseMatch) matches.push({ code: 'DB_CHINESE_URL_DUPLICATE', path: 'metadata.originalUrl', value: normalizeSourceUrl(originalUrl), severity: 'error', message: '현재 데이터와 중국어 원문 URL이 충돌합니다.', record: chineseMatch.post })
-    const topicKey = post.newsTracking?.topicKey
-    const topicMatch = topicKey ? referenceData.newsTopics.find((candidate) => candidate.categoryId === post.categoryId && tagComparisonKey(candidate.topicKey) === tagComparisonKey(topicKey)) : undefined
-    if (topicMatch && topicKey) matches.push({ code: 'DB_NEWS_TOPIC_REUSE_CANDIDATE', path: 'newsTracking.topicKey', value: topicKey, severity: 'warning', message: '같은 뉴스 주제 키가 있습니다. 게시물 중복이 아니며 후속 단계에서 기존 주제 재사용 여부를 확인하세요.', record: { title: topicMatch.canonicalTitle, categoryId: topicMatch.categoryId, publishedOn: null } })
+    post.newsTracking?.topics.forEach((topic, topicIndex) => {
+      const topicMatch = referenceData.newsTopics.find((candidate) => candidate.categoryId === post.categoryId && tagComparisonKey(candidate.topicKey) === tagComparisonKey(topic.topicKey))
+      if (!topicMatch) return
+      const conflict = topicMatch.canonicalTitle.trim() !== topic.canonicalTitle.trim()
+        || (topic.topicSummary !== null && topicMatch.topicSummary?.trim() !== topic.topicSummary.trim())
+        || topicMatch.status !== topic.status
+        || (topic.status === 'closed' && topicMatch.closedReason?.trim() !== topic.closedReason?.trim())
+      matches.push({
+        code: conflict ? 'IMPORT_TRACKING_TOPIC_CONFLICT' : 'DB_NEWS_TOPIC_REUSE_CANDIDATE',
+        path: `newsTracking.topics[${topicIndex}].topicKey`, value: topic.topicKey,
+        severity: conflict ? 'error' : 'warning',
+        message: conflict ? '기존 주제의 제목·요약·상태를 덮어쓸 수 없습니다.' : '동일한 주제 키를 안전하게 재사용할 후보입니다.',
+        record: { title: topicMatch.canonicalTitle, categoryId: topicMatch.categoryId, publishedOn: null },
+      })
+    })
     matches.forEach((match) => addIssue(result.issues, issue(match.code, match.severity, match.message, `posts[${index}].${match.path}`, index, match.value, match.record)))
   })
 }

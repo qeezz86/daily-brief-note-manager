@@ -8,6 +8,7 @@ import {
   CONTENT_IMPORT_FORMAT,
   CONTENT_IMPORT_SCHEMA_VERSION,
 } from './importValidation.constants'
+import type { ImportNewsTracking } from './importTracking.types'
 
 export const importCategories: ImportCategory[] = [
   { id: 'economy', contentGroup: 'news', name: '경제', code: 'ECO', wrapperClass: 'daily-brief-note news-briefing economy', displayIdPattern: '#YYYY-MM-DD-ECO', slugPattern: 'economy-briefing-YYYY-MM-DD', enabled: true },
@@ -25,6 +26,15 @@ export const emptyImportReferenceData: ImportReferenceData = {
   existingTagKeys: [],
 }
 
+export function validNewsTracking(base = 'economy-core'): ImportNewsTracking {
+  const topicExternalKey = `${base}-topic`
+  return {
+    topics: [{ topicExternalKey, topicKey: base, canonicalTitle: '경제 핵심 주제', topicSummary: '경제 핵심 흐름', status: 'active' as const, closedReason: null, firstSeenAt: '2026-07-12', lastSeenAt: '2026-07-12' }],
+    updates: [{ updateExternalKey: `${base}-update`, topicExternalKey, updateType: 'new' as const, headline: '경제 핵심 뉴스', factSummary: '경제 핵심 사실', importanceSummary: '중요성', impactSummary: '영향', changeSummary: null, previousUpdateExternalKey: null, itemOrder: 1, sourceOrders: [1] }],
+    followups: [],
+  }
+}
+
 export function validNewsPost(overrides: Partial<ImportPost> = {}): ImportPost {
   const sourceUrl = 'https://example.com/articles/economy-1'
   return {
@@ -34,7 +44,7 @@ export function validNewsPost(overrides: Partial<ImportPost> = {}): ImportPost {
     image: { prompt: '전문적인 경제 뉴스 장면, 텍스트 없음', alt: '경제 시장 흐름을 보여주는 장면' },
     tags: ['금리', '환율', '물가', '금융시장', '산업동향'],
     sources: [{ sourceName: 'Example', sourceTitle: '경제 원문', sourceUrl, sourcePublishedAt: '2026-07-12T09:00:00+09:00', checkedPoint: '핵심 수치 확인' }],
-    newsTracking: { topicKey: 'economy-core', updates: [{}], followups: [] },
+    newsTracking: validNewsTracking(),
     metadata: null,
     ...overrides,
   }

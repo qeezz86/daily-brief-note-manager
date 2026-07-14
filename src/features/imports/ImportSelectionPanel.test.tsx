@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
-import { emptyImportReferenceData, importCategories, validImportBundle, validNewsPost } from './imports.fixtures'
+import { emptyImportReferenceData, importCategories, validImportBundle, validNewsPost, validNewsTracking } from './imports.fixtures'
 import { ImportSelectionPanel } from './ImportSelectionPanel'
 import { defaultImportSelection, importItemClientKey } from './importSelection'
 import { validateImportBundle } from './validateImportBundle'
@@ -9,7 +9,7 @@ import { validateImportBundle } from './validateImportBundle'
 function resultWithReadyAndWarning() {
   return validateImportBundle(validImportBundle([
     validNewsPost(),
-    validNewsPost({ externalKey: 'warning', title: '경고 경제 뉴스', slug: 'economy-briefing-2026-07-13', briefingDate: '2026-07-13', publishedOn: '2026-07-13', displayId: '#2026-07-13-ECO', wordpressUrl: 'https://example.org/economy-2026-07-13', newsTracking: { topicKey: 'warning-topic', updates: [{}], followups: [] }, seo: { ...validNewsPost().seo!, metaDescription: 'short' } }),
+    validNewsPost({ externalKey: 'warning', title: '경고 경제 뉴스', slug: 'economy-briefing-2026-07-13', briefingDate: '2026-07-13', publishedOn: '2026-07-13', displayId: '#2026-07-13-ECO', wordpressUrl: 'https://example.org/economy-2026-07-13', newsTracking: validNewsTracking('warning-topic'), seo: { ...validNewsPost().seo!, metaDescription: 'short' } }),
   ]), emptyImportReferenceData)
 }
 

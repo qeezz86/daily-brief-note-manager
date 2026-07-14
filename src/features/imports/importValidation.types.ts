@@ -1,5 +1,6 @@
 import type { ContentStatus } from '../posts/posts.types'
 import type { CONTENT_IMPORT_FORMAT } from './importValidation.constants'
+import type { ImportNewsTracking } from './importTracking.types'
 
 export type ImportIssueSeverity = 'error' | 'warning' | 'info'
 export type ImportItemStatus = 'ready' | 'warning' | 'invalid' | 'duplicate'
@@ -71,11 +72,7 @@ export interface ImportPost {
   tags?: string[]
   sources?: ImportSource[]
   metadata?: Record<string, unknown> | null
-  newsTracking?: {
-    topicKey?: string | null
-    updates?: unknown[]
-    followups?: unknown[]
-  } | null
+  newsTracking?: ImportNewsTracking | null
 }
 
 export interface ImportBundle {
@@ -101,6 +98,7 @@ export interface ImportNormalizedPreview {
   tags: Array<{ name: string; comparisonKey: string }>
   sources: Array<{ sourceUrl: string; normalizedUrl: string }>
   metadata: Record<string, unknown> | null
+  newsTracking: { present: boolean; topicCount: number; updateCount: number; followupCount: number }
   htmlBody: { present: boolean; length: number; checksum: string | null }
 }
 
@@ -157,6 +155,9 @@ export interface ExistingNewsTopic {
   categoryId: string
   topicKey: string
   canonicalTitle: string
+  topicSummary: string | null
+  status: 'active' | 'monitoring' | 'closed' | 'reopened'
+  closedReason: string | null
 }
 
 export interface ImportReferenceData {
