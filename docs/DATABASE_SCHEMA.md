@@ -217,6 +217,16 @@ unique 조건:
 
 `import_news_tracking_for_post(p_post_id uuid, p_tracking jsonb)`는 Phase 4A-3의 뉴스 게시물 한 건 tracking Import 전용 `SECURITY DEFINER` 함수다. `auth.uid()` 소유 post를 잠그고 post에서 category를 결정한 뒤 topic 생성 또는 정확한 key의 기존 topic 재사용, 초기 상태 이력, update graph, 1-based source order 연결과 followup을 하나의 transaction으로 저장한다. owner, category, 내부 UUID와 생성·수정 시각은 입력받지 않는다. 기존 topic의 제목·요약·상태·종료 사유는 변경하지 않으며 충돌하면 전체 tracking transaction을 rollback한다. 같은 payload 내부의 `update_external_key`만 previous 참조에 사용할 수 있고 missing/self/cycle/cross-topic 참조를 차단한다. post에 update가 이미 있거나 source가 연결돼 있으면 덮어쓰지 않는다. 이 transaction 실패는 앞서 완료된 `import_content_post` transaction의 post·SEO·태그·출처를 삭제하거나 변경하지 않는다.
 
+### 5.6 Phase 4A-4 Import job
+
+`import_jobs`는 owner별 bundle fingerprint와 작업 상태, Dry Run 집계, 예상·실제 item 수와 시작·완료·취소 시각을 저장한다. `(owner_id, source_fingerprint)`는 unique이며 상태는 `preparing`, `ready`, `running`, `completed`, `completed_with_errors`, `cancelled`, `failed`다.
+
+`import_job_items`는 `(job_id, item_index)`와 `(job_id, external_key)`를 unique로 유지하고 item fingerprint, 제목·category, warning 승인, 불변 `normalized_payload`, 별도 content/tracking 상태, 생성 post, 안전한 오류·retry 가능 여부, attempt 수와 tracking 결과 집계를 저장한다. content 상태는 `pending`, `running`, `imported`, `failed`, `skipped_duplicate`, `cancelled`, tracking 상태는 `not_applicable`, `not_present`, `pending`, `running`, `imported`, `failed`, `cancelled`다. `(job_id, owner_id)`와 nullable `(post_id, owner_id)` 복합 FK로 소유권을 강제한다.
+
+`import_job_item_attempts`는 stage, 증가하는 attempt 번호, 상태, 안전한 오류 code·message, retry 가능 여부와 시작·완료 시각을 append-only로 보존한다. raw SQL 오류, SQLSTATE, constraint 이름, query와 인증 정보는 저장하지 않는다.
+
+세 테이블은 authenticated 사용자가 자기 행만 SELECT할 수 있고 직접 INSERT·UPDATE·DELETE 권한은 없다. create, chunk append, finalize, content/tracking stage, cancel·resume 전용 `SECURITY DEFINER` RPC만 쓰기를 수행하며 `auth.uid()`와 compound ownership을 다시 확인한다. content/tracking RPC는 item row lock으로 동시 호출을 직렬화하고 내부 Import 호출을 PL/pgSQL subtransaction으로 격리해 단계 변경 rollback과 실패 상태 기록을 함께 보장한다. 읽기 RPC가 작업 목록·상세 집계를 DB에서 계산하므로 클라이언트 counter drift를 사용하지 않는다.
+
 이미지 프롬프트가 실제로 변경되면 DB trigger가 `image_prompt_version`을 1 증가시키고 `image_prompt_updated_at`을 갱신한다. 동일한 프롬프트를 다시 저장할 때는 버전과 변경 시각을 증가시키지 않는다.
 
 ### 5.3 `tags`

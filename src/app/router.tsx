@@ -30,6 +30,8 @@ import { BriefingPromptsPage } from '../pages/BriefingPromptsPage'
 import { BriefingPromptHistoryPage } from '../pages/BriefingPromptHistoryPage'
 import { BriefingPromptRunDetailPage } from '../pages/BriefingPromptRunDetailPage'
 import { ImportPage } from '../pages/ImportPage'
+import { ImportHistoryPage } from '../pages/ImportHistoryPage'
+import { ImportJobDetailPage } from '../pages/ImportJobDetailPage'
 
 export const routes: RouteObject[] = [
   {
@@ -70,6 +72,14 @@ export const routes: RouteObject[] = [
           {
             path: '/imports/new',
             element: <ImportPage />,
+          },
+          {
+            path: '/imports/history',
+            element: <ImportHistoryPage />,
+          },
+          {
+            path: '/imports/history/:jobId',
+            element: <ImportJobDetailPage />,
           },
           {
             path: '/content/:postId',

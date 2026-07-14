@@ -7,8 +7,7 @@ import type { DatabaseClient } from '../shared/supabase/client'
 import { importCategories, validImportBundle } from '../features/imports/imports.fixtures'
 import { ImportPageContent } from './ImportPage'
 
-const importContentPostMock = vi.hoisted(() => vi.fn())
-const importNewsTrackingMock = vi.hoisted(() => vi.fn())
+const prepareImportJobMock = vi.hoisted(() => vi.fn())
 const duplicateLookupMock = vi.hoisted(() => vi.fn())
 
 vi.mock('../features/imports/importDuplicates.queries', () => ({
@@ -20,11 +19,7 @@ vi.mock('../features/imports/importDuplicates.repository', () => ({
   getImportDuplicateReferenceData: duplicateLookupMock,
 }))
 
-vi.mock('../features/imports/importExecution.repository', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../features/imports/importExecution.repository')>()
-  return { ...actual, importContentPost: importContentPostMock }
-})
-vi.mock('../features/imports/importTracking.repository', () => ({ importNewsTrackingForPost: importNewsTrackingMock }))
+vi.mock('../features/imports/prepareImportJob', () => ({ prepareImportJob: prepareImportJobMock }))
 
 const client = {} as DatabaseClient
 const validText = JSON.stringify(validImportBundle())
@@ -45,8 +40,7 @@ async function switchToTextAndValidate(text = validText) {
 describe('ImportPageContent', () => {
   beforeEach(() => {
     duplicateLookupMock.mockReset().mockResolvedValue({ databaseCheck: 'complete', referenceData: { posts: [], chineseUrls: [], newsTopics: [], existingTagKeys: [] } })
-    importContentPostMock.mockReset().mockResolvedValue({ postId: '00000000-0000-0000-0000-000000000001', title: '경제 핵심 뉴스', categoryId: 'economy', status: 'published', slug: 'economy-briefing-2026-07-12', displayId: '#2026-07-12-ECO', publishedOn: '2026-07-12', wordpressUrl: null })
-    importNewsTrackingMock.mockReset().mockResolvedValue({ postId: '00000000-0000-0000-0000-000000000001', topicCount: 1, reusedTopicCount: 0, createdTopicCount: 1, updateCount: 1, followupCount: 0, sourceLinkCount: 1 })
+    prepareImportJobMock.mockReset().mockResolvedValue({ jobId: '00000000-0000-0000-0000-000000000001', isExisting: false, status: 'ready', sourceFingerprint: 'a'.repeat(64) })
     vi.spyOn(window, 'confirm').mockReturnValue(true)
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: vi.fn().mockResolvedValue(undefined) } })
   })
@@ -54,8 +48,8 @@ describe('ImportPageContent', () => {
   it('Dry Run 안내와 입력 방식을 렌더링한다', () => {
     renderPage()
     expect(screen.getByRole('heading', { name: '콘텐츠 가져오기' })).toBeInTheDocument()
-    expect(screen.getByText('Phase 4A-3')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: '선택 항목 Import' })).not.toBeInTheDocument()
+    expect(screen.getByText('Phase 4A-4')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Import 작업 만들기' })).not.toBeInTheDocument()
   })
 
   it('붙여넣은 JSON을 검증하고 요약을 표시한다', async () => {
@@ -145,30 +139,27 @@ describe('ImportPageContent', () => {
 
   it('ready 항목을 기본 선택하고 complete 상태에서 Import를 허용한다', async () => {
     renderPage(); await switchToTextAndValidate()
-    expect(await screen.findByRole('button', { name: '선택 항목 Import' })).toBeEnabled()
+    expect(await screen.findByRole('button', { name: 'Import 작업 만들기' })).toBeEnabled()
     expect(screen.getByText('선택 1개')).toBeInTheDocument()
   })
 
   it('최종 확인을 취소하면 RPC를 호출하지 않는다', async () => {
     vi.mocked(window.confirm).mockReturnValue(false)
-    renderPage(); const user = await switchToTextAndValidate(); await user.click(await screen.findByRole('button', { name: '선택 항목 Import' }))
-    expect(await screen.findByText('Import 실행을 취소했습니다. 저장된 항목은 없습니다.')).toBeInTheDocument()
-    expect(importContentPostMock).not.toHaveBeenCalled()
+    renderPage(); const user = await switchToTextAndValidate(); await user.click(await screen.findByRole('button', { name: 'Import 작업 만들기' }))
+    expect(await screen.findByText('Import 작업 생성을 취소했습니다.')).toBeInTheDocument()
+    expect(prepareImportJobMock).not.toHaveBeenCalled()
   })
 
-  it('직전 중복 재검사 후 성공 결과와 게시물 링크를 표시한다', async () => {
-    const rendered = renderPage(); const invalidate = vi.spyOn(rendered.queryClient, 'invalidateQueries'); const user = await switchToTextAndValidate(); await user.click(await screen.findByRole('button', { name: '선택 항목 Import' }))
-    expect(await screen.findByText(/Import 완료: 콘텐츠 성공 1/)).toBeInTheDocument()
-    expect(importContentPostMock).toHaveBeenCalledTimes(1)
-    expect(importNewsTrackingMock).toHaveBeenCalledTimes(1)
-    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['posts'] })
-    expect(screen.getByRole('link', { name: '생성된 게시물 열기' })).toHaveAttribute('href', '/content/00000000-0000-0000-0000-000000000001')
+  it('직전 중복 재검사 후 영구 job snapshot을 준비한다', async () => {
+    renderPage(); const user = await switchToTextAndValidate(); await user.click(await screen.findByRole('button', { name: 'Import 작업 만들기' }))
+    await waitFor(() => expect(prepareImportJobMock).toHaveBeenCalledTimes(1))
+    expect(prepareImportJobMock).toHaveBeenCalledWith(client, expect.objectContaining({ format: 'daily-brief-note-content-import', schemaVersion: 1 }))
   })
 
   it('warning은 승인 전 기본 미선택이며 승인 후 개별 선택한다', async () => {
     const warningText = JSON.stringify(validImportBundle([{ ...validImportBundle().posts[0], seo: { ...validImportBundle().posts[0].seo!, metaDescription: 'short' } }]))
     renderPage(); const user = await switchToTextAndValidate(warningText)
-    const importButton = await screen.findByRole('button', { name: '선택 항목 Import' })
+    const importButton = await screen.findByRole('button', { name: 'Import 작업 만들기' })
     expect(importButton).toBeDisabled()
     await user.click(screen.getByLabelText('경고 확인'))
     const selection = screen.getByLabelText('Import 선택'); expect(selection).toBeEnabled(); await user.click(selection)
@@ -178,40 +169,38 @@ describe('ImportPageContent', () => {
   it.each(['partial', 'unavailable'] as const)('%s DB lookup이면 실제 Import를 차단한다', async (databaseCheck) => {
     duplicateLookupMock.mockResolvedValueOnce({ databaseCheck, referenceData: { posts: [], chineseUrls: [], newsTopics: [], existingTagKeys: [] } })
     renderPage(); await switchToTextAndValidate()
-    expect(await screen.findByRole('button', { name: '선택 항목 Import' })).toBeDisabled()
-    expect(screen.getByText(/DB 중복 검사가 complete가 아니므로/)).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Import 작업 만들기' })).toBeDisabled()
+    expect(screen.getByText(/DB 중복 검사가 complete가 아니므로 작업을 만들 수 없습니다/)).toBeInTheDocument()
   })
 
   it('Import 직전 새 duplicate를 발견하면 RPC 없이 건너뛴다', async () => {
     duplicateLookupMock
       .mockResolvedValueOnce({ databaseCheck: 'complete', referenceData: { posts: [], chineseUrls: [], newsTopics: [], existingTagKeys: [] } })
       .mockResolvedValueOnce({ databaseCheck: 'complete', referenceData: { posts: [{ categoryId: 'economy', title: '기존', slug: 'economy-briefing-2026-07-12', displayId: null, seriesNo: null, briefingDate: null, publishedOn: null, wordpressUrl: null }], chineseUrls: [], newsTopics: [], existingTagKeys: [] } })
-    renderPage(); const user = await switchToTextAndValidate(); await user.click(await screen.findByRole('button', { name: '선택 항목 Import' }))
-    expect(await screen.findByText(/모든 선택 항목이 Import 직전 중복/)).toBeInTheDocument()
-    expect(importContentPostMock).not.toHaveBeenCalled()
+    renderPage(); const user = await switchToTextAndValidate(); await user.click(await screen.findByRole('button', { name: 'Import 작업 만들기' }))
+    expect(await screen.findByText(/Import 직전 새 중복 또는 검증 오류/)).toBeInTheDocument()
+    expect(prepareImportJobMock).not.toHaveBeenCalled()
   })
 
   it('Import 직전 duplicate 재조회 실패 시 저장을 중단한다', async () => {
     duplicateLookupMock.mockResolvedValueOnce({ databaseCheck: 'complete', referenceData: { posts: [], chineseUrls: [], newsTopics: [], existingTagKeys: [] } }).mockRejectedValueOnce(new Error('network raw error'))
-    renderPage(); const user = await switchToTextAndValidate(); await user.click(await screen.findByRole('button', { name: '선택 항목 Import' }))
-    expect(await screen.findByText('Import 직전 DB 중복 재검사에 실패했습니다. 게시물을 저장하지 않았습니다.')).toBeInTheDocument()
-    expect(importContentPostMock).not.toHaveBeenCalled()
+    renderPage(); const user = await switchToTextAndValidate(); await user.click(await screen.findByRole('button', { name: 'Import 작업 만들기' }))
+    expect(await screen.findByText(/Import 작업 준비에 실패했습니다/)).toBeInTheDocument()
+    expect(prepareImportJobMock).not.toHaveBeenCalled()
   })
 
   it('확인 dialog에 rollback·기존 글·뉴스 추적 안내를 표시한다', async () => {
     vi.mocked(window.confirm).mockReturnValue(false)
-    renderPage(); const user = await switchToTextAndValidate(); await user.click(await screen.findByRole('button', { name: '선택 항목 Import' }))
+    renderPage(); const user = await switchToTextAndValidate(); await user.click(await screen.findByRole('button', { name: 'Import 작업 만들기' }))
+    expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('영구 Import 작업'))
     expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('별도 transaction'))
-    expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('tracking 실패 시 생성된 콘텐츠는 유지'))
-    expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('Phase 4A-4'))
+    expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('tracking 실패 시 콘텐츠는 유지'))
+    expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('작업 생성 후 상세 화면'))
   })
 
-  it('현재 세션 결과 복사에서 내부 post ID를 제외한다', async () => {
-    const writeText = vi.fn().mockResolvedValue(undefined)
-    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } })
-    renderPage(); const user = await switchToTextAndValidate(); await user.click(await screen.findByRole('button', { name: '선택 항목 Import' })); await screen.findByText(/Import 완료: 콘텐츠 성공 1/)
-    await user.click(screen.getByRole('button', { name: '결과 복사' }))
-    const copied = writeText.mock.calls.at(-1)?.[0] ?? ''
-    expect(copied).not.toContain('postId'); expect(copied).not.toContain('00000000-0000-0000-0000-000000000001')
+  it('세션 실행 결과 대신 영구 작업 이력 링크를 제공한다', async () => {
+    renderPage(); await switchToTextAndValidate()
+    expect(screen.getByRole('link', { name: '작업 이력' })).toHaveAttribute('href', '/imports/history')
+    expect(screen.queryByRole('button', { name: '결과 복사' })).not.toBeInTheDocument()
   })
 })

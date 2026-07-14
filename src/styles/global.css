@@ -120,6 +120,22 @@
 .import-execution-actions { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
 .import-execution-actions p { margin: .35rem 0 0; color: #68736f; }
 .import-panel progress { width: 100%; height: .9rem; accent-color: #2d7a5f; }
+.import-summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: .65rem; margin-top: 1rem; }
+.import-summary-grid span { padding: .75rem; border-radius: .4rem; background: #f4f7f5; color: #52605a; }
+.import-job-metadata { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: .75rem; margin: 1rem 0; }
+.import-job-metadata div { display: grid; gap: .2rem; }
+.import-job-metadata dt { color: #68736f; font-size: .82rem; }
+.import-job-metadata dd { margin: 0; font-weight: 650; }
+.import-panel details pre { overflow: auto; max-height: 20rem; padding: .75rem; border-radius: .4rem; background: #f4f7f5; white-space: pre-wrap; overflow-wrap: anywhere; }
+.import-job-list, .import-job-item-list { display: grid; gap: 1rem; }
+.import-job-card, .import-job-item { display: grid; gap: .85rem; padding: 1rem; border: 1px solid #d9dfdc; border-radius: .5rem; background: #fff; }
+.import-job-card dl, .import-job-item dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr)); gap: .75rem; margin: 0; }
+.import-job-card dl div, .import-job-item dl div { display: grid; gap: .2rem; }
+.import-job-card dt, .import-job-item dt { color: #68736f; font-size: .82rem; }
+.import-job-card dd, .import-job-item dd { margin: 0; font-weight: 650; }
+.import-job-item p { margin: .25rem 0 0; }
+.import-job-item details { border-top: 1px solid #e5e9e7; padding-top: .7rem; }
+.import-job-actions .form-actions { flex-wrap: wrap; }
 .import-execution-list p { margin: 0; color: #68736f; font-size: .82rem; }
 
 @media (max-width: 640px) {

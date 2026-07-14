@@ -214,6 +214,258 @@ export type Database = {
           },
         ]
       }
+      import_job_item_attempts: {
+        Row: {
+          attempt_no: number
+          completed_at: string | null
+          id: string
+          job_item_id: string
+          owner_id: string
+          retryable: boolean
+          safe_error_code: string | null
+          safe_error_message: string | null
+          stage: string
+          started_at: string
+          status: string
+        }
+        Insert: {
+          attempt_no: number
+          completed_at?: string | null
+          id?: string
+          job_item_id: string
+          owner_id: string
+          retryable?: boolean
+          safe_error_code?: string | null
+          safe_error_message?: string | null
+          stage: string
+          started_at?: string
+          status: string
+        }
+        Update: {
+          attempt_no?: number
+          completed_at?: string | null
+          id?: string
+          job_item_id?: string
+          owner_id?: string
+          retryable?: boolean
+          safe_error_code?: string | null
+          safe_error_message?: string | null
+          stage?: string
+          started_at?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "import_job_item_attempts_job_item_id_owner_id_fkey"
+            columns: ["job_item_id", "owner_id"]
+            isOneToOne: false
+            referencedRelation: "import_job_items"
+            referencedColumns: ["id", "owner_id"]
+          },
+        ]
+      }
+      import_job_items: {
+        Row: {
+          category_id: string
+          content_attempt_count: number
+          content_completed_at: string | null
+          content_error_code: string | null
+          content_error_message: string | null
+          content_retryable: boolean
+          content_started_at: string | null
+          content_status: string
+          created_at: string
+          created_topic_count: number | null
+          external_key: string
+          followup_count: number | null
+          id: string
+          item_index: number
+          job_id: string
+          normalized_payload: Json
+          owner_id: string
+          payload_fingerprint: string
+          post_id: string | null
+          reused_topic_count: number | null
+          source_link_count: number | null
+          title: string
+          topic_count: number | null
+          tracking_attempt_count: number
+          tracking_completed_at: string | null
+          tracking_error_code: string | null
+          tracking_error_message: string | null
+          tracking_retryable: boolean
+          tracking_started_at: string | null
+          tracking_status: string
+          update_count: number | null
+          updated_at: string
+          validation_status: string
+          warning_acknowledged: boolean
+        }
+        Insert: {
+          category_id: string
+          content_attempt_count?: number
+          content_completed_at?: string | null
+          content_error_code?: string | null
+          content_error_message?: string | null
+          content_retryable?: boolean
+          content_started_at?: string | null
+          content_status?: string
+          created_at?: string
+          created_topic_count?: number | null
+          external_key: string
+          followup_count?: number | null
+          id?: string
+          item_index: number
+          job_id: string
+          normalized_payload: Json
+          owner_id: string
+          payload_fingerprint: string
+          post_id?: string | null
+          reused_topic_count?: number | null
+          source_link_count?: number | null
+          title: string
+          topic_count?: number | null
+          tracking_attempt_count?: number
+          tracking_completed_at?: string | null
+          tracking_error_code?: string | null
+          tracking_error_message?: string | null
+          tracking_retryable?: boolean
+          tracking_started_at?: string | null
+          tracking_status: string
+          update_count?: number | null
+          updated_at?: string
+          validation_status: string
+          warning_acknowledged?: boolean
+        }
+        Update: {
+          category_id?: string
+          content_attempt_count?: number
+          content_completed_at?: string | null
+          content_error_code?: string | null
+          content_error_message?: string | null
+          content_retryable?: boolean
+          content_started_at?: string | null
+          content_status?: string
+          created_at?: string
+          created_topic_count?: number | null
+          external_key?: string
+          followup_count?: number | null
+          id?: string
+          item_index?: number
+          job_id?: string
+          normalized_payload?: Json
+          owner_id?: string
+          payload_fingerprint?: string
+          post_id?: string | null
+          reused_topic_count?: number | null
+          source_link_count?: number | null
+          title?: string
+          topic_count?: number | null
+          tracking_attempt_count?: number
+          tracking_completed_at?: string | null
+          tracking_error_code?: string | null
+          tracking_error_message?: string | null
+          tracking_retryable?: boolean
+          tracking_started_at?: string | null
+          tracking_status?: string
+          update_count?: number | null
+          updated_at?: string
+          validation_status?: string
+          warning_acknowledged?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "import_job_items_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "import_job_items_job_id_owner_id_fkey"
+            columns: ["job_id", "owner_id"]
+            isOneToOne: false
+            referencedRelation: "import_jobs"
+            referencedColumns: ["id", "owner_id"]
+          },
+          {
+            foreignKeyName: "import_job_items_post_id_owner_id_fkey"
+            columns: ["post_id", "owner_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id", "owner_id"]
+          },
+        ]
+      }
+      import_jobs: {
+        Row: {
+          acknowledged_warning_count: number
+          cancelled_at: string | null
+          completed_at: string | null
+          created_at: string
+          dry_run_summary: Json
+          duplicate_count: number
+          expected_item_count: number
+          format: string
+          id: string
+          invalid_count: number
+          owner_id: string
+          ready_count: number
+          schema_version: number
+          source_fingerprint: string
+          source_name: string | null
+          started_at: string | null
+          status: string
+          total_count: number
+          updated_at: string
+          warning_count: number
+        }
+        Insert: {
+          acknowledged_warning_count?: number
+          cancelled_at?: string | null
+          completed_at?: string | null
+          created_at?: string
+          dry_run_summary?: Json
+          duplicate_count?: number
+          expected_item_count: number
+          format: string
+          id?: string
+          invalid_count?: number
+          owner_id: string
+          ready_count?: number
+          schema_version: number
+          source_fingerprint: string
+          source_name?: string | null
+          started_at?: string | null
+          status?: string
+          total_count: number
+          updated_at?: string
+          warning_count?: number
+        }
+        Update: {
+          acknowledged_warning_count?: number
+          cancelled_at?: string | null
+          completed_at?: string | null
+          created_at?: string
+          dry_run_summary?: Json
+          duplicate_count?: number
+          expected_item_count?: number
+          format?: string
+          id?: string
+          invalid_count?: number
+          owner_id?: string
+          ready_count?: number
+          schema_version?: number
+          source_fingerprint?: string
+          source_name?: string | null
+          started_at?: string | null
+          status?: string
+          total_count?: number
+          updated_at?: string
+          warning_count?: number
+        }
+        Relationships: []
+      }
       info_db_metadata: {
         Row: {
           difficulty: string | null
@@ -738,6 +990,22 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      append_import_job_items: {
+        Args: { p_items: Json; p_job_id: string }
+        Returns: Json
+      }
+      cancel_import_job: { Args: { p_job_id: string }; Returns: Json }
+      create_import_job: {
+        Args: {
+          p_dry_run_summary: Json
+          p_expected_item_count: number
+          p_format: string
+          p_schema_version: number
+          p_source_fingerprint: string
+          p_source_name: string
+        }
+        Returns: Json
+      }
       create_news_followup: {
         Args: {
           p_check_text: string
@@ -801,6 +1069,19 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      finalize_import_job: { Args: { p_job_id: string }; Returns: Json }
+      get_import_job: { Args: { p_job_id: string }; Returns: Json }
+      get_import_job_items: { Args: { p_job_id: string }; Returns: Json }
+      get_import_jobs: {
+        Args: {
+          p_created_from?: string
+          p_created_to?: string
+          p_limit?: number
+          p_source_name?: string
+          p_status?: string
+        }
+        Returns: Json
+      }
       get_news_briefing_prompt_context: {
         Args: {
           p_category_id: string
@@ -812,6 +1093,10 @@ export type Database = {
         Returns: Json
       }
       import_content_post: { Args: { p_item: Json }; Returns: Json }
+      import_job_safe_error: {
+        Args: { p_error: string; p_stage: string }
+        Returns: Json
+      }
       import_news_tracking_for_post: {
         Args: { p_post_id: string; p_tracking: Json }
         Returns: Json
@@ -823,6 +1108,10 @@ export type Database = {
       issue_series_no: {
         Args: { p_category_id: string; p_owner_id: string }
         Returns: number
+      }
+      refresh_import_job_status: {
+        Args: { p_job_id: string; p_owner_id: string }
+        Returns: undefined
       }
       reorder_news_updates: {
         Args: { p_post_id: string; p_update_ids: string[] }
@@ -853,6 +1142,15 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      resume_cancelled_import_job: { Args: { p_job_id: string }; Returns: Json }
+      run_import_job_item_content: {
+        Args: { p_job_item_id: string }
+        Returns: Json
+      }
+      run_import_job_item_tracking: {
+        Args: { p_job_item_id: string }
+        Returns: Json
       }
       save_ai_publication_bundle: {
         Args: {

@@ -199,6 +199,20 @@ DB 중복 조회 상태는 `complete`, `partial`, `unavailable`로 유지한다.
 - `topicId`, `updateId`, `followupId`, `sourceId`, `ownerId`, 생성·수정 시각은 입력할 수 없다.
 - 콘텐츠와 tracking은 별도 transaction이다. tracking 실패 시 콘텐츠는 유지된다. 영구 job, resume, retry와 완전한 재실행 idempotency는 Phase 4A-4 범위다.
 
+### 3.4 Phase 4A-4 영구 Import job
+
+- Dry Run 자체는 저장하지 않고 사용자가 선택과 warning 승인을 확정해 job 생성을 승인한 시점부터 영구 저장한다.
+- 선택 항목은 콘텐츠 실행 payload와 선택적 tracking payload로 정규화한 불변 snapshot으로 저장한다. retry는 현재 화면 입력이 아니라 이 snapshot만 사용한다.
+- snapshot에는 `owner_id`, 사용자 이메일, token·key, 내부 UUID, raw Supabase 오류, SQLSTATE, constraint 이름과 stack trace를 포함하지 않는다.
+- canonical JSON은 object key를 사전순으로 정렬하고 array 순서·문자열 내용을 보존한다. object의 `undefined`는 제거하고 array의 `undefined`는 위치 보존을 위해 `null`로 처리한다. Web Crypto SHA-256 lowercase hexadecimal만 사용하고 비암호학적 fallback은 사용하지 않는다.
+- source fingerprint는 format, schema version, 선택된 normalized snapshot과 warning 승인 상태로 만들며 source 파일명은 제외한다. item fingerprint는 normalized snapshot 전체로 만든다.
+- 같은 사용자의 같은 source fingerprint는 새 job을 만들지 않고 기존 job을 반환한다. 다른 사용자의 fingerprint와는 독립적이다.
+- snapshot은 최대 100개씩 순차 등록한다. 같은 index·fingerprint 재등록은 성공하고 같은 index의 다른 fingerprint는 충돌한다. 모든 index와 expected count가 일치한 뒤에만 `ready`로 finalize한다.
+- 콘텐츠와 tracking은 별도 item transaction이다. 성공 stage는 다시 실행하지 않고 기존 결과를 반환하며 tracking 실패 시 콘텐츠는 유지한다.
+- `계속 실행`은 content pending 또는 content imported + tracking pending만 item index 순서로 실행한다. 실패는 사용자가 명시적으로 콘텐츠, tracking 또는 전체 실패 retry를 선택해야 한다.
+- 취소는 아직 시작하지 않은 pending stage만 취소하며 성공 stage는 유지한다. 재개하면 취소된 pending stage만 원래 상태로 돌린다.
+- 브라우저가 닫힌 동안 자동 실행하지 않고 background worker, cron과 자동 무한 retry를 사용하지 않는다.
+
 ## 4. 기존 WordPress 글 수동 가져오기
 
 ### 4.1 입력 항목
