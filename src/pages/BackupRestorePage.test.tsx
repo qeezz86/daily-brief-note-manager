@@ -7,8 +7,8 @@ import type { ValidatedBackupBundle } from '../features/backups/backupRestore.ty
 import type { DatabaseClient } from '../shared/supabase/client'
 import { BackupRestorePageContent } from './BackupRestorePage'
 
-const mocks = vi.hoisted(() => ({ categories: vi.fn(), conflicts: vi.fn() }))
-vi.mock('../features/backups/backupConflicts.repository', () => ({ getBackupRestoreCategories: mocks.categories, getBackupConflictReferenceData: mocks.conflicts }))
+const mocks = vi.hoisted(() => ({ categories: vi.fn(), conflicts: vi.fn(), targetCollisions: vi.fn() }))
+vi.mock('../features/backups/backupConflicts.repository', () => ({ getBackupRestoreCategories: mocks.categories, getBackupConflictReferenceData: mocks.conflicts, getBackupRestoreTargetCollisions: mocks.targetCollisions }))
 
 const client = {} as DatabaseClient
 let bundle: ValidatedBackupBundle
@@ -26,6 +26,7 @@ describe('BackupRestorePage', () => {
     vi.clearAllMocks(); bundle = await backupRestoreBundleFixture()
     mocks.categories.mockResolvedValue(currentCategoriesFromBundle(bundle))
     mocks.conflicts.mockResolvedValue({ databaseCheck: 'complete', records: [] })
+    mocks.targetCollisions.mockResolvedValue({ databaseCheck: 'complete', collisions: [] })
   })
   it('페이지 설명과 read-only 범위를 렌더링한다', () => {
     view(); expect(screen.getByRole('heading', { name: '백업 복원 Dry Run' })).toBeInTheDocument(); expect(screen.getByText('Phase 4B-2')).toBeInTheDocument(); expect(screen.getByText(/DB 쓰기는 수행하지 않습니다/)).toBeInTheDocument()
@@ -78,5 +79,37 @@ describe('BackupRestorePage', () => {
   })
   it('입력 파일이 바뀌면 기존 결과를 제거한다', async () => {
     view(); paste(); await userEvent.click(screen.getByRole('button', { name: '복원 Dry Run 검사' })); await screen.findByRole('heading', { name: '복원 가능' }); const file = new File([JSON.stringify(bundle)], 'other.json'); await userEvent.upload(screen.getByLabelText('JSON 파일'), file); await waitFor(() => expect(screen.queryByRole('heading', { name: '복원 가능' })).not.toBeInTheDocument())
+  })
+  it('Dry Run 뒤 복원 정책과 ready 계획을 만든다', async () => {
+    view(); paste(); await userEvent.click(screen.getByRole('button', { name: '복원 Dry Run 검사' })); await screen.findByRole('heading', { name: '복원 가능' })
+    await userEvent.click(screen.getByRole('button', { name: '복원 계획 만들기' }))
+    expect(await screen.findByRole('heading', { name: '실행 입력 준비 완료' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '복원 정책' })).toBeInTheDocument(); expect(screen.getByText(/UUID v5 remap/)).toBeInTheDocument(); expect(screen.getByRole('heading', { name: 'Dependency stage' })).toBeInTheDocument()
+  })
+  it('정책 변경 시 계획을 stale 처리하고 다시 생성한다', async () => {
+    view(); paste(); await userEvent.click(screen.getByRole('button', { name: '복원 Dry Run 검사' })); await screen.findByRole('heading', { name: '복원 가능' }); await userEvent.click(screen.getByRole('button', { name: '복원 계획 만들기' })); await screen.findByRole('heading', { name: '실행 입력 준비 완료' })
+    await userEvent.selectOptions(screen.getByLabelText('timestamp'), 'database_default')
+    expect(screen.getByText(/stale 상태/)).toBeInTheDocument(); expect(screen.getByRole('button', { name: '복원 계획 JSON 다운로드' })).toBeDisabled()
+    await userEvent.click(screen.getByRole('button', { name: '계획 다시 생성' })); await waitFor(() => expect(screen.queryByText(/stale 상태/)).not.toBeInTheDocument())
+  })
+  it('ID conflict의 record 예외 block을 적용한다', async () => {
+    mocks.conflicts.mockResolvedValue({ databaseCheck: 'complete', records: [{ section: 'posts', id: bundle.data.posts[0].id, signature: '{}' }] })
+    view(); paste(); await userEvent.click(screen.getByRole('button', { name: '복원 Dry Run 검사' })); await screen.findByRole('heading', { name: '경고 있음' }); await userEvent.click(screen.getByRole('button', { name: '복원 계획 만들기' }))
+    await screen.findByRole('heading', { name: '실행 입력 준비 완료' }); const exception = await screen.findByLabelText(`${bundle.data.posts[0].slug} 예외 정책`); await userEvent.selectOptions(exception, 'block'); await userEvent.click(screen.getByRole('button', { name: '계획 다시 생성' }))
+    expect(await screen.findByRole('heading', { name: '계획 차단' })).toBeInTheDocument(); expect(screen.getByRole('button', { name: '복원 계획 JSON 복사' })).toBeDisabled()
+  })
+  it('partial DB lookup 계획을 차단한다', async () => {
+    mocks.conflicts.mockResolvedValue({ databaseCheck: 'partial', records: [] }); view(); paste(); await userEvent.click(screen.getByRole('button', { name: '복원 Dry Run 검사' })); await screen.findByRole('heading', { name: '경고 있음' }); await userEvent.click(screen.getByRole('button', { name: '복원 계획 만들기' }))
+    expect(await screen.findByRole('heading', { name: '계획 차단' })).toBeInTheDocument(); expect(screen.getByText('RESTORE_DATABASE_LOOKUP_INCOMPLETE')).toBeInTheDocument()
+  })
+  it('계획 JSON과 경고·remap 요약을 복사한다', async () => {
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: vi.fn().mockResolvedValue(undefined) } }); const writeText = vi.mocked(navigator.clipboard.writeText)
+    view(); paste(); await userEvent.click(screen.getByRole('button', { name: '복원 Dry Run 검사' })); await screen.findByRole('heading', { name: '복원 가능' }); await userEvent.click(screen.getByRole('button', { name: '복원 계획 만들기' })); await screen.findByRole('heading', { name: '실행 입력 준비 완료' })
+    await userEvent.click(screen.getByRole('button', { name: '복원 계획 JSON 복사' })); await userEvent.click(screen.getByRole('button', { name: '경고·차단 목록 복사' })); await userEvent.click(screen.getByRole('button', { name: 'ID remap 요약 복사' }))
+    expect(writeText).toHaveBeenCalledTimes(3); expect(writeText).toHaveBeenCalledWith(expect.stringContaining('daily-brief-note-restore-plan'))
+  })
+  it('Dry Run으로 돌아가도 분석 결과를 유지한다', async () => {
+    view(); paste(); await userEvent.click(screen.getByRole('button', { name: '복원 Dry Run 검사' })); await screen.findByRole('heading', { name: '복원 가능' }); await userEvent.click(screen.getByRole('button', { name: '복원 계획 만들기' })); await screen.findByRole('heading', { name: '실행 입력 준비 완료' }); await userEvent.click(screen.getByRole('button', { name: 'Dry Run으로 돌아가기' }))
+    expect(screen.getByRole('heading', { name: '백업 복원 Dry Run' })).toBeInTheDocument(); expect(screen.getByRole('heading', { name: '복원 가능' })).toBeInTheDocument()
   })
 })

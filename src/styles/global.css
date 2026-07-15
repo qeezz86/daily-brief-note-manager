@@ -169,6 +169,14 @@
 .backup-checksum code { padding: .75rem; border-radius: .4rem; background: #17211e; color: #eff8f4; overflow-wrap: anywhere; font-size: .78rem; }
 .backup-actions { display: flex; gap: .65rem; flex-wrap: wrap; }
 .backup-actions .primary-button { margin-top: 0; }
+.restore-policy-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: .75rem; margin-top: 1rem; }
+.restore-policy-grid label, .restore-override-list label { display: grid; gap: .35rem; color: #46534f; font-size: .8rem; }
+.restore-policy-grid select, .restore-override-list select { min-height: 42px; padding: .5rem; border: 1px solid #bfc9c5; border-radius: .4rem; background: #fff; }
+.restore-override-list, .restore-stage-list { display: grid; gap: .55rem; margin: .75rem 0 0; padding: 0; list-style: none; }
+.restore-override-list li { display: grid; grid-template-columns: minmax(0, 1fr) minmax(10rem, 14rem); gap: .75rem; padding: .7rem; border-radius: .4rem; background: #f4f7f5; align-items: center; }
+.restore-override-list span { min-width: 0; overflow-wrap: anywhere; }
+.restore-stage-list li { display: grid; grid-template-columns: minmax(10rem, 1fr) auto; gap: .25rem 1rem; padding: .7rem; border-left: 3px solid #7ab49f; background: #f4f7f5; }
+.restore-stage-list small { grid-column: 1 / -1; color: #68736f; }
 .backup-file-info { margin: .65rem 0; color: #46534f; overflow-wrap: anywhere; }
 .backup-input-divider { margin: 1rem 0; color: #7a8581; text-align: center; }
 .backup-panel textarea { width: 100%; box-sizing: border-box; margin-top: .4rem; padding: .75rem; border: 1px solid #bfc9c5; border-radius: .4rem; resize: vertical; font: .82rem/1.55 ui-monospace, SFMono-Regular, Consolas, monospace; }
@@ -185,8 +193,10 @@
 .backup-result-list li > small { grid-column: 2; color: #68736f; overflow-wrap: anywhere; }
 .backup-final-status { border-width: 2px; }
 .backup-final-status.is-restorable { border-color: #7ab49f; background: #f5fbf8; }
+.backup-final-status.is-ready { border-color: #7ab49f; background: #f5fbf8; }
 .backup-final-status.is-warning { border-color: #d7c783; background: #fffdf5; }
 .backup-final-status.is-not_restorable { border-color: #d89b98; background: #fff8f7; }
+.backup-final-status.is-blocked { border-color: #d89b98; background: #fff8f7; }
 .backup-section-counts .is-invalid { color: #8c2f2b; background: #fff0ef; }
 .backup-section-counts .is-warning { color: #67570f; background: #fff8d9; }
 
@@ -201,6 +211,8 @@
   .backup-progress { grid-template-columns: 1fr; }
   .backup-result-list li { grid-template-columns: 1fr; }
   .backup-result-list li > small { grid-column: 1; }
+  .restore-override-list li, .restore-stage-list li { grid-template-columns: 1fr; }
+  .restore-stage-list small { grid-column: auto; }
 }
 
 .news-update-list { display: grid; gap: 1rem; padding-left: 1.25rem; }

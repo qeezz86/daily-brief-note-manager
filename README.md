@@ -2,7 +2,9 @@
 
 Daily Brief Note의 콘텐츠, SEO 정보, 출처, 뉴스 추적 이력과 생성 프롬프트를 관리하기 위한 비공개 웹앱입니다.
 
-현재 저장소는 Phase 4B-2 단계입니다. `/backups`에서 현재 인증 사용자의 공식 `core`·`full` JSON 백업을 생성하고, `/backups/restore`에서 파일 또는 JSON text의 checksum·schema·manifest·관계·민감정보·category 호환성과 현재 DB 충돌 후보를 read-only Dry Run으로 검사할 수 있습니다. 실제 복원과 DB 쓰기는 아직 수행하지 않습니다.
+현재 저장소는 Phase 4B-3 단계입니다. `/backups`에서 현재 인증 사용자의 공식 `core`·`full` JSON 백업을 생성하고, `/backups/restore`에서 checksum·schema·관계·category 호환성과 현재 DB 충돌 후보를 read-only Dry Run으로 검사한 뒤 실행 가능한 복원 계획을 만들 수 있습니다. 계획은 preserve·deterministic UUID v5 remap·reuse·skip·block 정책, category mapping, 관계 ID map, dependency stage, 예상 집계와 SHA-256 fingerprint를 포함합니다. 실제 복원과 DB 쓰기는 아직 수행하지 않습니다.
+
+복원 계획은 원본 백업과 분리된 `daily-brief-note-restore-plan` schema version 1 JSON입니다. 전체 HTML, prompt text, Import normalized payload, owner ID와 인증 정보는 계획에 복제하지 않습니다. blocked 또는 stale 계획은 복사·다운로드할 수 없고, Phase 4B-4 실행 직전에 DB 충돌 상태를 반드시 다시 확인해야 합니다. overwrite, 기존 row update, unique suffix, slug·series number·topic key 자동 변경은 지원하지 않습니다.
 
 ## 요구 환경
 

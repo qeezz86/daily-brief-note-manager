@@ -1547,7 +1547,24 @@ CSV는 검토와 내보내기 전용이며 전체 관계 복원에 사용하지 
 
 Phase 4B-2는 INSERT·UPDATE·DELETE, overwrite·upsert, category 생성, UUID remap 실행, transaction, restore job, resume·retry와 실제 복원을 포함하지 않는다. 실제 계획 선택과 반영은 Phase 4B-3 이후 별도 단계다.
 
-### 16.3 Git 관리 대상
+### 16.3 Phase 4B-3 결정적 복원 계획
+
+Dry Run 완료 후 같은 `/backups/restore` 화면에서 원본 bundle과 read-only DB lookup 결과를 메모리에서 재사용해 `daily-brief-note-restore-plan` schema version 1 파일을 만든다. 별도 restore job을 저장하거나 DB를 변경하지 않는다.
+
+- 전역 정책은 ID 충돌 remap/block, 동일 데이터 reuse/skip, full operational history include/exclude, 비활성 category allow/block, pattern 차이에서 현재 설정 사용/block, timestamp 보존/DB 기본값 계획을 지원한다.
+- record별 예외는 충돌 record에만 허용하며 key 불일치, broken relation과 category 의미 불일치는 강제로 block한다. overwrite, update, unique suffix, slug·series number·topic key 자동 변경은 없다.
+- 새 row는 원 UUID를 preserve하고 원 ID만 충돌하면 고정 restore namespace와 `backup checksum:section:original UUID`를 입력으로 UUID v5 target을 만든다. remap target이 현재 DB와 충돌하면 계획을 block한다.
+- ID map은 posts, tags, sources, news tracking, generated prompts와 full Import history의 source ID를 preserve·remap·reuse·skip target으로 연결한다. 관계 row는 이 target을 통해 해석한다. owner UUID는 포함하지 않는다.
+- category는 UUID remap하지 않고 같은 ID·content group·code에만 mapping한다. name·wrapper·pattern·active 차이는 정책에 따른 warning/block이며 과거 slug·display ID·HTML을 변환하지 않는다.
+- 실행 stage는 실제 FK에 맞춰 tags, posts, metadata, postTags, counter, news topics/history/updates, previous links, sources, followups, prompts, Import jobs/items/attempts 순서를 결정적으로 생성한다. previous update graph는 안정적인 topological sort를 사용하고 missing/self/장주기 cycle을 block한다.
+- plan fingerprint는 backup checksum과 profile/schema, DB analysis fingerprint, category mapping, 정책, record action, ID map, stage와 summary의 canonical JSON SHA-256이다. `createdAt`은 입력에서 제외한다.
+- 모든 source row action, target 해석, target 중복, preserve/remap 충돌, stage coverage, dependency 순서, previous DAG, category mapping, summary와 fingerprint를 검증한다. error 또는 block이 있거나 DB lookup이 partial/unavailable이면 plan status는 `blocked`다.
+- 계획 JSON에는 전체 `htmlBody`, prompt text, normalized Import payload, owner ID, email, token과 raw DB 오류를 포함하지 않는다. 원본 backup은 별도 실행 입력으로 유지한다.
+- blocked 또는 정책 변경으로 stale인 계획은 복사·다운로드할 수 없다. Phase 4B-4 실행 직전에 동일 DB conflict 분석을 다시 실행해야 한다.
+
+실제 INSERT·UPDATE·DELETE, restore transaction/job, resume·retry와 rollback은 Phase 4B-4 범위다.
+
+### 16.4 Git 관리 대상
 
 Git에 저장:
 

@@ -139,6 +139,7 @@ export interface ExistingRestoreRecord {
   key?: string
   categoryId?: string
   signature: string
+  currentValue?: number
 }
 
 export interface BackupConflictLookupResult {

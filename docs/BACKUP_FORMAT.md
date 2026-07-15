@@ -126,3 +126,17 @@ DB 조회는 기존 RLS가 적용되는 현재 인증 사용자의 행만 명시
 Phase 4B-3용 restore analysis JSON에는 checksum fingerprint, schema/profile, category 차이, section·conflict count, preserve·reuse·remap·conflict 후보와 검사 상태만 포함한다. 전체 `htmlBody`, 전체 prompt text, normalized Import payload, 인증 정보와 token은 제외한다. 분석 결과는 복사할 수 있지만 저장하지 않으며 입력이 변경되면 폐기한다.
 
 Phase 4B-2는 read-only다. 실제 restore, overwrite/upsert, category 생성·수정, UUID remap 생성·실행, transaction과 restore job은 수행하지 않는다.
+
+## 11. Phase 4B-3 복원 계획
+
+Dry Run의 local bundle, category compatibility와 RLS가 적용된 DB conflict lookup을 입력으로 별도 `daily-brief-note-restore-plan` schema version 1 JSON을 생성한다. 상세 계약은 `docs/RESTORE_PLAN_FORMAT.md`를 따른다.
+
+- 원본 백업은 수정하거나 계획에 복제하지 않는다.
+- 계획에는 record action, deterministic UUID v5 ID map, category mapping, dependency stage, 예상 집계, issue와 SHA-256 fingerprint만 포함한다.
+- 전체 HTML, prompt text, Import normalized payload, owner ID, email, token과 raw DB 오류를 포함하지 않는다.
+- `createdAt`은 파일 표시 시각이며 fingerprint 입력에서 제외한다.
+- DB lookup이 complete가 아니거나 필수 관계·category·target을 해석할 수 없으면 계획을 block한다.
+- blocked 또는 stale 계획은 복사·다운로드하지 않는다.
+- Phase 4B-4 실행 직전에 DB 충돌과 remap target을 다시 조회해야 한다.
+
+Phase 4B-3도 read-only다. 실제 row 생성·수정·삭제, counter update, restore job과 transaction은 수행하지 않는다.

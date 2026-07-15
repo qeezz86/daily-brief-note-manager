@@ -41,7 +41,7 @@ export async function getBackupRestoreCategories(client: DatabaseClient): Promis
 interface PostRow { id: string; category_id: string; title: string; slug: string; wordpress_url: string | null; series_no: number | null; briefing_date: string | null; published_on: string | null; display_id: string | null }
 interface TagRow { id: string; name: string; normalized_name: string }
 interface TopicRow { id: string; category_id: string; topic_key: string; canonical_title: string; topic_summary: string | null; status: string }
-interface IdRow { id: string }
+interface PromptRow { id: string; category_id: string; requested_post_count: number; actual_post_count: number; prompt_mode: string; reference_date: string; closed_lookback_days: number; context_schema_version: number; context_snapshot: unknown; prompt_text: string; generated_at: string }
 interface SourceRow { id: string; post_id: string; news_update_id: string | null; source_url: string; sort_order: number }
 interface UpdateRow { id: string; post_id: string; topic_id: string; item_order: number; update_type: string; headline: string }
 interface FollowupRow { id: string; topic_id: string; check_text: string; status: string }
@@ -78,7 +78,7 @@ export async function getBackupConflictReferenceData(client: DatabaseClient, bun
   const sourceQuery = await chunks<string, SourceRow>(unique(data.sources.map((row) => row.id)), (part) => client.from('sources').select('id, post_id, news_update_id, source_url, sort_order').in('id', part))
   const updateQuery = await chunks<string, UpdateRow>(unique(data.newsUpdates.map((row) => row.id)), (part) => client.from('news_updates').select('id, post_id, topic_id, item_order, update_type, headline').in('id', part))
   const followupQuery = await chunks<string, FollowupRow>(unique(data.newsFollowups.map((row) => row.id)), (part) => client.from('news_followups').select('id, topic_id, check_text, status').in('id', part))
-  const promptQuery = await chunks<string, IdRow>(unique(data.generatedPrompts.map((row) => row.id)), (part) => client.from('generated_prompts').select('id').in('id', part))
+  const promptQuery = await chunks<string, PromptRow>(unique(data.generatedPrompts.map((row) => row.id)), (part) => client.from('generated_prompts').select('id, category_id, requested_post_count, actual_post_count, prompt_mode, reference_date, closed_lookback_days, context_schema_version, context_snapshot, prompt_text, generated_at').in('id', part))
   const postTagQuery = await chunks<string, PostTagRow>(unique(data.postTags.map((row) => row.postId)), (part) => client.from('post_tags').select('post_id, tag_id').in('post_id', part))
   const seoQuery = await chunks<string, SeoRow>(unique(data.seoData.map((row) => row.postId)), (part) => client.from('seo_data').select('post_id, representative_title, meta_description, focus_keyword').in('post_id', part))
   const aiQuery = await chunks<string, AiRow>(unique(data.aiMetadata.map((row) => row.postId)), (part) => client.from('ai_metadata').select('post_id, field_name, difficulty, estimated_read_min').in('post_id', part))
@@ -124,13 +124,13 @@ export async function getBackupConflictReferenceData(client: DatabaseClient, bun
   sourceQuery.rows.forEach((row) => records.push({ section: 'sources', id: row.id, signature: signature({ postId: row.post_id, newsUpdateId: row.news_update_id, sourceUrl: row.source_url, sortOrder: row.sort_order }) }))
   updateQuery.rows.forEach((row) => records.push({ section: 'newsUpdates', id: row.id, signature: signature({ postId: row.post_id, topicId: row.topic_id, itemOrder: row.item_order, updateType: row.update_type, headline: row.headline }) }))
   followupQuery.rows.forEach((row) => records.push({ section: 'newsFollowups', id: row.id, signature: signature({ topicId: row.topic_id, checkText: row.check_text, status: row.status }) }))
-  promptQuery.rows.forEach((row) => records.push({ section: 'generatedPrompts', id: row.id, signature: '' }))
+  promptQuery.rows.forEach((row) => records.push({ section: 'generatedPrompts', id: row.id, signature: signature({ categoryId: row.category_id, requestedPostCount: row.requested_post_count, actualPostCount: row.actual_post_count, promptMode: row.prompt_mode, referenceDate: row.reference_date, closedLookbackDays: row.closed_lookback_days, contextSchemaVersion: row.context_schema_version, contextSnapshot: row.context_snapshot, promptText: row.prompt_text, generatedAt: row.generated_at }) }))
   postTagQuery.rows.forEach((row) => records.push({ section: 'postTags', key: `${row.post_id}|${row.tag_id}`, signature: '' }))
   seoQuery.rows.forEach((row) => records.push({ section: 'seoData', key: row.post_id, signature: signature({ postId: row.post_id, representativeTitle: row.representative_title, metaDescription: row.meta_description, focusKeyword: row.focus_keyword }) }))
   aiQuery.rows.forEach((row) => records.push({ section: 'aiMetadata', key: row.post_id, signature: signature({ postId: row.post_id, fieldName: row.field_name, difficulty: row.difficulty, estimatedReadMin: row.estimated_read_min }) }))
   infoQuery.rows.forEach((row) => records.push({ section: 'infoDbMetadata', key: row.post_id, signature: signature({ postId: row.post_id, fieldName: row.field_name, difficulty: row.difficulty, estimatedReadMin: row.estimated_read_min, referenceDate: row.reference_date }) }))
   chineseQuery.rows.forEach((row) => records.push({ section: 'chineseMetadata', key: row.original_url ? `originalUrl:${normalizeSourceUrl(row.original_url).toLocaleLowerCase('en-US')}` : row.post_id, signature: signature({ postId: row.post_id, originalUrl: row.original_url, originalTitle: row.original_title, learningTopic: row.learning_topic }) }))
-  counterQuery.rows.forEach((row) => records.push({ section: 'seriesCounters', key: row.category_id, categoryId: row.category_id, signature: signature({ categoryId: row.category_id, lastIssuedNo: row.last_issued_no }) }))
+  counterQuery.rows.forEach((row) => records.push({ section: 'seriesCounters', key: row.category_id, categoryId: row.category_id, signature: signature({ categoryId: row.category_id, lastIssuedNo: row.last_issued_no }), currentValue: row.last_issued_no }))
   historyQuery.rows.forEach((row) => records.push({ section: 'newsStatusHistory', id: row.id, signature: signature({ topicId: row.topic_id, toStatus: row.to_status, changedAt: row.changed_at }) }))
   jobQuery.rows.forEach((row) => records.push({ section: 'importJobs', id: row.id, key: `fingerprint:${row.source_fingerprint}`, signature: signature({ sourceFingerprint: row.source_fingerprint, status: row.status }) }))
   itemQuery.rows.forEach((row) => records.push({ section: 'importJobItems', id: row.id, signature: signature({ jobId: row.job_id, itemIndex: row.item_index, payloadFingerprint: row.payload_fingerprint }) }))
@@ -139,4 +139,29 @@ export async function getBackupConflictReferenceData(client: DatabaseClient, bun
   const allResults: Array<ChunkResult<unknown>> = [...postQueries, ...tagQueries, ...topicQueries, sourceQuery, updateQuery, followupQuery, promptQuery, postTagQuery, seoQuery, aiQuery, infoQuery, chineseQuery, counterQuery, historyQuery, jobQuery, itemQuery, attemptQuery]
   const deduped = new Map(records.map((record) => [`${record.section}|${record.id ?? ''}|${record.key ?? ''}`, record]))
   return { databaseCheck: status(allResults), records: [...deduped.values()].sort((left, right) => `${left.section}|${left.id ?? ''}|${left.key ?? ''}`.localeCompare(`${right.section}|${right.id ?? ''}|${right.key ?? ''}`)) }
+}
+
+export async function getBackupRestoreTargetCollisions(
+  client: DatabaseClient,
+  targets: Array<{ section: string; id: string }>,
+) {
+  const values = (section: string) => unique(targets.filter((target) => target.section === section).map((target) => target.id))
+  const queries = await Promise.all([
+    chunks<string, { id: string }>(values('posts'), (part) => client.from('posts').select('id').in('id', part)),
+    chunks<string, { id: string }>(values('tags'), (part) => client.from('tags').select('id').in('id', part)),
+    chunks<string, { id: string }>(values('sources'), (part) => client.from('sources').select('id').in('id', part)),
+    chunks<string, { id: string }>(values('newsTopics'), (part) => client.from('news_topics').select('id').in('id', part)),
+    chunks<string, { id: string }>(values('newsStatusHistory'), (part) => client.from('news_status_history').select('id').in('id', part)),
+    chunks<string, { id: string }>(values('newsUpdates'), (part) => client.from('news_updates').select('id').in('id', part)),
+    chunks<string, { id: string }>(values('newsFollowups'), (part) => client.from('news_followups').select('id').in('id', part)),
+    chunks<string, { id: string }>(values('generatedPrompts'), (part) => client.from('generated_prompts').select('id').in('id', part)),
+    chunks<string, { id: string }>(values('importJobs'), (part) => client.from('import_jobs').select('id').in('id', part)),
+    chunks<string, { id: string }>(values('importJobItems'), (part) => client.from('import_job_items').select('id').in('id', part)),
+    chunks<string, { id: string }>(values('importJobItemAttempts'), (part) => client.from('import_job_item_attempts').select('id').in('id', part)),
+  ])
+  const sections = ['posts', 'tags', 'sources', 'newsTopics', 'newsStatusHistory', 'newsUpdates', 'newsFollowups', 'generatedPrompts', 'importJobs', 'importJobItems', 'importJobItemAttempts']
+  return {
+    databaseCheck: status(queries),
+    collisions: queries.flatMap((query, index) => query.rows.map((row) => ({ section: sections[index], id: row.id }))),
+  }
 }
