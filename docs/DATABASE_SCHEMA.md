@@ -544,7 +544,9 @@ AI·정보DB·중국어 학습 컨텍스트의 exact title, slug, focus keyword 
 - 브라우저는 공식 format·manifest를 조립하고 관계와 민감정보를 검증한 뒤 canonical payload의 SHA-256 checksum을 추가한다.
 - 공식 외부 형식은 `docs/BACKUP_FORMAT.md`를 따른다.
 
-복구는 Phase 4B-1 범위가 아니다. 후속 구현은 실제 반영 전 dry-run과 중복 검사를 수행하고 항목별 `insert`, `skip`, `update` 선택과 예정 작업·오류를 표시해야 한다.
+복구는 Phase 4B-1 범위가 아니다. 후속 구현은 실제 반영 전 dry-run과 중복 검사를 수행하고 항목별 `preserve`, `remap`, `reuse`, `skip`, `block` 계획과 예정 작업·오류를 표시해야 한다.
+
+복원 계획 schemaVersion 1과 현재 복원 정책에서는 기존 데이터 overwrite 및 update를 지원하지 않는다. 향후 지원 여부는 별도 schema version과 migration에서 재검토한다.
 
 ### 12.2 CSV
 
@@ -566,4 +568,4 @@ CSV는 검토와 내보내기 전용이며 전체 관계 복원 형식으로 사
 ## 13. 확인 필요 사항
 
 1. `prompt_mode`의 DB 허용값을 check constraint로 강제할지 확정이 필요하다.
-2. 백업 JSON 복구의 테이블별 적용 순서와 `update` 시 하위 관계의 교체·병합 범위는 후속 복구 단계에서 확정해야 한다.
+2. 백업 JSON 복구의 테이블별 적용 순서와 관계 remap·reuse·skip 범위는 후속 복구 단계에서 확정해야 한다. 기존 데이터 overwrite 및 update 지원 여부는 별도 schema version과 migration에서 재검토한다.

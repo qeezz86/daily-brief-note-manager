@@ -32,6 +32,8 @@
 
 전역 정책은 ID 충돌, 동일 데이터, 운영 이력, 비활성 category, pattern 차이와 timestamp를 다룬다. 충돌 record에는 허용된 범위에서 `recordOverrides`를 지정할 수 있다. 지원 action은 `create`, `preserve_id`, `remap_id`, `reuse_existing`, `skip`, `block`이다. overwrite와 update action은 없다.
 
+복원 계획 schemaVersion 1과 현재 복원 정책에서는 기존 데이터 overwrite 및 update를 지원하지 않는다. 향후 지원 여부는 별도 schema version과 migration에서 재검토한다.
+
 `recordActions`는 section, source ID, target ID, action, conflict type, 안정적 reason code, dependency, warning과 짧은 safe display만 담는다. 본문이나 prompt 원문을 넣지 않는다.
 
 ## 4. 결정적 ID map
