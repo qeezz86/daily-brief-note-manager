@@ -30,6 +30,7 @@ export function AppLayout() {
             <NavLink to="/news-topics">뉴스 주제</NavLink>
             <NavLink to="/news-followups">후속 확인</NavLink>
             <NavLink to="/briefing-prompts">브리핑 프롬프트</NavLink>
+            <NavLink to="/backups">백업</NavLink>
           </nav>
           <div className="app-header__account">
             <span title={user?.email}>{user?.email}</span>

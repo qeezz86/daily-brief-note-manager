@@ -32,6 +32,7 @@ import { BriefingPromptRunDetailPage } from '../pages/BriefingPromptRunDetailPag
 import { ImportPage } from '../pages/ImportPage'
 import { ImportHistoryPage } from '../pages/ImportHistoryPage'
 import { ImportJobDetailPage } from '../pages/ImportJobDetailPage'
+import { BackupPage } from '../pages/BackupPage'
 
 export const routes: RouteObject[] = [
   {
@@ -80,6 +81,14 @@ export const routes: RouteObject[] = [
           {
             path: '/imports/history/:jobId',
             element: <ImportJobDetailPage />,
+          },
+          {
+            path: '/backups',
+            element: <BackupPage />,
+          },
+          {
+            path: '/backups/new',
+            element: <BackupPage />,
           },
           {
             path: '/content/:postId',

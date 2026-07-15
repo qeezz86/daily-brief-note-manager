@@ -18,7 +18,7 @@ test-results/
 .vite/
 
 # Private exports and backups
-backups/
+/backups/
 exports/
 
 # Operating system files

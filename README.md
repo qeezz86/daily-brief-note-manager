@@ -2,7 +2,7 @@
 
 Daily Brief Note의 콘텐츠, SEO 정보, 출처, 뉴스 추적 이력과 생성 프롬프트를 관리하기 위한 비공개 웹앱입니다.
 
-현재 저장소는 Phase 4A-4 단계입니다. `/imports`에서 공식 schema version 1 콘텐츠 Import bundle을 Dry Run한 뒤 선택한 `ready`와 승인한 `warning` 항목을 불변 execution snapshot으로 영구 job에 등록합니다. `/imports/history`와 상세 화면에서 콘텐츠와 뉴스 tracking을 별도 transaction으로 순차 실행하며, 새로고침 뒤 pending 단계 resume, retry 가능한 콘텐츠·tracking 실패의 수동 재시도, tracking 단계만 재시도, 취소·재개와 item별 attempt 이력을 지원합니다. 성공한 단계의 RPC 재호출은 기존 결과를 반환하고 tracking 실패 시 이미 생성된 콘텐츠는 유지됩니다.
+현재 저장소는 Phase 4B-1 단계입니다. 기존 콘텐츠 Import 작업 이력·resume·retry에 더해 `/backups`에서 현재 인증 사용자의 전체 데이터를 일관된 snapshot으로 조회하고, 관계·민감정보·checksum 무결성을 검증한 공식 JSON 백업 파일을 생성할 수 있습니다. 기본 `core`는 콘텐츠와 뉴스 추적 데이터를, `full`은 여기에 Import 작업·attempt 이력을 포함합니다.
 
 ## 요구 환경
 
@@ -100,6 +100,8 @@ npx supabase gen types typescript --local > src/shared/supabase/database.types.t
 Phase 3B-4 검증 결과는 `valid`, `warning`, `invalid`를 구분합니다. 오류가 있거나 설정 변경으로 미리보기가 stale이면 프롬프트 저장과 복사를 차단하며 JSON 복사는 디버깅 목적으로 유지합니다. 데이터 부재, 간단 모드의 정상적인 상세 생략, exact headline 중복, 과도한 길이 같은 경고는 확인 후 저장·복사를 허용합니다. 새 snapshot에는 `promptValidationVersion`과 오류 없는 validation summary만 선택적으로 저장합니다. 과거 이력은 현재 규칙으로 재검증하지 않으며 저장 당시 summary가 없으면 이전 이력으로 표시합니다. AI 의미 유사도, 외부 기사 비교와 실제 뉴스 사실 검증은 수행하지 않습니다.
 
 `/imports`는 UTF-8 `.json` 파일과 직접 붙여넣은 JSON 중 마지막으로 선택한 한 입력만 사용합니다. 파일 제한은 20 MB, 게시물 제한은 2,000개이며 BOM, 과도한 중첩·문자열, prototype pollution 키를 차단합니다. DB exact duplicate 후보는 100개씩 RLS 범위에서 순차 확인하고 조회 상태가 `complete`일 때만 job을 만들 수 있습니다. source와 item fingerprint는 canonical JSON의 SHA-256이며 파일명은 동일 bundle 판정에 포함하지 않습니다. snapshot은 100개씩 idempotent하게 등록되고 finalize 이후 직접 수정할 수 없습니다. 동일 사용자·동일 fingerprint는 새 job 대신 기존 상세로 연결됩니다. 브라우저가 닫힌 동안 자동 실행하지 않고 자동 retry도 수행하지 않으며, 사용자가 작업 상세에서 명시적으로 계속 실행하거나 실패 단계를 재시도합니다. 전체 백업의 `data` schema 또는 backup format은 이 화면에서 받지 않습니다.
+
+`/backups`와 `/backups/new`는 공식 `daily-brief-note-backup` schema version 1 JSON을 브라우저에서 생성합니다. DB 함수는 `auth.uid()` 범위의 행만 한 SQL snapshot에서 읽고 `owner_id`를 내보내지 않습니다. 생성기는 관계 무결성과 민감정보 패턴을 검사하고, checksum 필드를 제외한 canonical payload의 SHA-256을 계산한 뒤 즉시 재검증합니다. 20 MB 이상은 경고하고 100 MB를 초과하면 생성을 중단합니다. 다운로드 파일명은 `daily-brief-note-backup-{profile}-{Asia/Seoul 시각}.json`입니다. 정확한 형식은 `docs/BACKUP_FORMAT.md`를 따르며 복원 기능은 아직 제공하지 않습니다.
 
 콘텐츠 수정 화면에서는 WordPress HTML 원문, SEO 대표 제목·대안 제목 4개·메타 설명·포커스 키워드, 태그, 대표 이미지 프롬프트·ALT 문구와 순서가 있는 출처를 입력합니다. 카테고리 설정의 `content_group`이 `ai`이면 분야·난이도·예상 읽기 시간을, `info_db`이면 여기에 기준일까지 별도로 입력합니다. `ready`와 `published`에서 두 metadata의 분야·난이도·예상 읽기 시간은 필수이며, 난이도 저장값은 `beginner`·`intermediate`·`advanced`, 읽기 시간은 1~600분 정수다. 정보DB 기준일은 nullable이며 경고 안내만 제공한다. 빈 draft metadata는 저장하지 않고 기존 빈 draft metadata는 삭제하지만 archived의 기존 metadata는 보존한다. HTML은 카테고리 설정의 wrapper를 기준으로 strict validation하며 화면에서 실행하지 않습니다. `ready`와 `published` 전환에는 유효한 HTML, 완성된 SEO, 5~8개 태그, 이미지 프롬프트·ALT, 1개 이상의 완전한 출처와 HTML `#sources` 링크 일치가 필요하고 `published`에는 발행일도 필요합니다. `draft`와 기존 `archived` 데이터는 미완성을 허용합니다. AI 칼럼·정보DB·중국어 학습은 각각의 publication bundle RPC에서 posts·SEO·태그·출처·metadata를 한 트랜잭션으로 저장합니다.
 

@@ -528,16 +528,23 @@ AI·정보DB·중국어 학습 컨텍스트의 exact title, slug, focus keyword 
 
 ## 12. 백업 및 복구
 
-### 12.1 JSON
+### 12.1 Phase 4B-1 JSON snapshot RPC
 
-JSON은 관계 데이터를 포함한 전체 복원용 형식이다.
+`get_user_backup_estimate(p_profile text default 'core')`는 현재 인증 사용자와 선택 profile의 section별 row count, 전체 row count, category manifest count와 operational history 포함 여부를 반환한다.
 
-- 최상위 `schemaVersion`의 초기값은 정수 `1`이다.
-- 모든 사용자 데이터 테이블과 관계 복원에 필요한 식별자를 포함한다.
-- 인증 정보와 비밀 키는 포함하지 않는다.
-- 가져오기는 실제 반영 전 dry-run과 중복 검사를 수행한다.
-- 중복 항목별 처리 방식은 `insert`, `skip`, `update` 중에서 선택한다.
-- dry-run 결과에는 예정된 insert·skip·update와 오류를 구분해 표시한다.
+`get_user_backup_snapshot(p_profile text default 'core')`는 백업 본문을 반환하는 `STABLE SECURITY INVOKER` 함수다. owner 인자를 받지 않고 `auth.uid()`를 사용하며, 인증되지 않은 호출과 `core`·`full` 이외 profile을 거부한다. `public`과 `anon`의 실행 권한은 제거하고 `authenticated`만 실행할 수 있다. 각 user-owned table을 명시적으로 `owner_id = auth.uid()`로 제한하고 기존 RLS도 그대로 적용한다.
+
+- 모든 data-bearing CTE와 최종 JSON 집계를 하나의 SQL statement에서 실행해 서로 다른 시점의 관계가 섞이지 않게 한다.
+- `core`는 posts, seoData, tags, postTags, sources, 세 metadata, seriesCounters, 네 news tracking section, generatedPrompts를 포함한다.
+- `full`은 core에 importJobs, importJobItems, importJobItemAttempts를 추가한다.
+- 관계 복원에 필요한 내부 UUID와 timestamp는 보존하고 `owner_id`는 제외한다.
+- nullable 필드는 null로 보존하며 array는 section별 안정적인 key로 결정적 정렬한다.
+- category 공용 seed 행은 data에서 제외하고 현재 category 의미를 category manifest에 기록한다.
+- snapshot은 section count, 전체 count, profile flag와 update 관계 검사를 함께 반환한다.
+- 브라우저는 공식 format·manifest를 조립하고 관계와 민감정보를 검증한 뒤 canonical payload의 SHA-256 checksum을 추가한다.
+- 공식 외부 형식은 `docs/BACKUP_FORMAT.md`를 따른다.
+
+복구는 Phase 4B-1 범위가 아니다. 후속 구현은 실제 반영 전 dry-run과 중복 검사를 수행하고 항목별 `insert`, `skip`, `update` 선택과 예정 작업·오류를 표시해야 한다.
 
 ### 12.2 CSV
 
@@ -559,4 +566,4 @@ CSV는 검토와 내보내기 전용이며 전체 관계 복원 형식으로 사
 ## 13. 확인 필요 사항
 
 1. `prompt_mode`의 DB 허용값을 check constraint로 강제할지 확정이 필요하다.
-2. 백업 JSON의 테이블별 관계 복원 순서와 `update` 시 하위 관계의 교체·병합 범위가 아직 정해지지 않았다.
+2. 백업 JSON 복구의 테이블별 적용 순서와 `update` 시 하위 관계의 교체·병합 범위는 후속 복구 단계에서 확정해야 한다.

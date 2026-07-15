@@ -1092,6 +1092,8 @@ export type Database = {
         }
         Returns: Json
       }
+      get_user_backup_estimate: { Args: { p_profile?: string }; Returns: Json }
+      get_user_backup_snapshot: { Args: { p_profile?: string }; Returns: Json }
       import_content_post: { Args: { p_item: Json }; Returns: Json }
       import_job_safe_error: {
         Args: { p_error: string; p_stage: string }
