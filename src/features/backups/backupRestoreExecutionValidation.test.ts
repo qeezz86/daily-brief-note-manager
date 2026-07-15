@@ -52,9 +52,9 @@ describe('restore execution validation matrix', () => {
     const issuePlan = { ...plan, issues: [{ severity: 'warning', code: 'WARNING', message: 'warning', section: 'posts' }] }
     expect((await validateRestoreExecution(client, {}, issuePlan)).issues.map((issue) => issue.code)).toContain('RESTORE_PLAN_NOT_READY')
   })
-  it('operational history include 정책을 차단한다', async () => {
+  it('core backup의 operational history include 정책을 차단한다', async () => {
     const input = structuredClone(plan); input.policies.operationalHistory = 'include'
-    expect((await validateRestoreExecution(client, {}, input)).issues.map((issue) => issue.code)).toContain('RESTORE_OPERATIONAL_HISTORY_BLOCKED')
+    expect((await validateRestoreExecution(client, {}, input)).issues.map((issue) => issue.code)).toContain('RESTORE_OPERATIONAL_HISTORY_PROFILE_INVALID')
   })
   it('summary의 operational history 포함도 차단한다', async () => {
     const input = structuredClone(plan); input.summary.operationalHistory = 'included'

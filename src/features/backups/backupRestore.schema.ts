@@ -74,17 +74,28 @@ export const backupRestoreSectionSchemas = {
   }).strict()),
   importJobs: z.array(z.object({
     id, format: z.string(), schemaVersion: positive, sourceName: nullableString,
-    sourceFingerprint: z.string().regex(/^[0-9a-f]{64}$/), status: z.string(), expectedItemCount: nonnegative,
+    sourceFingerprint: z.string().regex(/^[0-9a-f]{64}$/),
+    status: z.enum(['preparing', 'ready', 'running', 'completed', 'completed_with_errors', 'cancelled', 'failed']),
+    expectedItemCount: nonnegative,
     totalCount: nonnegative, readyCount: nonnegative, warningCount: nonnegative, invalidCount: nonnegative,
     duplicateCount: nonnegative, acknowledgedWarningCount: nonnegative, dryRunSummary: z.unknown(),
     startedAt: nullableDatetime, completedAt: nullableDatetime, cancelledAt: nullableDatetime,
-    createdAt: datetime, updatedAt: datetime,
-  }).strict()),
+    createdAt: datetime, updatedAt: datetime, restoredFromBackup: z.boolean().optional(),
+    executionLocked: z.boolean().optional(), restoreOriginChecksum: z.string().regex(/^[0-9a-f]{64}$/).nullable().optional(),
+  }).strict().superRefine((row, context) => {
+    if (row.restoredFromBackup === true && (row.executionLocked !== true || !row.restoreOriginChecksum)) {
+      context.addIssue({ code: 'custom', message: '복원 provenance가 있는 Import job은 실행 잠금과 origin checksum이 필요합니다.' })
+    }
+    if (row.restoredFromBackup !== true && row.restoreOriginChecksum != null) {
+      context.addIssue({ code: 'custom', message: '일반 Import job에는 restore origin checksum을 기록할 수 없습니다.' })
+    }
+  })),
   importJobItems: z.array(z.object({
     id, jobId: id, itemIndex: nonnegative, externalKey: z.string(),
     payloadFingerprint: z.string().regex(/^[0-9a-f]{64}$/), title: z.string(), categoryId: z.string(),
-    validationStatus: z.string(), normalizedPayload: z.unknown(), warningAcknowledged: z.boolean(),
-    contentStatus: z.string(), trackingStatus: z.string(), postId: id.nullable(),
+    validationStatus: z.enum(['ready', 'warning']), normalizedPayload: z.record(z.string(), z.unknown()), warningAcknowledged: z.boolean(),
+    contentStatus: z.enum(['pending', 'running', 'imported', 'failed', 'skipped_duplicate', 'cancelled']),
+    trackingStatus: z.enum(['not_applicable', 'not_present', 'pending', 'running', 'imported', 'failed', 'cancelled']), postId: id.nullable(),
     contentAttemptCount: nonnegative, trackingAttemptCount: nonnegative,
     contentErrorCode: nullableString, contentErrorMessage: nullableString, contentRetryable: z.boolean(),
     trackingErrorCode: nullableString, trackingErrorMessage: nullableString, trackingRetryable: z.boolean(),
@@ -95,7 +106,7 @@ export const backupRestoreSectionSchemas = {
     createdAt: datetime, updatedAt: datetime,
   }).strict()),
   importJobItemAttempts: z.array(z.object({
-    id, jobItemId: id, stage: z.string(), attemptNo: positive, status: z.string(),
+    id, jobItemId: id, stage: z.enum(['content', 'tracking']), attemptNo: positive, status: z.enum(['running', 'imported', 'failed']),
     safeErrorCode: nullableString, safeErrorMessage: nullableString, retryable: z.boolean(),
     startedAt: datetime, completedAt: nullableDatetime,
   }).strict()),

@@ -141,8 +141,12 @@ Dry Run의 local bundle, category compatibility와 RLS가 적용된 DB conflict 
 
 Phase 4B-3도 read-only다. 실제 row 생성·수정·삭제, counter update, restore job과 transaction은 수행하지 않는다.
 
-## Phase 4B-4A 실행 입력
+## Phase 4B-4A·4B 실행 입력
 
 공식 backup JSON만으로는 실제 복원을 시작할 수 없다. 같은 checksum·profile·schema version을 참조하는 ready restore plan JSON이 함께 필요하다. 실행 화면은 backup checksum과 schema/관계/민감정보를 다시 검증하고 현재 DB 충돌 조회가 `complete`일 때만 불변 record snapshot을 등록한다.
 
-`full` profile의 `importJobs`, `importJobItems`, `importJobItemAttempts`는 Phase 4B-4A 실행 snapshot에 포함하지 않는다. WordPress 외부 asset이나 이미지 파일도 복원하지 않으며 저장된 prompt/ALT text만 post payload의 일부로 취급한다.
+`full` profile에서 `operationalHistory: include`를 선택하면 `importJobs`, `importJobItems`, `importJobItemAttempts`를 core 이후 실행 snapshot에 포함한다. exclude는 Phase 4B-4A와 동일하게 이 section과 stage를 만들지 않는다. WordPress 외부 asset이나 이미지 파일은 복원하지 않으며 저장된 prompt/ALT text만 post payload의 일부로 취급한다.
+
+schema version 1의 `importJobs`는 `restoredFromBackup`, `executionLocked`, `restoreOriginChecksum`을 선택 필드로 정의한다. 필드가 없는 기존 v1은 false·false·null로 해석하고, 새 full 백업은 명시적으로 기록한다. 임의 추가 필드는 허용하지 않는다. 백업의 잠금 값과 무관하게 신규 복원 job은 항상 잠기며, exact reuse된 기존 job은 변경하지 않는다.
+
+운영 이력은 source fingerprint, item index·external key, 부모 job/item과 nullable post 관계, normalized payload fingerprint·금지 key, 상태·timestamp·attempt count를 검증한다. 전체 normalized payload는 restore plan에 넣지 않고 실행 snapshot을 준비할 때 검증된 원본 backup에서 가져온다.

@@ -30,7 +30,24 @@ export async function validateRestoreExecution(client: DatabaseClient, backupVal
   if (plan.backup.checksum !== local.bundle.checksum.value) issues.push({ code: 'RESTORE_BACKUP_PLAN_CHECKSUM_MISMATCH', message: '계획이 선택한 백업 checksum과 연결되지 않습니다.' })
   if (plan.backup.profile !== local.bundle.profile || plan.backup.schemaVersion !== local.bundle.schemaVersion) issues.push({ code: 'RESTORE_BACKUP_PLAN_PROFILE_MISMATCH', message: '백업 profile 또는 schema version이 계획과 다릅니다.' })
   if (plan.status !== 'ready' || plan.issues.some((issue) => issue.severity !== 'info')) issues.push({ code: 'RESTORE_PLAN_NOT_READY', message: 'warning 또는 blocked issue가 없는 ready 계획만 실행할 수 있습니다.' })
-  if (plan.policies.operationalHistory !== 'exclude' || plan.summary.operationalHistory === 'included') issues.push({ code: 'RESTORE_OPERATIONAL_HISTORY_BLOCKED', message: '운영 Import 이력 포함 계획은 Phase 4B-4B 전까지 실행할 수 없습니다.' })
+  const operationalSections = ['importJobs', 'importJobItems', 'importJobItemAttempts'] as const
+  if (plan.policies.operationalHistory === 'include') {
+    if (local.bundle.profile !== 'full' || plan.summary.operationalHistory !== 'included') {
+      issues.push({ code: 'RESTORE_OPERATIONAL_HISTORY_PROFILE_INVALID', message: '운영 이력 포함 실행에는 full backup과 included 계획이 필요합니다.' })
+    }
+    for (const section of local.bundle.profile === 'full' && local.bundle.data ? operationalSections : []) {
+      const sourceIds = new Set((local.bundle.data[section] ?? []).map((row) => row.id))
+      const actions = plan.recordActions.filter((action) => action.section === section)
+      if (actions.length !== sourceIds.size || actions.some((action) => !sourceIds.has(action.sourceId) || action.action === 'block')) {
+        issues.push({ code: 'RESTORE_OPERATIONAL_ACTION_MISSING', message: `${section}의 실행 action이 backup source와 일치하지 않습니다.` })
+      }
+      if (sourceIds.size > 0 && !plan.executionStages.some((stage) => stage.name === section)) {
+        issues.push({ code: 'RESTORE_OPERATIONAL_STAGE_MISSING', message: `${section} 실행 stage가 없습니다.` })
+      }
+    }
+  } else if (plan.summary.operationalHistory === 'included') {
+    issues.push({ code: 'RESTORE_OPERATIONAL_HISTORY_BLOCKED', message: '운영 이력 제외 정책과 plan summary가 일치하지 않습니다.' })
+  }
 
   const lookup = await getBackupConflictReferenceData(client, local.bundle)
   const final = await validateBackupForRestore(backupValue, { currentCategories: categories, lookup })

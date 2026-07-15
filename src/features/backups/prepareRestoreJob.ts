@@ -15,7 +15,8 @@ const fallbackStage: Record<string, string> = {
   tags: 'tags', posts: 'posts', seoData: 'metadata', aiMetadata: 'metadata', infoDbMetadata: 'metadata',
   chineseMetadata: 'metadata', postTags: 'postTags', seriesCounters: 'seriesCounters', newsTopics: 'newsTopics',
   newsStatusHistory: 'newsStatusHistory', newsUpdates: 'newsUpdates', sources: 'sources', newsFollowups: 'newsFollowups',
-  generatedPrompts: 'generatedPrompts',
+  generatedPrompts: 'generatedPrompts', importJobs: 'importJobs', importJobItems: 'importJobItems',
+  importJobItemAttempts: 'importJobItemAttempts',
 }
 
 function asJson(value: unknown): Json { return value as Json }
@@ -30,7 +31,7 @@ export async function buildPreparedRestoreRecords(bundle: ValidatedBackupBundle,
   const rows = new Map(buildRestoreCandidates(bundle).map((candidate) => [restoreRecordKey(candidate.section, candidate.sourceId), candidate.row]))
   const grouped = new Map<number, Array<{ action: RestoreRecordPlan; stageKey: string; payload: Record<string, unknown> }>>()
   for (const action of plan.recordActions) {
-    if (OPERATIONAL.has(action.section)) continue
+    if (OPERATIONAL.has(action.section) && plan.policies.operationalHistory === 'exclude') continue
     if (action.action === 'block') throw new Error('RESTORE_PLAN_BLOCK_ACTION')
     const stage = stageFor(plan, action)
     const payload = rows.get(restoreRecordKey(action.section, action.sourceId))

@@ -405,12 +405,15 @@ export type Database = {
           created_at: string
           dry_run_summary: Json
           duplicate_count: number
+          execution_locked: boolean
           expected_item_count: number
           format: string
           id: string
           invalid_count: number
           owner_id: string
           ready_count: number
+          restore_origin_checksum: string | null
+          restored_from_backup: boolean
           schema_version: number
           source_fingerprint: string
           source_name: string | null
@@ -427,12 +430,15 @@ export type Database = {
           created_at?: string
           dry_run_summary?: Json
           duplicate_count?: number
+          execution_locked?: boolean
           expected_item_count: number
           format: string
           id?: string
           invalid_count?: number
           owner_id: string
           ready_count?: number
+          restore_origin_checksum?: string | null
+          restored_from_backup?: boolean
           schema_version: number
           source_fingerprint: string
           source_name?: string | null
@@ -449,12 +455,15 @@ export type Database = {
           created_at?: string
           dry_run_summary?: Json
           duplicate_count?: number
+          execution_locked?: boolean
           expected_item_count?: number
           format?: string
           id?: string
           invalid_count?: number
           owner_id?: string
           ready_count?: number
+          restore_origin_checksum?: string | null
+          restored_from_backup?: boolean
           schema_version?: number
           source_fingerprint?: string
           source_name?: string | null
@@ -1205,11 +1214,24 @@ export type Database = {
         Args: { p_items: Json; p_job_id: string }
         Returns: Json
       }
+      append_import_job_items_unlocked: {
+        Args: { p_items: Json; p_job_id: string }
+        Returns: Json
+      }
       append_restore_job_records: {
         Args: { p_job_id: string; p_records: Json }
         Returns: Json
       }
+      assert_import_item_job_unlocked: {
+        Args: { p_item_id: string }
+        Returns: undefined
+      }
+      assert_import_job_unlocked: {
+        Args: { p_job_id: string }
+        Returns: undefined
+      }
       cancel_import_job: { Args: { p_job_id: string }; Returns: Json }
+      cancel_import_job_unlocked: { Args: { p_job_id: string }; Returns: Json }
       cancel_restore_job: { Args: { p_job_id: string }; Returns: Json }
       create_import_job: {
         Args: {
@@ -1306,10 +1328,25 @@ export type Database = {
         Returns: Json
       }
       finalize_import_job: { Args: { p_job_id: string }; Returns: Json }
+      finalize_import_job_unlocked: {
+        Args: { p_job_id: string }
+        Returns: Json
+      }
       finalize_restore_job: { Args: { p_job_id: string }; Returns: Json }
       get_import_job: { Args: { p_job_id: string }; Returns: Json }
       get_import_job_items: { Args: { p_job_id: string }; Returns: Json }
+      get_import_job_v1: { Args: { p_job_id: string }; Returns: Json }
       get_import_jobs: {
+        Args: {
+          p_created_from?: string
+          p_created_to?: string
+          p_limit?: number
+          p_source_name?: string
+          p_status?: string
+        }
+        Returns: Json
+      }
+      get_import_jobs_v1: {
         Args: {
           p_created_from?: string
           p_created_to?: string
@@ -1345,11 +1382,16 @@ export type Database = {
       get_restore_jobs: { Args: { p_limit?: number }; Returns: Json }
       get_user_backup_estimate: { Args: { p_profile?: string }; Returns: Json }
       get_user_backup_snapshot: { Args: { p_profile?: string }; Returns: Json }
+      get_user_backup_snapshot_v1: {
+        Args: { p_profile?: string }
+        Returns: Json
+      }
       import_content_post: { Args: { p_item: Json }; Returns: Json }
       import_job_safe_error: {
         Args: { p_error: string; p_stage: string }
         Returns: Json
       }
+      import_job_write_is_restore: { Args: never; Returns: boolean }
       import_news_tracking_for_post: {
         Args: { p_post_id: string; p_tracking: Json }
         Returns: Json
@@ -1400,6 +1442,13 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      restore_apply_import_record: {
+        Args: {
+          p_backup_checksum: string
+          p_record: Database["public"]["Tables"]["restore_job_records"]["Row"]
+        }
+        Returns: string
+      }
       restore_apply_record: {
         Args: {
           p_preserve: boolean
@@ -1408,11 +1457,43 @@ export type Database = {
         Returns: string
       }
       restore_canonical_json: { Args: { p_value: Json }; Returns: string }
+      restore_import_attempt_exact: {
+        Args: {
+          p_record: Database["public"]["Tables"]["restore_job_records"]["Row"]
+        }
+        Returns: boolean
+      }
+      restore_import_error_is_safe: {
+        Args: { p_value: string }
+        Returns: boolean
+      }
+      restore_import_item_exact: {
+        Args: {
+          p_record: Database["public"]["Tables"]["restore_job_records"]["Row"]
+        }
+        Returns: boolean
+      }
+      restore_import_item_payload_valid: {
+        Args: { p_fingerprint: string; p_payload: Json }
+        Returns: boolean
+      }
+      restore_import_job_exact: {
+        Args: { p: Json; p_owner: string; p_target: string }
+        Returns: boolean
+      }
+      restore_import_payload_is_safe: {
+        Args: { p_value: Json }
+        Returns: boolean
+      }
       restore_job_json: { Args: { p_job_id: string }; Returns: Json }
       restore_payload_fingerprint: { Args: { p_value: Json }; Returns: string }
       restore_payload_has_forbidden_key: {
         Args: { p_value: Json }
         Returns: boolean
+      }
+      restore_planned_target: {
+        Args: { p_job_id: string; p_section: string; p_source_id: string }
+        Returns: string
       }
       restore_safe_error: { Args: { p_message: string }; Returns: Json }
       restore_target: {
@@ -1423,6 +1504,10 @@ export type Database = {
         Args: { p_section: string; p_target: string }
         Returns: boolean
       }
+      restore_validate_import_history_plan: {
+        Args: { p_job: Database["public"]["Tables"]["restore_jobs"]["Row"] }
+        Returns: undefined
+      }
       restore_verify_existing: {
         Args: {
           p_record: Database["public"]["Tables"]["restore_job_records"]["Row"]
@@ -1430,6 +1515,10 @@ export type Database = {
         Returns: boolean
       }
       resume_cancelled_import_job: { Args: { p_job_id: string }; Returns: Json }
+      resume_cancelled_import_job_unlocked: {
+        Args: { p_job_id: string }
+        Returns: Json
+      }
       resume_cancelled_restore_job: {
         Args: { p_job_id: string }
         Returns: Json
@@ -1438,7 +1527,15 @@ export type Database = {
         Args: { p_job_item_id: string }
         Returns: Json
       }
+      run_import_job_item_content_unlocked: {
+        Args: { p_job_item_id: string }
+        Returns: Json
+      }
       run_import_job_item_tracking: {
+        Args: { p_job_item_id: string }
+        Returns: Json
+      }
+      run_import_job_item_tracking_unlocked: {
         Args: { p_job_item_id: string }
         Returns: Json
       }

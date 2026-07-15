@@ -148,11 +148,14 @@ export async function buildRestorePlan(input: BuildRestorePlanInput): Promise<Re
 
   actions.sort((left, right) => restoreRecordKey(left.section, left.sourceId).localeCompare(restoreRecordKey(right.section, right.sourceId)))
   const graph = buildRestoreExecutionGraph(input.bundle, actions); issues.push(...graph.issues)
+  const executionStages = input.policies.operationalHistory === 'exclude'
+    ? graph.stages.filter((stage) => !operationalSections.has(stage.name))
+    : graph.stages
   const planBase = {
     format: RESTORE_PLAN_FORMAT, schemaVersion: RESTORE_PLAN_SCHEMA_VERSION, planVersion: RESTORE_PLAN_VERSION, status: 'ready' as const, createdAt,
     backup: { format: input.bundle.format, schemaVersion: input.bundle.schemaVersion, profile: input.bundle.profile, checksum: input.bundle.checksum.value, exportedAt: input.bundle.exportedAt },
     analysis: { fingerprint: analysisFingerprint, createdAt, databaseLookupStatus: input.lookup.databaseCheck, recheckRequiredBeforeExecution: true as const },
-    policies: structuredClone(input.policies), categoryMappings: category.mappings, recordActions: actions, idMap, executionStages: graph.stages,
+    policies: structuredClone(input.policies), categoryMappings: category.mappings, recordActions: actions, idMap, executionStages,
     summary: summary(actions, category.mappings, input.bundle.profile, input.policies.operationalHistory), issues: [] as RestorePlanIssue[],
   }
   const provisional = { ...planBase, fingerprint: { algorithm: RESTORE_PLAN_CHECKSUM_ALGORITHM, value: '0'.repeat(64) } } as RestorePlan

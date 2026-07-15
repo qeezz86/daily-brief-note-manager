@@ -42,6 +42,9 @@ export interface ImportJobListItem {
   createdAt: string
   startedAt: string | null
   completedAt: string | null
+  restoredFromBackup?: boolean
+  executionLocked?: boolean
+  restoreOriginChecksum?: string | null
 }
 
 export interface ImportJobDetail extends ImportJobListItem {

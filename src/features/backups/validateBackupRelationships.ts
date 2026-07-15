@@ -88,7 +88,7 @@ export function validateBackupRelationships(
     ['newsUpdates', data.newsUpdates.map((row) => `${row.postId}|${row.itemOrder}`)],
     ['sources', data.sources.map((row) => `${row.postId}|${row.sortOrder}`)],
     ['importJobItems', (data.importJobItems ?? []).map((row) => `${row.jobId}|${row.itemIndex}`)],
-    ['importJobItemAttempts', (data.importJobItemAttempts ?? []).map((row) => `${row.jobItemId}|${row.attemptNo}`)],
+    ['importJobItemAttempts', (data.importJobItemAttempts ?? []).map((row) => `${row.jobItemId}|${row.stage}|${row.attemptNo}`)],
   ]
   compositeSections.forEach(([section, keys]) => {
     const seen = new Set<string>()

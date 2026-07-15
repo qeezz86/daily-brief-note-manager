@@ -4,6 +4,7 @@ import {
   BACKUP_FORMAT,
   BACKUP_SCHEMA_VERSION,
 } from './backup.constants'
+import { backupRestoreSectionSchemas } from './backupRestore.schema'
 
 const profileSchema = z.enum(['core', 'full'])
 const id = z.string().uuid()
@@ -36,9 +37,9 @@ const backupDataSchema = z.object({
   newsUpdates: z.array(row({ id, postId: id, topicId: id, previousUpdateId: id.nullable(), itemOrder: z.number().int().positive() })),
   newsFollowups: z.array(row({ id, topicId: id, createdAt: z.string() })),
   generatedPrompts: z.array(row({ id, categoryId: z.string(), contextSnapshot: z.unknown(), generatedAt: z.string() })),
-  importJobs: z.array(row({ id, createdAt: z.string() })).optional(),
-  importJobItems: z.array(row({ id, jobId: id, postId: id.nullable(), itemIndex: z.number().int().nonnegative(), normalizedPayload: z.unknown() })).optional(),
-  importJobItemAttempts: z.array(row({ id, jobItemId: id, attemptNo: z.number().int().positive() })).optional(),
+  importJobs: backupRestoreSectionSchemas.importJobs.optional(),
+  importJobItems: backupRestoreSectionSchemas.importJobItems.optional(),
+  importJobItemAttempts: backupRestoreSectionSchemas.importJobItemAttempts.optional(),
 }).strict()
 
 export const backupEstimateSchema = z.object({

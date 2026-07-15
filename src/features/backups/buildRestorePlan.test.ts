@@ -19,7 +19,7 @@ describe('buildRestorePlan', () => {
     expect(result.status).toBe('ready')
     expect(result.recordActions.find((item) => item.section === 'posts')?.action).toBe('preserve_id')
     expect(result.idMap.posts[bundle.data.posts[0].id].targetId).toBe(bundle.data.posts[0].id)
-    expect(result.executionStages.map((stage) => stage.name)).toEqual(['tags', 'posts', 'metadata', 'postTags', 'seriesCounters', 'newsTopics', 'newsStatusHistory', 'newsUpdates', 'newsUpdatePreviousLinks', 'sources', 'newsFollowups', 'generatedPrompts', 'importJobs', 'importJobItems', 'importJobItemAttempts'])
+    expect(result.executionStages.map((stage) => stage.name)).toEqual(['tags', 'posts', 'metadata', 'postTags', 'seriesCounters', 'newsTopics', 'newsStatusHistory', 'newsUpdates', 'newsUpdatePreviousLinks', 'sources', 'newsFollowups', 'generatedPrompts'])
     expect((await validateRestorePlan(result, bundle)).valid).toBe(true)
   })
   it('ID conflict를 결정적으로 remap하며 정책 변경 시 차단한다', async () => {
@@ -48,9 +48,9 @@ describe('buildRestorePlan', () => {
   })
   it('full operational history를 기본 제외하고 선택 시 포함한다', async () => {
     const bundle = await backupRestoreBundleFixture('full')
-    const excluded = await plan(bundle); expect(excluded.summary.operationalHistory).toBe('excluded'); expect(excluded.recordActions.find((item) => item.section === 'importJobs')?.action).toBe('skip')
+    const excluded = await plan(bundle); expect(excluded.summary.operationalHistory).toBe('excluded'); expect(excluded.recordActions.find((item) => item.section === 'importJobs')?.action).toBe('skip'); expect(excluded.executionStages.map((stage) => stage.name)).not.toContain('importJobs')
     const include = policies(); include.operationalHistory = 'include'
-    const included = await plan(bundle, [], include); expect(included.summary.operationalHistory).toBe('included'); expect(included.recordActions.find((item) => item.section === 'importJobs')?.action).toBe('preserve_id')
+    const included = await plan(bundle, [], include); expect(included.summary.operationalHistory).toBe('included'); expect(included.recordActions.find((item) => item.section === 'importJobs')?.action).toBe('preserve_id'); expect(included.executionStages.map((stage) => stage.name)).toEqual(expect.arrayContaining(['importJobs', 'importJobItems', 'importJobItemAttempts']))
   })
   it('비활성 category와 pattern 정책을 적용한다', async () => {
     const bundle = await backupRestoreBundleFixture(); const categories = currentCategoriesFromBundle(bundle); categories[0].enabled = false; categories[0].wrapperClass = 'changed'
@@ -94,4 +94,3 @@ describe('buildRestorePlan', () => {
     expect(json).toContain('recheckRequiredBeforeExecution')
   })
 })
-

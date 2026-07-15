@@ -7,6 +7,7 @@ import { verifyBackupChecksum, BackupChecksumUnavailableError } from './calculat
 import { compareCategoryManifest } from './compareCategoryManifest'
 import { scanBackupForSecrets } from './scanBackupForSecrets'
 import { validateBackupRelationships } from './validateBackupRelationships'
+import { validateImportHistory } from './validateImportHistory'
 import { backupCategoryRestoreSchema, backupRestoreDataSchema, backupRestoreSectionSchemas, type BackupRestoreSectionName } from './backupRestore.schema'
 import type {
   BackupCategoryManifestEntry,
@@ -174,6 +175,8 @@ export async function validateBackupForRestore(
   }
   const relationships = validateBackupRelationships(snapshot)
   relationships.issues.forEach((problem) => addIssue(issues, problem.code, 'error', problem.message, `$.data.${problem.section}`, problem.section))
+  const importHistoryIssues = await validateImportHistory(snapshot, options.cryptoApi)
+  importHistoryIssues.forEach((problem) => addIssue(issues, problem.code, 'error', problem.message, `$.data.${problem.section}`, problem.section))
   const differences = compareCategoryManifest(bundle.manifest.categoryManifest as BackupCategoryManifestEntry[], options.currentCategories, referencedCategoryIds(bundle))
   differences.forEach((difference) => addIssue(issues, difference.severity === 'error' ? 'BACKUP_CATEGORY_INCOMPATIBLE' : 'BACKUP_CATEGORY_DIFFERENCE', difference.severity, difference.message, `$.manifest.categoryManifest.${difference.categoryId}.${difference.field}`, 'categoryManifest'))
   if (bundle.profile === 'full') addIssue(issues, 'BACKUP_FULL_OPERATIONAL_HISTORY', 'warning', 'full profile에는 Import operational history가 포함되어 복원 정책 확인이 필요합니다.', '$.profile', 'profile')

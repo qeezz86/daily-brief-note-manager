@@ -43,6 +43,18 @@ describe('BackupRestoreExecutePage', () => {
     expect(screen.getByText('생성 예정').nextSibling).toHaveTextContent('7'); expect(screen.getByText('counter').nextSibling).toHaveTextContent('1')
   })
   it('실제 준비 record count를 표시한다', async () => { view(); await validateFiles(); expect(await screen.findByText('전체 실행 record')).toHaveProperty('nextSibling.textContent', '9') })
+  it('full include 계획은 운영 이력 수와 실행 잠금·core 유지 정책을 표시한다', async () => {
+    const fullBundle = { ...bundle, profile: 'full' } as ValidatedBackupBundle
+    const fullPlan = { ...plan, backup: { ...plan.backup, profile: 'full' }, policies: { operationalHistory: 'include' }, summary: { ...plan.summary, sectionCounts: { ...plan.summary.sectionCounts, importJobs: 2, importJobItems: 3, importJobItemAttempts: 4 } } } as unknown as RestorePlan
+    mocks.validate.mockResolvedValue({ valid: true, issues: [], bundle: fullBundle, plan: fullPlan, categories: [] })
+    view(); await validateFiles()
+    expect(await screen.findByRole('heading', { name: 'Import 운영 이력' })).toBeInTheDocument()
+    expect(screen.getByText('Import job').nextSibling).toHaveTextContent('2')
+    expect(screen.getByText('Import item').nextSibling).toHaveTextContent('3')
+    expect(screen.getByText('Import attempt').nextSibling).toHaveTextContent('4')
+    expect(screen.getByText(/신규 운영 이력은 실행 잠금 상태로 복원/)).toBeInTheDocument()
+    expect(screen.getByText(/운영 stage가 실패해도 완료된 core 데이터는 유지/)).toBeInTheDocument()
+  })
   it.each(['기존 row를 overwrite하지 않습니다.', '완료 stage는 자동 rollback되지 않습니다.', '수동 retry합니다.', '브라우저가 닫혀 있으면 실행되지 않습니다.', '운영 Import 이력과 restore undo는 지원하지 않습니다.', '이미 생성된 row는 유지합니다.'])('%s 안내를 표시한다', async (message) => { view(); await validateFiles(); expect(await screen.findByText(new RegExp(message.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))).toBeInTheDocument() })
   it('RESTORE 문자열 불일치 시 job 생성을 차단한다', async () => {
     view(); await validateFiles(); const button = await screen.findByRole('button', { name: '영구 restore job 생성' }); await userEvent.type(screen.getByLabelText('계속하려면 RESTORE 입력'), 'restore'); expect(button).toBeDisabled(); expect(mocks.prepare).not.toHaveBeenCalled()

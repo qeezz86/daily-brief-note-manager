@@ -37,7 +37,7 @@ select is((select value->>'status' from restore_one),'preparing','12 job starts 
 select is((select owner_id from public.restore_jobs where id=(select (value->>'jobId')::uuid from restore_one)),'00000000-0000-0000-0000-000000004c01'::uuid,'13 owner injected from auth');
 select is((public.test_restore_job(repeat('a',64),2)->>'isExisting'),'true','14 same checksum and plan returns existing');
 select throws_ok($$ select public.create_restore_job('daily-brief-note-backup',1,'wrong',repeat('b',64),'daily-brief-note-restore-plan',1,1,repeat('b',64),repeat('f',64),'ready','x','{"operationalHistory":"exclude"}','[]','[]',1) $$,'23514','RESTORE_INVALID_PAYLOAD','15 invalid profile blocked');
-select throws_ok($$ select public.create_restore_job('daily-brief-note-backup',1,'full',repeat('b',64),'daily-brief-note-restore-plan',1,1,repeat('b',64),repeat('f',64),'ready','x','{"operationalHistory":"include"}','[]','[]',1) $$,'23514','RESTORE_OPERATIONAL_HISTORY_BLOCKED','16 operational include blocked');
+select lives_ok($$ select public.create_restore_job('daily-brief-note-backup',1,'full',repeat('b',64),'daily-brief-note-restore-plan',1,1,repeat('b',64),repeat('f',64),'ready','x','{"operationalHistory":"include"}','[]','[]',1) $$,'16 full operational include accepted');
 
 select is((public.append_restore_job_records((select (value->>'jobId')::uuid from restore_one),jsonb_build_array(
  public.test_restore_record('tag-one','4c100000-0000-0000-0000-000000000001',1),

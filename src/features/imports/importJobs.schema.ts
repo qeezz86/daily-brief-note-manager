@@ -9,6 +9,8 @@ export const importJobListItemSchema = z.object({
   totalCount: z.number().int().nonnegative(), completedCount: z.number().int().nonnegative(), successCount: z.number().int().nonnegative(),
   failedCount: z.number().int().nonnegative(), pendingCount: z.number().int().nonnegative(),
   progressPercent: z.number().nonnegative(), createdAt: z.string(), startedAt: nullableTimestamp, completedAt: nullableTimestamp,
+  restoredFromBackup: z.boolean().default(false), executionLocked: z.boolean().default(false),
+  restoreOriginChecksum: z.string().regex(/^[0-9a-f]{64}$/).nullable().default(null),
 }).strict()
 
 export const importJobDetailSchema = importJobListItemSchema.extend({

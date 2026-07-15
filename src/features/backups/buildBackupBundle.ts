@@ -13,6 +13,7 @@ import { canonicalizeBackup } from './canonicalizeBackup'
 import { createBackupFileName } from './createBackupFileName'
 import { scanBackupForSecrets } from './scanBackupForSecrets'
 import { validateBackupRelationships } from './validateBackupRelationships'
+import { validateImportHistory } from './validateImportHistory'
 
 export class BackupBuildError extends Error {
   constructor(
@@ -34,6 +35,10 @@ export async function buildBackupBundle(
   const relationshipValidation = validateBackupRelationships(snapshot)
   if (!relationshipValidation.valid) {
     throw new BackupBuildError('relationship', '백업 데이터 관계 무결성 검사를 통과하지 못했습니다.')
+  }
+  const importHistoryIssues = await validateImportHistory(snapshot, options.cryptoApi)
+  if (importHistoryIssues.length) {
+    throw new BackupBuildError('relationship', 'Import 운영 이력 무결성 검사를 통과하지 못했습니다.')
   }
   if (scanBackupForSecrets(snapshot).length) {
     throw new BackupBuildError('secret', '백업 데이터에서 민감정보가 감지되었습니다.')

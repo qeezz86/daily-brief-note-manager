@@ -19,6 +19,7 @@ const messages: Record<string, string> = {
   IMPORT_JOB_CONTENT_REQUIRED: '콘텐츠 단계가 성공한 뒤 tracking을 실행할 수 있습니다.',
   IMPORT_JOB_NOT_FOUND: 'Import 작업을 찾을 수 없습니다.',
   IMPORT_JOB_ITEM_NOT_FOUND: 'Import 항목을 찾을 수 없습니다.',
+  IMPORT_JOB_EXECUTION_LOCKED: '백업에서 복원된 과거 Import 이력은 다시 실행할 수 없습니다.',
 }
 
 export function mapImportJobError(error: unknown) {

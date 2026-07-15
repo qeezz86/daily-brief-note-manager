@@ -26,4 +26,23 @@ describe('Import job UI components', () => {
   it('시도 기록을 펼쳐 stage와 번호를 표시한다', async () => { render(<MemoryRouter><ImportJobItemList items={[item()]} /></MemoryRouter>); await userEvent.click(screen.getByText('시도 기록 1개')); expect(screen.getByText(/tracking #1/)).toBeInTheDocument() })
   it('제목과 external key로 검색한다', async () => { render(<MemoryRouter><ImportJobItemList items={[item(), item({ id: '00000000-0000-0000-0000-000000000021', itemIndex: 1, title: '두 번째 뉴스', externalKey: 'external-two' })]} /></MemoryRouter>); await userEvent.type(screen.getByPlaceholderText('제목 또는 external key'), '두 번째'); expect(screen.queryByText(/1\. 첫 번째 뉴스/)).not.toBeInTheDocument(); expect(screen.getByText(/2\. 두 번째 뉴스/)).toBeInTheDocument() })
   it('payload snapshot과 HTML 원문은 렌더링하지 않는다', () => { render(<MemoryRouter><ImportJobItemList items={[item()]} /></MemoryRouter>); expect(screen.getByText(/snapshot 원문과 HTML은/)).toBeInTheDocument(); expect(document.body.textContent).not.toContain('<div class=') })
+  it('복원된 작업 목록에 badge, 실행 잠금과 origin checksum을 표시한다', () => {
+    render(<MemoryRouter><ImportJobList jobs={[{ ...listJob, restoredFromBackup: true, executionLocked: true, restoreOriginChecksum: 'c'.repeat(64) }]} /></MemoryRouter>)
+    expect(screen.getByText(/completed_with_errors · 복원된 과거 이력/)).toBeInTheDocument()
+    expect(screen.getByText(/실행 잠금 · origin cccccccccccc…/)).toBeInTheDocument()
+  })
+  it('일반 작업 목록에는 복원 badge와 실행 잠금을 표시하지 않는다', () => {
+    render(<MemoryRouter><ImportJobList jobs={[listJob]} /></MemoryRouter>)
+    expect(screen.queryByText(/복원된 과거 이력/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/실행 잠금/)).not.toBeInTheDocument()
+  })
+  it('실행 잠금 작업은 안내만 표시하고 모든 실행 액션을 숨긴다', () => {
+    const handlers = { onExecute: vi.fn(), onCancel: vi.fn(), onResume: vi.fn() }
+    render(<ImportJobActions job={{ ...detail, executionLocked: true, restoredFromBackup: true, restoreOriginChecksum: 'c'.repeat(64) }} busy={false} {...handlers} />)
+    expect(screen.getByText('복원된 과거 이력')).toBeInTheDocument()
+    expect(screen.getByText(/콘텐츠와 tracking을 다시 실행할 수 없습니다/)).toBeInTheDocument()
+    for (const name of ['계속 실행', '실패 항목 재시도', '콘텐츠 실패 재시도', 'tracking 실패 재시도', '작업 취소', '취소된 작업 재개']) {
+      expect(screen.queryByRole('button', { name })).not.toBeInTheDocument()
+    }
+  })
 })

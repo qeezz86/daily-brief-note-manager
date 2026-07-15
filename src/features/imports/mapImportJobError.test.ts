@@ -17,6 +17,7 @@ describe('mapImportJobError', () => {
     ['IMPORT_JOB_CONTENT_REQUIRED', '콘텐츠 단계'],
     ['IMPORT_JOB_NOT_FOUND', '작업을 찾을 수 없습니다'],
     ['IMPORT_JOB_ITEM_NOT_FOUND', '항목을 찾을 수 없습니다'],
+    ['IMPORT_JOB_EXECUTION_LOCKED', '백업에서 복원된 과거 Import 이력'],
   ])('%s를 안정적인 한국어 오류로 변환한다', (code, message) => {
     const error = mapImportJobError({ code: '22023', message: `raw ${code} constraint_secret` })
     expect(error.errorCode).toBe(code)

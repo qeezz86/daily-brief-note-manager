@@ -70,7 +70,7 @@ export function ImportJobDetailPageContent({ client = supabase, userId = '', job
   if (!jobQuery.data) return <div className="content-state"><h1>Import 작업을 찾을 수 없습니다</h1><Link to="/imports/history">작업 이력으로</Link></div>
   const job = jobQuery.data
   return <section className="content-page" aria-labelledby="import-job-detail-title">
-    <div className="content-page__heading"><div><p className="dashboard__eyebrow">{job.status}</p><h1 id="import-job-detail-title">{job.sourceName ?? '이름 없는 Import 작업'}</h1><p>{job.sourceFingerprint} · schema v{job.schemaVersion}</p></div><Link className="secondary-button" to="/imports/history">작업 이력</Link></div>
+    <div className="content-page__heading"><div><p className="dashboard__eyebrow">{job.status}{job.restoredFromBackup ? ' · 복원된 과거 이력' : ''}</p><h1 id="import-job-detail-title">{job.sourceName ?? '이름 없는 Import 작업'}</h1><p>{job.sourceFingerprint} · schema v{job.schemaVersion}</p>{job.executionLocked ? <p>실행 잠금 · restore origin {job.restoreOriginChecksum?.slice(0, 12) ?? '-'}…</p> : null}</div><Link className="secondary-button" to="/imports/history">작업 이력</Link></div>
     {message ? <p className="form-alert" role="status">{message}</p> : null}
     {progress ? <p role="status">{progress.currentTitle ?? '상태 갱신 중'} · {progress.completed}/{progress.total}</p> : null}
     <ImportJobProgress job={job} />

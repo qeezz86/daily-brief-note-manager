@@ -54,11 +54,13 @@ fingerprint 입력은 plan version, backup metadata/checksum, DB analysis finger
 
 blocked 또는 stale 계획은 복사·다운로드할 수 없다. Phase 4B-4는 실행 직전에 현재 DB 분석과 remap target 충돌을 다시 확인해야 한다.
 
-## 8. Phase 4B-4A 실행 계약
+## 8. Phase 4B-4A·4B 실행 계약
 
 - 실행 가능한 plan은 `status: ready`, 정상 SHA-256 fingerprint, `analysis.databaseLookupStatus: complete`여야 한다.
-- `policies.operationalHistory`는 `exclude`여야 하며 warning·blocked·stale 계획은 실행하지 않는다.
+- core profile의 `policies.operationalHistory`는 `exclude`여야 한다. full profile은 `exclude` 또는 `include`를 지원하며 warning·blocked·stale 계획은 실행하지 않는다.
 - 실행 직전에 같은 정책과 최신 RLS 범위 DB 결과로 계획을 다시 만들었을 때 fingerprint가 같아야 한다.
 - 원래 record action은 불변 restore record가 된다. 신규 news update의 `previousUpdateId`는 `newsUpdatePreviousLinks` stage의 제한된 link record로 분리된다.
 - reuse와 skip도 실행 stage에서 exact 상태를 다시 확인한다. target ID가 존재한다는 이유만으로 reuse하지 않는다.
 - plan JSON에는 원문 row를 복제하지 않는다. 실행 payload는 반드시 선택한 원본 backup에서 다시 만든다.
+
+full/include 계획은 세 operational section의 모든 source action과 `importJobs` → `importJobItems` → `importJobItemAttempts` stage를 포함해야 한다. parent job/item, nullable post ID map, source fingerprint와 target UUID를 최신 DB 결과로 다시 확인한다. preserve/remap 신규 job은 실행 잠금되고 exact reuse/skip 기존 row는 수정하지 않는다. exclude 계획에는 operational stage를 만들지 않는다.

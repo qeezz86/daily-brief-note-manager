@@ -4,6 +4,7 @@ import type { RestoreExecutionStage, RestorePlanIssue, RestoreRecordPlan } from 
 import type { ValidatedBackupBundle } from './backupRestore.types'
 
 const active = new Set(['create', 'preserve_id', 'remap_id'])
+const staged = new Set(['create', 'preserve_id', 'remap_id', 'reuse_existing', 'skip'])
 
 export function topologicalNewsUpdateIds(bundle: ValidatedBackupBundle): { ids: string[]; issues: RestorePlanIssue[] } {
   const rows = bundle.data.newsUpdates
@@ -38,7 +39,7 @@ export function topologicalNewsUpdateIds(bundle: ValidatedBackupBundle): { ids: 
 export function buildRestoreExecutionGraph(bundle: ValidatedBackupBundle, actions: RestoreRecordPlan[]) {
   const topology = topologicalNewsUpdateIds(bundle)
   const bySection = new Map<string, RestoreRecordPlan[]>()
-  actions.filter((action) => active.has(action.action)).forEach((action) => bySection.set(action.section, [...(bySection.get(action.section) ?? []), action]))
+  actions.filter((action) => staged.has(action.action)).forEach((action) => bySection.set(action.section, [...(bySection.get(action.section) ?? []), action]))
   const metadata = ['seoData', 'aiMetadata', 'infoDbMetadata', 'chineseMetadata']
   const stageSections: Record<string, string[]> = {
     tags: ['tags'], posts: ['posts'], metadata, postTags: ['postTags'], seriesCounters: ['seriesCounters'], newsTopics: ['newsTopics'],
