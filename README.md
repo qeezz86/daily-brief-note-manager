@@ -2,9 +2,9 @@
 
 Daily Brief Note의 콘텐츠, SEO 정보, 출처, 뉴스 추적 이력과 생성 프롬프트를 관리하기 위한 비공개 웹앱입니다.
 
-현재 저장소는 Phase 4B-3 단계입니다. `/backups`에서 현재 인증 사용자의 공식 `core`·`full` JSON 백업을 생성하고, `/backups/restore`에서 checksum·schema·관계·category 호환성과 현재 DB 충돌 후보를 read-only Dry Run으로 검사한 뒤 실행 가능한 복원 계획을 만들 수 있습니다. 계획은 preserve·deterministic UUID v5 remap·reuse·skip·block 정책, category mapping, 관계 ID map, dependency stage, 예상 집계와 SHA-256 fingerprint를 포함합니다. 실제 복원과 DB 쓰기는 아직 수행하지 않습니다.
+현재 저장소는 Phase 4B-4A 단계입니다. `/backups`에서 공식 `core`·`full` JSON 백업을 생성하고, `/backups/restore`에서 read-only Dry Run과 결정적 복원 계획을 만든 뒤 `/backups/restore/execute`에서 원본 backup과 plan을 다시 검증해 core 데이터를 실제 복원할 수 있습니다. `/backups/restore/jobs`는 영구 job·record·attempt, stage 진행률, 수동 retry, 취소·재개를 제공합니다.
 
-복원 계획은 원본 백업과 분리된 `daily-brief-note-restore-plan` schema version 1 JSON입니다. 전체 HTML, prompt text, Import normalized payload, owner ID와 인증 정보는 계획에 복제하지 않습니다. blocked 또는 stale 계획은 복사·다운로드할 수 없고, Phase 4B-4 실행 직전에 DB 충돌 상태를 반드시 다시 확인해야 합니다. overwrite, 기존 row update, unique suffix, slug·series number·topic key 자동 변경은 지원하지 않습니다.
+복원 계획은 원본 백업과 분리된 `daily-brief-note-restore-plan` schema version 1 JSON입니다. 실행에는 두 파일이 모두 필요하고 checksum·fingerprint·category·DB 충돌을 직전에 다시 확인합니다. record별 transaction이므로 부분 성공할 수 있으며 브라우저가 닫혀 있는 동안 자동 실행하지 않습니다. 기존 row overwrite, 자동 suffix, restore undo와 운영 Import 이력 복원은 지원하지 않습니다. 허용되는 기존 row 변경은 series counter의 단조 증가와 이번 job이 만든 뉴스 update의 previous 연결 완성으로 제한됩니다.
 
 ## 요구 환경
 

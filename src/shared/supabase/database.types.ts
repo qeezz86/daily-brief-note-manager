@@ -828,6 +828,217 @@ export type Database = {
           },
         ]
       }
+      restore_job_record_attempts: {
+        Row: {
+          attempt_no: number
+          completed_at: string | null
+          id: string
+          owner_id: string
+          restore_job_record_id: string
+          retryable: boolean | null
+          safe_error_code: string | null
+          safe_error_message: string | null
+          started_at: string
+          status: string
+        }
+        Insert: {
+          attempt_no: number
+          completed_at?: string | null
+          id?: string
+          owner_id: string
+          restore_job_record_id: string
+          retryable?: boolean | null
+          safe_error_code?: string | null
+          safe_error_message?: string | null
+          started_at?: string
+          status: string
+        }
+        Update: {
+          attempt_no?: number
+          completed_at?: string | null
+          id?: string
+          owner_id?: string
+          restore_job_record_id?: string
+          retryable?: boolean | null
+          safe_error_code?: string | null
+          safe_error_message?: string | null
+          started_at?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "restore_job_record_attempts_restore_job_record_id_owner_id_fkey"
+            columns: ["restore_job_record_id", "owner_id"]
+            isOneToOne: false
+            referencedRelation: "restore_job_records"
+            referencedColumns: ["id", "owner_id"]
+          },
+        ]
+      }
+      restore_job_records: {
+        Row: {
+          action: string
+          attempt_count: number
+          completed_at: string | null
+          created_at: string
+          dependencies: Json
+          error_code: string | null
+          error_message: string | null
+          id: string
+          job_id: string
+          owner_id: string
+          payload: Json
+          payload_fingerprint: string
+          retryable: boolean | null
+          safe_display: string
+          section: string
+          sequence_no: number
+          source_id: string
+          stage_key: string
+          stage_order: number
+          started_at: string | null
+          status: string
+          target_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          action: string
+          attempt_count?: number
+          completed_at?: string | null
+          created_at?: string
+          dependencies?: Json
+          error_code?: string | null
+          error_message?: string | null
+          id?: string
+          job_id: string
+          owner_id: string
+          payload: Json
+          payload_fingerprint: string
+          retryable?: boolean | null
+          safe_display?: string
+          section: string
+          sequence_no: number
+          source_id: string
+          stage_key: string
+          stage_order: number
+          started_at?: string | null
+          status?: string
+          target_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          action?: string
+          attempt_count?: number
+          completed_at?: string | null
+          created_at?: string
+          dependencies?: Json
+          error_code?: string | null
+          error_message?: string | null
+          id?: string
+          job_id?: string
+          owner_id?: string
+          payload?: Json
+          payload_fingerprint?: string
+          retryable?: boolean | null
+          safe_display?: string
+          section?: string
+          sequence_no?: number
+          source_id?: string
+          stage_key?: string
+          stage_order?: number
+          started_at?: string | null
+          status?: string
+          target_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "restore_job_records_job_id_owner_id_fkey"
+            columns: ["job_id", "owner_id"]
+            isOneToOne: false
+            referencedRelation: "restore_jobs"
+            referencedColumns: ["id", "owner_id"]
+          },
+        ]
+      }
+      restore_jobs: {
+        Row: {
+          analysis_fingerprint: string
+          backup_checksum: string
+          backup_format: string
+          backup_profile: string
+          backup_schema_version: number
+          cancelled_at: string | null
+          category_mappings: Json
+          completed_at: string | null
+          created_at: string
+          current_stage_key: string | null
+          execution_stages: Json
+          expected_record_count: number
+          id: string
+          owner_id: string
+          plan_fingerprint: string
+          plan_format: string
+          plan_schema_version: number
+          plan_version: number
+          policies: Json
+          source_name: string | null
+          started_at: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          analysis_fingerprint: string
+          backup_checksum: string
+          backup_format: string
+          backup_profile: string
+          backup_schema_version: number
+          cancelled_at?: string | null
+          category_mappings: Json
+          completed_at?: string | null
+          created_at?: string
+          current_stage_key?: string | null
+          execution_stages: Json
+          expected_record_count: number
+          id?: string
+          owner_id: string
+          plan_fingerprint: string
+          plan_format: string
+          plan_schema_version: number
+          plan_version: number
+          policies: Json
+          source_name?: string | null
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          analysis_fingerprint?: string
+          backup_checksum?: string
+          backup_format?: string
+          backup_profile?: string
+          backup_schema_version?: number
+          cancelled_at?: string | null
+          category_mappings?: Json
+          completed_at?: string | null
+          created_at?: string
+          current_stage_key?: string | null
+          execution_stages?: Json
+          expected_record_count?: number
+          id?: string
+          owner_id?: string
+          plan_fingerprint?: string
+          plan_format?: string
+          plan_schema_version?: number
+          plan_version?: number
+          policies?: Json
+          source_name?: string | null
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       seo_data: {
         Row: {
           alternative_titles: Json
@@ -994,7 +1205,12 @@ export type Database = {
         Args: { p_items: Json; p_job_id: string }
         Returns: Json
       }
+      append_restore_job_records: {
+        Args: { p_job_id: string; p_records: Json }
+        Returns: Json
+      }
       cancel_import_job: { Args: { p_job_id: string }; Returns: Json }
+      cancel_restore_job: { Args: { p_job_id: string }; Returns: Json }
       create_import_job: {
         Args: {
           p_dry_run_summary: Json
@@ -1069,7 +1285,28 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      create_restore_job: {
+        Args: {
+          p_analysis_fingerprint: string
+          p_backup_checksum: string
+          p_backup_format: string
+          p_backup_profile: string
+          p_backup_schema_version: number
+          p_category_mappings: Json
+          p_execution_stages: Json
+          p_expected_record_count: number
+          p_plan_fingerprint: string
+          p_plan_format: string
+          p_plan_schema_version: number
+          p_plan_status: string
+          p_plan_version: number
+          p_policies: Json
+          p_source_name: string
+        }
+        Returns: Json
+      }
       finalize_import_job: { Args: { p_job_id: string }; Returns: Json }
+      finalize_restore_job: { Args: { p_job_id: string }; Returns: Json }
       get_import_job: { Args: { p_job_id: string }; Returns: Json }
       get_import_job_items: { Args: { p_job_id: string }; Returns: Json }
       get_import_jobs: {
@@ -1092,6 +1329,20 @@ export type Database = {
         }
         Returns: Json
       }
+      get_restore_job: { Args: { p_job_id: string }; Returns: Json }
+      get_restore_job_records: {
+        Args: {
+          p_action?: string
+          p_job_id: string
+          p_retryable?: boolean
+          p_search?: string
+          p_section?: string
+          p_stage?: string
+          p_status?: string
+        }
+        Returns: Json
+      }
+      get_restore_jobs: { Args: { p_limit?: number }; Returns: Json }
       get_user_backup_estimate: { Args: { p_profile?: string }; Returns: Json }
       get_user_backup_snapshot: { Args: { p_profile?: string }; Returns: Json }
       import_content_post: { Args: { p_item: Json }; Returns: Json }
@@ -1112,6 +1363,10 @@ export type Database = {
         Returns: number
       }
       refresh_import_job_status: {
+        Args: { p_job_id: string; p_owner_id: string }
+        Returns: undefined
+      }
+      refresh_restore_job_status: {
         Args: { p_job_id: string; p_owner_id: string }
         Returns: undefined
       }
@@ -1145,13 +1400,50 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      restore_apply_record: {
+        Args: {
+          p_preserve: boolean
+          p_record: Database["public"]["Tables"]["restore_job_records"]["Row"]
+        }
+        Returns: string
+      }
+      restore_canonical_json: { Args: { p_value: Json }; Returns: string }
+      restore_job_json: { Args: { p_job_id: string }; Returns: Json }
+      restore_payload_fingerprint: { Args: { p_value: Json }; Returns: string }
+      restore_payload_has_forbidden_key: {
+        Args: { p_value: Json }
+        Returns: boolean
+      }
+      restore_safe_error: { Args: { p_message: string }; Returns: Json }
+      restore_target: {
+        Args: { p_job_id: string; p_section: string; p_source_id: string }
+        Returns: string
+      }
+      restore_target_exists: {
+        Args: { p_section: string; p_target: string }
+        Returns: boolean
+      }
+      restore_verify_existing: {
+        Args: {
+          p_record: Database["public"]["Tables"]["restore_job_records"]["Row"]
+        }
+        Returns: boolean
+      }
       resume_cancelled_import_job: { Args: { p_job_id: string }; Returns: Json }
+      resume_cancelled_restore_job: {
+        Args: { p_job_id: string }
+        Returns: Json
+      }
       run_import_job_item_content: {
         Args: { p_job_item_id: string }
         Returns: Json
       }
       run_import_job_item_tracking: {
         Args: { p_job_item_id: string }
+        Returns: Json
+      }
+      run_restore_job_record: {
+        Args: { p_restore_job_record_id: string }
         Returns: Json
       }
       save_ai_publication_bundle: {

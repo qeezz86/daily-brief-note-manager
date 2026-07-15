@@ -34,6 +34,9 @@ import { ImportHistoryPage } from '../pages/ImportHistoryPage'
 import { ImportJobDetailPage } from '../pages/ImportJobDetailPage'
 import { BackupPage } from '../pages/BackupPage'
 import { BackupRestorePage } from '../pages/BackupRestorePage'
+import { BackupRestoreExecutePage } from '../pages/BackupRestoreExecutePage'
+import { BackupRestoreJobsPage } from '../pages/BackupRestoreJobsPage'
+import { BackupRestoreJobDetailPage } from '../pages/BackupRestoreJobDetailPage'
 
 export const routes: RouteObject[] = [
   {
@@ -99,6 +102,9 @@ export const routes: RouteObject[] = [
             path: '/backups/restore/new',
             element: <BackupRestorePage />,
           },
+          { path: '/backups/restore/execute', element: <BackupRestoreExecutePage /> },
+          { path: '/backups/restore/jobs', element: <BackupRestoreJobsPage /> },
+          { path: '/backups/restore/jobs/:jobId', element: <BackupRestoreJobDetailPage /> },
           {
             path: '/content/:postId',
             element: <ContentDetailPage />,

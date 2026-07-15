@@ -53,3 +53,12 @@ fingerprint 입력은 plan version, backup metadata/checksum, DB analysis finger
 계획에는 owner ID·email·인증 정보, 전체 HTML, prompt text, Import normalized payload, 전체 backup data와 raw DB 오류를 포함하지 않는다. 파일 MIME은 `application/json;charset=utf-8`, 파일명은 `daily-brief-note-restore-plan-YYYY-MM-DD-HHmmss.json`이며 시각은 `Asia/Seoul` 기준이다. Blob URL은 다운로드 trigger 뒤 즉시 revoke한다.
 
 blocked 또는 stale 계획은 복사·다운로드할 수 없다. Phase 4B-4는 실행 직전에 현재 DB 분석과 remap target 충돌을 다시 확인해야 한다.
+
+## 8. Phase 4B-4A 실행 계약
+
+- 실행 가능한 plan은 `status: ready`, 정상 SHA-256 fingerprint, `analysis.databaseLookupStatus: complete`여야 한다.
+- `policies.operationalHistory`는 `exclude`여야 하며 warning·blocked·stale 계획은 실행하지 않는다.
+- 실행 직전에 같은 정책과 최신 RLS 범위 DB 결과로 계획을 다시 만들었을 때 fingerprint가 같아야 한다.
+- 원래 record action은 불변 restore record가 된다. 신규 news update의 `previousUpdateId`는 `newsUpdatePreviousLinks` stage의 제한된 link record로 분리된다.
+- reuse와 skip도 실행 stage에서 exact 상태를 다시 확인한다. target ID가 존재한다는 이유만으로 reuse하지 않는다.
+- plan JSON에는 원문 row를 복제하지 않는다. 실행 payload는 반드시 선택한 원본 backup에서 다시 만든다.

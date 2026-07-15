@@ -140,3 +140,9 @@ Dry Run의 local bundle, category compatibility와 RLS가 적용된 DB conflict 
 - Phase 4B-4 실행 직전에 DB 충돌과 remap target을 다시 조회해야 한다.
 
 Phase 4B-3도 read-only다. 실제 row 생성·수정·삭제, counter update, restore job과 transaction은 수행하지 않는다.
+
+## Phase 4B-4A 실행 입력
+
+공식 backup JSON만으로는 실제 복원을 시작할 수 없다. 같은 checksum·profile·schema version을 참조하는 ready restore plan JSON이 함께 필요하다. 실행 화면은 backup checksum과 schema/관계/민감정보를 다시 검증하고 현재 DB 충돌 조회가 `complete`일 때만 불변 record snapshot을 등록한다.
+
+`full` profile의 `importJobs`, `importJobItems`, `importJobItemAttempts`는 Phase 4B-4A 실행 snapshot에 포함하지 않는다. WordPress 외부 asset이나 이미지 파일도 복원하지 않으며 저장된 prompt/ALT text만 post payload의 일부로 취급한다.

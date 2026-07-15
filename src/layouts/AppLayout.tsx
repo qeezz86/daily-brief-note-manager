@@ -32,6 +32,7 @@ export function AppLayout() {
             <NavLink to="/briefing-prompts">브리핑 프롬프트</NavLink>
             <NavLink to="/backups">백업</NavLink>
             <NavLink to="/backups/restore">복원 Dry Run</NavLink>
+            <NavLink to="/backups/restore/jobs">복원 작업</NavLink>
           </nav>
           <div className="app-header__account">
             <span title={user?.email}>{user?.email}</span>

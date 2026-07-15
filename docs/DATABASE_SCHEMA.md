@@ -569,3 +569,11 @@ CSV는 검토와 내보내기 전용이며 전체 관계 복원 형식으로 사
 
 1. `prompt_mode`의 DB 허용값을 check constraint로 강제할지 확정이 필요하다.
 2. 백업 JSON 복구의 테이블별 적용 순서와 관계 remap·reuse·skip 범위는 후속 복구 단계에서 확정해야 한다. 기존 데이터 overwrite 및 update 지원 여부는 별도 schema version과 migration에서 재검토한다.
+
+## Restore execution tables (Phase 4B-4A)
+
+`restore_jobs`는 owner별 backup checksum과 plan fingerprint를 unique하게 저장한다. 상태는 `preparing`, `ready`, `running`, `paused_with_errors`, `completed`, `cancelled`, `failed`다. 정책, category mapping과 execution stage는 job 생성 시 snapshot으로 고정된다.
+
+`restore_job_records`는 section/source별 실행 payload, target, action, dependency, stage/sequence와 상태를 저장한다. payload는 owner/auth 정보와 운영 Import section을 허용하지 않으며 fingerprint가 일치해야 한다. `restore_job_record_attempts`는 안전한 code/message와 retry 가능 여부만 append한다.
+
+세 테이블 모두 compound ownership FK와 RLS를 사용하고 authenticated 사용자에게 자기 row `SELECT`만 허용한다. INSERT·UPDATE·DELETE는 전용 SECURITY DEFINER RPC만 수행하며 PUBLIC·anon 실행 권한은 제거한다. 주요 RPC는 `create_restore_job`, `append_restore_job_records`, `finalize_restore_job`, `run_restore_job_record`, `cancel_restore_job`, `resume_cancelled_restore_job`, `get_restore_jobs`, `get_restore_job`, `get_restore_job_records`다.
