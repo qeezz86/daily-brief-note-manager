@@ -74,6 +74,7 @@ export function BackupPageContent({
         </div>
       </div>
       <div className="backup-notice"><strong>Phase 4B-1</strong><p>복원·덮어쓰기·클라우드 업로드는 포함하지 않습니다. WordPress DB·파일·이미지 백업과도 별개입니다.</p></div>
+      <div className="backup-actions"><a className="secondary-button" href="/backups/restore">백업 파일 검사</a><a className="secondary-button" href="/backups/restore/new">복원 Dry Run</a></div>
       {!client ? <p className="form-alert" role="status">Supabase가 설정되지 않아 백업을 생성할 수 없습니다.</p> : null}
       <BackupProfileSelector value={profile} disabled={busy} onChange={changeProfile} />
       <section className="backup-panel" aria-labelledby="backup-estimate-title">

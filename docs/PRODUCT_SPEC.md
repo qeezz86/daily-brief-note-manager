@@ -1532,15 +1532,20 @@ CSV는 검토와 내보내기 전용이며 전체 관계 복원에 사용하지 
 - followups CSV
 - sources CSV
 
-### 16.2 복구
+### 16.2 Phase 4B-2 복원 Dry Run과 호환성 검사
 
-- Phase 4B-1은 백업 생성·다운로드까지만 구현하며 복구 UI·DB write는 후속 단계다.
-- JSON 가져오기
-- 저장 전 dry-run과 중복 검사
-- 항목별 `insert`, `skip`, `update` 선택
-- `update`는 `id`, `owner_id`, `created_at`을 변경하지 않음
-- 실제 반영 전 dry-run 결과 확인과 명시적 실행
-- 가져오기 결과 로그 표시
+보호 경로 `/backups/restore`와 `/backups/restore/new`는 최대 100 MiB UTF-8 `.json` 파일 또는 JSON text 중 하나를 브라우저에서 읽고 공식 schema version 1 백업의 복원 가능성을 분석한다. 파일은 외부 서버로 업로드하지 않으며 입력 변경 시 이전 결과는 stale 처리하고 제거한다.
+
+- checksum 필드를 제외한 canonical JSON을 Phase 4B-1과 같은 규칙으로 SHA-256 재계산한다. algorithm·hex 형식·값 불일치 또는 Web Crypto 미지원이면 DB 충돌 조회를 수행하지 않는다.
+- core는 14개 필수 section, full은 여기에 세 Import operational section을 더한 17개 section을 독립 Zod schema로 검증한다. profile, section 목록, 실제 배열 길이, `sectionCounts`, `totalRecords`, generated prompt 수, category manifest 수와 operational flag를 재계산한다.
+- 기존 관계 validator를 재사용하고 metadata/category 종류, news post/topic category, previous update, source/update post, 종료 주제와 pending followup, 순서·복합 관계 중복까지 다시 검사한다. 금지 key와 token pattern도 전체 입력에서 재검사한다.
+- category row를 만들거나 수정하지 않는다. 백업 당시 manifest와 현재 설정의 ID·content group·code 차이는 복원 불가, 이름·wrapper·slug/display ID pattern·활성·정렬 차이는 경고로 기록한다.
+- local 검증이 유효할 때만 현재 인증 사용자의 posts, tags, topics, prompts, Import jobs와 관계 후보를 실제 unique key 및 원 UUID 기준으로 조회한다. 조회는 명시적 projection, 기존 RLS와 100개 chunk를 사용하고 owner 인자를 받지 않으며 raw DB 오류를 노출하지 않는다.
+- 후보는 `safe_new`, `exact_same`, `id_conflict`, `key_conflict`, `relation_conflict`, `missing_reference`로 결정적으로 분류한다. 이 단계에서는 새 UUID 또는 remap map을 만들지 않고 preserve·reuse·remap·conflict 개수와 안전한 reference만 기록한다.
+- 결과는 `restorable`, `warning`, `not_restorable`로 분류한다. partial·unavailable DB 조회는 warning이며 Phase 4B-3의 계획 확정을 차단할 수 있도록 analysis에 남긴다.
+- Phase 4B-3 입력용 restore analysis JSON에는 checksum fingerprint, schema/profile, category 차이, section·conflict count, conflict 목록, ID 정책 후보, DB 조회 상태, 관계·민감정보 검사와 권장 다음 작업을 포함한다. 전체 HTML, 전체 prompt text, normalized payload, token, owner ID와 raw 오류는 제외하며 영구 저장하지 않는다.
+
+Phase 4B-2는 INSERT·UPDATE·DELETE, overwrite·upsert, category 생성, UUID remap 실행, transaction, restore job, resume·retry와 실제 복원을 포함하지 않는다. 실제 계획 선택과 반영은 Phase 4B-3 이후 별도 단계다.
 
 ### 16.3 Git 관리 대상
 

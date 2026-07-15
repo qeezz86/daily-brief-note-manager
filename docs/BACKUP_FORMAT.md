@@ -112,3 +112,17 @@ checksum은 전송·저장 중 우발적 변경을 탐지하기 위한 것이며
 - UTF-8 BOM은 사용하지 않는다.
 - 파일명은 `daily-brief-note-backup-{profile}-YYYY-MM-DD-HHmmss.json`이며 timestamp는 `Asia/Seoul` 기준이다.
 - 같은 생성 결과는 사용자가 다시 생성하기 전까지 checksum·manifest 복사와 재다운로드에 그대로 사용한다.
+
+## 10. Phase 4B-2 복원 Dry Run
+
+`/backups/restore`는 이 문서의 version 1 JSON만 받으며 콘텐츠 Import bundle과 혼용하지 않는다. UTF-8 `.json` 파일 또는 JSON text 중 하나를 브라우저에서 읽고 100 MiB를 초과하면 parse 전에 차단한다. 입력은 외부 서버로 보내지 않는다.
+
+검사 순서는 format·version·profile과 checksum 구조 확인, checksum 제외 canonical payload의 SHA-256 재계산, manifest·section schema 및 count 재계산, 관계·민감정보 재검사, category manifest 비교, 현재 사용자의 DB 충돌 후보 조회, ID 정책 후보 분석이다. checksum이 invalid 또는 unavailable이면 이후 DB 조회를 수행하지 않는다.
+
+Category 호환성에서 ID 누락, `contentGroup` 또는 `code` 의미 차이는 복원 불가다. 표시 이름, wrapper, slug/display ID pattern, 활성 상태와 정렬 차이는 Phase 4B-3에서 정책을 선택할 수 있는 경고다. Category row를 자동 생성하거나 변경하지 않으며 과거 게시물의 display ID와 slug도 변경하지 않는다.
+
+DB 조회는 기존 RLS가 적용되는 현재 인증 사용자의 행만 명시적 projection으로 100개씩 확인한다. 후보는 안전한 신규, 동일 데이터, ID 충돌, unique key 충돌, 관계 충돌로 결정적으로 분류한다. partial 또는 unavailable 조회는 경고로 남기며 raw DB 오류, owner ID와 전체 row를 결과에 포함하지 않는다.
+
+Phase 4B-3용 restore analysis JSON에는 checksum fingerprint, schema/profile, category 차이, section·conflict count, preserve·reuse·remap·conflict 후보와 검사 상태만 포함한다. 전체 `htmlBody`, 전체 prompt text, normalized Import payload, 인증 정보와 token은 제외한다. 분석 결과는 복사할 수 있지만 저장하지 않으며 입력이 변경되면 폐기한다.
+
+Phase 4B-2는 read-only다. 실제 restore, overwrite/upsert, category 생성·수정, UUID remap 생성·실행, transaction과 restore job은 수행하지 않는다.

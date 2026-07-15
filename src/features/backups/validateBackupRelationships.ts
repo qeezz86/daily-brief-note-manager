@@ -52,7 +52,11 @@ export function validateBackupRelationships(
   const topicIds = new Set(data.newsTopics.map((row) => row.id))
   const updateIds = new Set(data.newsUpdates.map((row) => row.id))
   const updateTopics = new Map(data.newsUpdates.map((row) => [row.id, row.topicId]))
+  const updatePosts = new Map(data.newsUpdates.map((row) => [row.id, row.postId]))
   const categoryIds = new Set(snapshot.categoryManifest.map((row) => row.id))
+  const categoryGroups = new Map(snapshot.categoryManifest.map((row) => [row.id, row.contentGroup]))
+  const postsById = new Map(data.posts.map((row) => [row.id, row]))
+  const topicsById = new Map(data.newsTopics.map((row) => [row.id, row]))
   const jobIds = new Set((data.importJobs ?? []).map((row) => row.id))
   const jobItemIds = new Set((data.importJobItems ?? []).map((row) => row.id))
 
@@ -74,13 +78,36 @@ export function validateBackupRelationships(
     missing(!postIds.has(row.postId), 'POST_TAG_POST_MISSING', 'postTags', '태그 관계의 게시물이 없습니다.', issues)
     missing(!tagIds.has(row.tagId), 'POST_TAG_TAG_MISSING', 'postTags', '태그 관계의 태그가 없습니다.', issues)
   })
+  const compositeSections: Array<[string, string[]]> = [
+    ['postTags', data.postTags.map((row) => `${row.postId}|${row.tagId}`)],
+    ['seoData', data.seoData.map((row) => row.postId)],
+    ['aiMetadata', data.aiMetadata.map((row) => row.postId)],
+    ['infoDbMetadata', data.infoDbMetadata.map((row) => row.postId)],
+    ['chineseMetadata', data.chineseMetadata.map((row) => row.postId)],
+    ['seriesCounters', data.seriesCounters.map((row) => row.categoryId)],
+    ['newsUpdates', data.newsUpdates.map((row) => `${row.postId}|${row.itemOrder}`)],
+    ['sources', data.sources.map((row) => `${row.postId}|${row.sortOrder}`)],
+    ['importJobItems', (data.importJobItems ?? []).map((row) => `${row.jobId}|${row.itemIndex}`)],
+    ['importJobItemAttempts', (data.importJobItemAttempts ?? []).map((row) => `${row.jobItemId}|${row.attemptNo}`)],
+  ]
+  compositeSections.forEach(([section, keys]) => {
+    const seen = new Set<string>()
+    keys.forEach((key) => {
+      missing(seen.has(key), 'DUPLICATE_COMPOSITE_RELATION', section, `${section}에 중복 관계 또는 순서가 있습니다.`, issues)
+      seen.add(key)
+    })
+  })
   data.sources.forEach((row) => {
     missing(!postIds.has(row.postId), 'SOURCE_POST_MISSING', 'sources', '출처의 게시물이 없습니다.', issues)
     missing(row.newsUpdateId !== null && !updateIds.has(row.newsUpdateId), 'SOURCE_UPDATE_MISSING', 'sources', '출처의 뉴스 업데이트가 없습니다.', issues)
+    missing(row.newsUpdateId !== null && updatePosts.get(row.newsUpdateId) !== row.postId, 'SOURCE_UPDATE_POST_MISMATCH', 'sources', '출처와 뉴스 업데이트의 게시물이 다릅니다.', issues)
   })
   ;[...data.seoData, ...data.aiMetadata, ...data.infoDbMetadata, ...data.chineseMetadata].forEach((row) => {
     missing(!postIds.has(row.postId), 'METADATA_POST_MISSING', 'metadata', '메타데이터의 게시물이 없습니다.', issues)
   })
+  data.aiMetadata.forEach((row) => missing(categoryGroups.get(postsById.get(row.postId)?.categoryId ?? '') !== 'ai', 'AI_METADATA_CATEGORY_MISMATCH', 'aiMetadata', 'AI metadata의 게시물 카테고리가 다릅니다.', issues))
+  data.infoDbMetadata.forEach((row) => missing(categoryGroups.get(postsById.get(row.postId)?.categoryId ?? '') !== 'info_db', 'INFO_METADATA_CATEGORY_MISMATCH', 'infoDbMetadata', '정보DB metadata의 게시물 카테고리가 다릅니다.', issues))
+  data.chineseMetadata.forEach((row) => missing(categoryGroups.get(postsById.get(row.postId)?.categoryId ?? '') !== 'chinese', 'CHINESE_METADATA_CATEGORY_MISMATCH', 'chineseMetadata', '중국어 metadata의 게시물 카테고리가 다릅니다.', issues))
   data.newsStatusHistory.forEach((row) => {
     missing(!topicIds.has(row.topicId), 'HISTORY_TOPIC_MISSING', 'newsStatusHistory', '상태 이력의 주제가 없습니다.', issues)
   })
@@ -89,13 +116,20 @@ export function validateBackupRelationships(
     missing(!postIds.has(row.postId), 'UPDATE_POST_MISSING', 'newsUpdates', '뉴스 업데이트의 게시물이 없습니다.', issues)
     missing(row.previousUpdateId !== null && !updateIds.has(row.previousUpdateId), 'UPDATE_PREVIOUS_MISSING', 'newsUpdates', '이전 뉴스 업데이트가 없습니다.', issues)
     missing(row.previousUpdateId !== null && updateTopics.get(row.previousUpdateId) !== row.topicId, 'UPDATE_PREVIOUS_TOPIC_MISMATCH', 'newsUpdates', '이전 업데이트의 주제가 다릅니다.', issues)
+    const post = postsById.get(row.postId)
+    const topic = topicsById.get(row.topicId)
+    missing(Boolean(post) && categoryGroups.get(post!.categoryId) !== 'news', 'UPDATE_POST_CATEGORY_INVALID', 'newsUpdates', '뉴스 업데이트 게시물이 뉴스 카테고리가 아닙니다.', issues)
+    missing(Boolean(post && topic) && post!.categoryId !== topic!.categoryId, 'UPDATE_TOPIC_CATEGORY_MISMATCH', 'newsUpdates', '뉴스 주제와 게시물 카테고리가 다릅니다.', issues)
+    missing(row.updateType === 'closure_note' && topic?.status !== 'closed', 'CLOSURE_UPDATE_TOPIC_STATUS_INVALID', 'newsUpdates', '종료 메모의 주제가 종료 상태가 아닙니다.', issues)
   })
   data.newsFollowups.forEach((row) => {
     missing(!topicIds.has(row.topicId), 'FOLLOWUP_TOPIC_MISSING', 'newsFollowups', '후속 항목의 주제가 없습니다.', issues)
+    missing(row.status === 'pending' && topicsById.get(row.topicId)?.status === 'closed', 'CLOSED_TOPIC_PENDING_FOLLOWUP', 'newsFollowups', '종료 주제에 pending 후속 항목이 있습니다.', issues)
   })
   data.generatedPrompts.forEach((row) => {
     missing(!categoryIds.has(row.categoryId), 'PROMPT_CATEGORY_MISSING', 'generatedPrompts', '프롬프트의 카테고리가 manifest에 없습니다.', issues)
   })
+  data.seriesCounters.forEach((row) => missing(!categoryIds.has(row.categoryId), 'SERIES_COUNTER_CATEGORY_MISSING', 'seriesCounters', '시리즈 카운터의 카테고리가 manifest에 없습니다.', issues))
   ;(data.importJobItems ?? []).forEach((row) => {
     missing(!jobIds.has(row.jobId), 'IMPORT_ITEM_JOB_MISSING', 'importJobItems', 'Import 항목의 작업이 없습니다.', issues)
   })

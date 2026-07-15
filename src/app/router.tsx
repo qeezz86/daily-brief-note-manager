@@ -33,6 +33,7 @@ import { ImportPage } from '../pages/ImportPage'
 import { ImportHistoryPage } from '../pages/ImportHistoryPage'
 import { ImportJobDetailPage } from '../pages/ImportJobDetailPage'
 import { BackupPage } from '../pages/BackupPage'
+import { BackupRestorePage } from '../pages/BackupRestorePage'
 
 export const routes: RouteObject[] = [
   {
@@ -89,6 +90,14 @@ export const routes: RouteObject[] = [
           {
             path: '/backups/new',
             element: <BackupPage />,
+          },
+          {
+            path: '/backups/restore',
+            element: <BackupRestorePage />,
+          },
+          {
+            path: '/backups/restore/new',
+            element: <BackupRestorePage />,
           },
           {
             path: '/content/:postId',
