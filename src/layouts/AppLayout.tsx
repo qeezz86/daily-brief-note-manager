@@ -33,6 +33,7 @@ export function AppLayout() {
             <NavLink to="/backups">백업</NavLink>
             <NavLink to="/backups/restore">복원 Dry Run</NavLink>
             <NavLink to="/backups/restore/jobs">복원 작업</NavLink>
+            <NavLink to="/settings/wordpress">WordPress 연결</NavLink>
           </nav>
           <div className="app-header__account">
             <span title={user?.email}>{user?.email}</span>

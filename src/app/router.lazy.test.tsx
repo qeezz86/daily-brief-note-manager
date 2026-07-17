@@ -52,6 +52,7 @@ const lazyPageExpectations = [
   ['/backups/restore/execute', 'BackupRestoreExecutePage'],
   ['/backups/restore/jobs', 'BackupRestoreJobsPage'],
   ['/backups/restore/jobs/:jobId', 'BackupRestoreJobDetailPage'],
+  ['/settings/wordpress', 'WordPressSettingsPage'],
 ] as const
 
 describe('route inventory and lazy modules', () => {
@@ -116,8 +117,8 @@ describe('route inventory and lazy modules', () => {
     const dynamicPageImports = [...routerSource.matchAll(/import\('\.\.\/pages\/([^']+)'\)/g)]
       .map((match) => match[1])
 
-    expect(dynamicPageImports).toHaveLength(27)
-    expect(new Set(dynamicPageImports)).toHaveLength(27)
+    expect(dynamicPageImports).toHaveLength(28)
+    expect(new Set(dynamicPageImports)).toHaveLength(28)
     expect(routerSource).not.toMatch(/import\('\.\.\/pages'\)/)
     expect(routerSource).not.toMatch(/import\(`\.\.\/pages/)
     expect(routerSource).not.toMatch(/from '\.\.\/pages\/(?!NotFoundPage)/)

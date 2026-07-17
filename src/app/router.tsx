@@ -69,6 +69,8 @@ const lazyBackupRestoreJobsPage: LazyRoute = () =>
   import('../pages/BackupRestoreJobsPage').then(({ BackupRestoreJobsPage: Component }) => ({ Component }))
 const lazyBackupRestoreJobDetailPage: LazyRoute = () =>
   import('../pages/BackupRestoreJobDetailPage').then(({ BackupRestoreJobDetailPage: Component }) => ({ Component }))
+const lazyWordPressSettingsPage: LazyRoute = () =>
+  import('../pages/WordPressSettingsPage').then(({ WordPressSettingsPage: Component }) => ({ Component }))
 
 function lazyPage(path: string, lazy: LazyRoute): RouteObject {
   return {
@@ -115,6 +117,7 @@ export const routes: RouteObject[] = [
           lazyPage('/backups/restore/execute', lazyBackupRestoreExecutePage),
           lazyPage('/backups/restore/jobs', lazyBackupRestoreJobsPage),
           lazyPage('/backups/restore/jobs/:jobId', lazyBackupRestoreJobDetailPage),
+          lazyPage('/settings/wordpress', lazyWordPressSettingsPage),
           lazyPage('/content/:postId', lazyContentDetailPage),
           lazyPage('/content/:postId/edit', lazyContentEditPage),
           lazyPage('/news-topics', lazyNewsTopicsPage),

@@ -1285,6 +1285,59 @@ a {
   opacity: 0.65;
 }
 
+.wordpress-page__description {
+  max-width: 680px;
+  margin: 10px 0 0;
+  color: #68736f;
+  line-height: 1.6;
+}
+
+.wordpress-page__action {
+  margin-top: 0;
+  align-self: flex-start;
+}
+
+.wordpress-live-region {
+  margin-top: 24px;
+  color: #53605c;
+  font-size: .875rem;
+}
+
+.wordpress-diagnostics__results {
+  display: grid;
+  margin-top: 20px;
+  gap: 16px;
+}
+
+.wordpress-status,
+.wordpress-panel {
+  padding: 22px;
+  border: 1px solid #d9dfdc;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.wordpress-status--ready { border-color: #8fc3ad; }
+.wordpress-status--partial { border-color: #d7c783; background: #fffdf4; }
+.wordpress-status--insufficient_permissions { border-color: #e4b5b1; background: #fff8f7; }
+.wordpress-status h2,
+.wordpress-panel h2 { margin: 5px 0 0; font-size: 1.1rem; }
+.wordpress-status > p:last-of-type,
+.wordpress-panel > p { color: #68736f; line-height: 1.6; }
+.wordpress-status dl,
+.wordpress-panel dl { display: grid; margin: 18px 0 0; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.wordpress-status dt,
+.wordpress-panel dt { color: #7a8581; font-size: .75rem; font-weight: 700; }
+.wordpress-status dd,
+.wordpress-panel dd { margin: 5px 0 0; overflow-wrap: anywhere; color: #34403c; }
+.wordpress-capability-table-wrap { margin-top: 16px; overflow-x: auto; }
+.wordpress-capability-table-wrap table { width: 100%; border-collapse: collapse; }
+.wordpress-capability-table-wrap th,
+.wordpress-capability-table-wrap td { padding: 11px 12px; border-bottom: 1px solid #d9dfdc; text-align: left; }
+.wordpress-capability-table-wrap thead th { color: #53605c; font-size: .8125rem; }
+.wordpress-panel--warning { border-color: #d7c783; background: #fffdf4; }
+.wordpress-panel--warning ul { margin-bottom: 0; padding-left: 20px; line-height: 1.7; }
+
 @keyframes loading-spin {
   to {
     transform: rotate(360deg);
@@ -1365,6 +1418,10 @@ a {
     width: 100%;
     justify-content: center;
   }
+
+  .wordpress-page__action { width: 100%; justify-content: center; }
+  .wordpress-status dl,
+  .wordpress-panel dl { grid-template-columns: 1fr; }
 
   .prompt-settings > .primary-button,
   .prompt-panel__heading .secondary-button { width: 100%; }

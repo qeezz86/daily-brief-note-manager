@@ -2,7 +2,9 @@
 
 Daily Brief Note의 콘텐츠, SEO 정보, 출처, 뉴스 추적 이력과 생성 프롬프트를 관리하기 위한 비공개 웹앱입니다.
 
-현재 저장소는 Phase 4C-3 단계입니다. `/backups`에서 공식 `core`·`full` JSON 백업을 생성하고, `/backups/restore`에서 read-only Dry Run과 결정적 복원 계획을 만든 뒤 `/backups/restore/execute`에서 원본 backup과 plan을 다시 검증해 core 데이터와 선택한 full Import 운영 이력을 실제 복원할 수 있습니다. `/backups/restore/jobs`는 영구 job·record·attempt, stage 진행률, 수동 retry, 취소·재개를 제공합니다.
+현재 저장소는 Phase 5A 단계입니다. 인증된 단일 허용 사용자는 `/settings/wordpress`에서 Supabase Edge Function을 통해 단일 WordPress 사이트의 REST API와 Application Password, capability 및 읽기 전용 리소스를 진단할 수 있습니다. WordPress credential은 브라우저나 DB에 저장하지 않으며 실제 게시·수정·삭제 요청은 수행하지 않습니다. 자세한 보안 경계와 로컬 설정은 [`docs/WORDPRESS_INTEGRATION.md`](docs/WORDPRESS_INTEGRATION.md)를 참고합니다.
+
+Phase 4B의 `/backups`에서는 공식 `core`·`full` JSON 백업을 생성하고, `/backups/restore`에서 read-only Dry Run과 결정적 복원 계획을 만든 뒤 `/backups/restore/execute`에서 원본 backup과 plan을 다시 검증해 core 데이터와 선택한 full Import 운영 이력을 실제 복원할 수 있습니다. `/backups/restore/jobs`는 영구 job·record·attempt, stage 진행률, 수동 retry, 취소·재개를 제공합니다.
 
 복원 계획은 원본 백업과 분리된 `daily-brief-note-restore-plan` schema version 1 JSON입니다. 실행에는 두 파일이 모두 필요하고 checksum·fingerprint·category·DB 충돌을 직전에 다시 확인합니다. record별 transaction이므로 부분 성공할 수 있으며 브라우저가 닫혀 있는 동안 자동 실행하지 않습니다. 기존 row overwrite·merge, 자동 suffix와 restore undo는 지원하지 않습니다. 허용되는 기존 row 변경은 series counter의 단조 증가와 이번 job이 만든 뉴스 update의 previous 연결 완성으로 제한됩니다.
 
@@ -55,6 +57,7 @@ Phase 4C-3에서는 Vite production manifest로 entry, static closure, 대표 ro
 ```bash
 npm run lint
 npm run test
+npm run test:wordpress
 npm run build
 npm run bundle:check
 ```
@@ -62,6 +65,17 @@ npm run bundle:check
 `npm run build:budget`은 production build와 budget 검사를 연속 실행합니다. 의도된 bundle 변화의 원인을 검토한 뒤에만 `npm run bundle:baseline`으로 기존 `dist`의 승인 baseline을 갱신하고, 생성된 `config/bundle-baseline.json` diff를 코드 리뷰에 포함합니다.
 
 Bundle budget CI는 Supabase module을 포함한 production graph를 일정하게 만들기 위해 로컬 주소와 비밀정보가 아닌 공개 placeholder key를 build-time 환경변수로 사용합니다. CI는 앱을 실행하거나 원격 Supabase에 연결하지 않으며 실제 credential이나 GitHub secret을 저장하지 않습니다. Raw 최대 chunk와 gzip 최대 chunk는 서로 다른 asset일 수 있으므로 각각 독립적으로 측정합니다.
+
+## WordPress read-only 진단
+
+Phase 5A는 `Browser → authenticated Supabase Edge Function → WordPress REST API` 경계만 제공합니다. 실제 secret은 Git에서 제외된 `supabase/functions/.env.local`에 사용자가 직접 설정하며, 예제는 `supabase/functions/.env.example`에 있습니다.
+
+```powershell
+Copy-Item supabase/functions/.env.example supabase/functions/.env.local
+npx supabase functions serve wordpress-diagnostics --env-file supabase/functions/.env.local
+```
+
+실제 WordPress URL이나 Application Password를 채팅, Git, screenshot 또는 브라우저 환경변수에 남기지 마세요. 로컬 mock 기반 검증은 `npm run test:wordpress`로 외부 네트워크 없이 실행합니다. 원격 Function 배포와 secret 설정은 Phase 5A 자동 작업 범위에 포함되지 않습니다.
 
 ## Supabase Auth 설정
 
