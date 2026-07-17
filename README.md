@@ -61,6 +61,8 @@ npm run bundle:check
 
 `npm run build:budget`은 production build와 budget 검사를 연속 실행합니다. 의도된 bundle 변화의 원인을 검토한 뒤에만 `npm run bundle:baseline`으로 기존 `dist`의 승인 baseline을 갱신하고, 생성된 `config/bundle-baseline.json` diff를 코드 리뷰에 포함합니다.
 
+Bundle budget CI는 Supabase module을 포함한 production graph를 일정하게 만들기 위해 로컬 주소와 비밀정보가 아닌 공개 placeholder key를 build-time 환경변수로 사용합니다. CI는 앱을 실행하거나 원격 Supabase에 연결하지 않으며 실제 credential이나 GitHub secret을 저장하지 않습니다. Raw 최대 chunk와 gzip 최대 chunk는 서로 다른 asset일 수 있으므로 각각 독립적으로 측정합니다.
+
 ## Supabase Auth 설정
 
 Supabase Dashboard의 Authentication URL Configuration에 개발 주소를 등록합니다.

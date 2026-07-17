@@ -53,5 +53,23 @@ describe('bundle budget policy', () => {
   it('passes exactly at the effective limit', () => { const metrics = sampleMetrics({ name: 'entry', raw: 110 }); const baseline = createBaseline(budgetConfig(), sampleMetrics()); expect(evaluateBudgets(budgetConfig(), metrics, baseline).pass).toBe(true) })
   it('fails above regression allowance', () => { const metrics = sampleMetrics({ name: 'entry', raw: 111 }); const baseline = createBaseline(budgetConfig(), sampleMetrics()); expect(evaluateBudgets(budgetConfig(), metrics, baseline).pass).toBe(false) })
   it('records violation detail', () => { const metrics = sampleMetrics({ name: 'entry', raw: 111 }); const baseline = createBaseline(budgetConfig(), sampleMetrics()); expect(evaluateBudgets(budgetConfig(), metrics, baseline).violations[0]).toMatchObject({ metric: 'entry', dimension: 'raw', excess: 1 }) })
+  it('fails gzip independently while raw passes', () => {
+    const metrics = sampleMetrics({ name: 'largest-chunk', raw: 100, gzip: 61, dimensionAssets: { raw: 'assets/raw.js', gzip: 'assets/gzip.js' } })
+    const baseline = createBaseline(budgetConfig(), sampleMetrics())
+    expect(evaluateBudgets(budgetConfig(), metrics, baseline).violations).toEqual([
+      expect.objectContaining({ metric: 'largest-chunk', dimension: 'gzip', source: 'assets/gzip.js' }),
+    ])
+  })
+  it('fails raw independently while gzip passes', () => {
+    const metrics = sampleMetrics({ name: 'largest-chunk', raw: 111, gzip: 50, dimensionAssets: { raw: 'assets/raw.js', gzip: 'assets/gzip.js' } })
+    const baseline = createBaseline(budgetConfig(), sampleMetrics())
+    expect(evaluateBudgets(budgetConfig(), metrics, baseline).violations).toEqual([
+      expect.objectContaining({ metric: 'largest-chunk', dimension: 'raw', source: 'assets/raw.js' }),
+    ])
+  })
+  it('does not store dimension asset names in the baseline', () => {
+    const metrics = sampleMetrics({ name: 'largest-chunk', dimensionAssets: { raw: 'assets/raw-HASH.js', gzip: 'assets/gzip-HASH.js' } })
+    expect(JSON.stringify(createBaseline(budgetConfig(), metrics))).not.toContain('HASH')
+  })
   it('fails a chunk over 500 KiB independently', () => { const metrics = sampleMetrics(); const baseline = createBaseline(budgetConfig(), metrics); expect(evaluateBudgets(budgetConfig(), metrics, baseline, [{ file: 'huge.js', raw: 512001 }]).pass).toBe(false) })
 })

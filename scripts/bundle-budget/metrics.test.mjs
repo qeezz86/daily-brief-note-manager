@@ -3,7 +3,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
-import { calculateMetrics, isJavaScriptAsset, measureAssets, measurePrecache, parsePrecacheUrls } from './metrics.mjs'
+import { calculateMetrics, isJavaScriptAsset, measureAssets, measurePrecache, parsePrecacheUrls, selectLargestChunks } from './metrics.mjs'
 import { budgetConfig, syntheticManifest, writeAssets } from './fixtures.test.mjs'
 
 describe('bundle size metrics', () => {
@@ -29,6 +29,38 @@ describe('bundle size metrics', () => {
   it('rejects CSS as JavaScript', () => expect(isJavaScriptAsset('assets/a.css')).toBe(false))
   it('rejects maps as JavaScript', () => expect(isJavaScriptAsset('assets/a.js.map')).toBe(false))
   it('rejects non-string asset values', () => expect(isJavaScriptAsset(null)).toBe(false))
+  it('selects the same asset when it is largest in raw and gzip bytes', () => {
+    const largest = selectLargestChunks([
+      { file: 'assets/a.js', raw: 20, gzip: 10 },
+      { file: 'assets/b.js', raw: 10, gzip: 5 },
+    ])
+    expect(largest).toEqual({
+      raw: { file: 'assets/a.js', raw: 20, gzip: 10 },
+      gzip: { file: 'assets/a.js', raw: 20, gzip: 10 },
+    })
+  })
+  it('selects raw and gzip maximum assets independently', () => {
+    const largest = selectLargestChunks([
+      { file: 'assets/raw.js', raw: 20, gzip: 5 },
+      { file: 'assets/gzip.js', raw: 15, gzip: 10 },
+    ])
+    expect(largest.raw.file).toBe('assets/raw.js')
+    expect(largest.gzip.file).toBe('assets/gzip.js')
+  })
+  it('breaks raw ties by normalized file name', () => {
+    const largest = selectLargestChunks([
+      { file: 'assets\\z.js', raw: 20, gzip: 5 },
+      { file: 'assets/a.js', raw: 20, gzip: 4 },
+    ])
+    expect(largest.raw.file).toBe('assets/a.js')
+  })
+  it('breaks gzip ties by normalized file name', () => {
+    const largest = selectLargestChunks([
+      { file: 'assets\\z.js', raw: 20, gzip: 10 },
+      { file: 'assets/a.js', raw: 10, gzip: 10 },
+    ])
+    expect(largest.gzip.file).toBe('assets/a.js')
+  })
   it('parses double-quoted precache URLs', () => expect(parsePrecacheUrls('x.precacheAndRoute([{url:"index.html"}])')).toEqual(['index.html']))
   it('parses single-quoted precache URLs', () => expect(parsePrecacheUrls("x.precacheAndRoute([{url:'index.html'}])")).toEqual(['index.html']))
   it('deduplicates precache URLs', () => expect(parsePrecacheUrls('x.precacheAndRoute([{url:"a.js"},{url:"a.js"}])')).toEqual(['a.js']))
@@ -55,5 +87,13 @@ describe('bundle size metrics', () => {
     await writeFile(path.join(directory, 'sw.js'), 'x.precacheAndRoute([{url:"index.html"}])')
     const { chunks } = await calculateMetrics(budgetConfig(), syntheticManifest(), directory)
     expect(chunks[0].raw).toBeGreaterThanOrEqual(chunks.at(-1).raw)
+  })
+  it('records the selected asset for each largest chunk dimension', async () => {
+    await writeFile(path.join(directory, 'index.html'), 'html')
+    await writeFile(path.join(directory, 'sw.js'), 'x.precacheAndRoute([{url:"index.html"}])')
+    const { metrics } = await calculateMetrics(budgetConfig(), syntheticManifest(), directory)
+    const largest = metrics.find(({ name }) => name === 'largest-chunk')
+    expect(largest.dimensionAssets.raw).toMatch(/^assets\//)
+    expect(largest.dimensionAssets.gzip).toMatch(/^assets\//)
   })
 })

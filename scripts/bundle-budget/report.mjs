@@ -14,6 +14,7 @@ function resultMap(evaluation) {
 export function createReport({ rootDirectory, manifestPath, config, baseline, metrics, chunks, evaluation, generatedAt = new Date().toISOString() }) {
   const results = resultMap(evaluation)
   const safeSource = (source) => source && path.isAbsolute(source) ? repositoryRelative(rootDirectory, source) : source
+  const largestChunk = metrics.find((metric) => metric.name === 'largest-chunk')
   return {
     schemaVersion: 1,
     generatedAt,
@@ -29,9 +30,16 @@ export function createReport({ rootDirectory, manifestPath, config, baseline, me
       ...(metric.gzip === undefined ? {} : { gzip: metric.gzip }),
       ...(metric.entries === undefined ? {} : { entries: metric.entries }),
       assets: metric.assets,
+      ...(metric.dimensionAssets === undefined ? {} : { dimensionAssets: metric.dimensionAssets }),
       ...(metric.urls === undefined ? {} : { urls: metric.urls }),
       result: results.get(metric.name)?.status ?? 'INFO',
     })),
+    ...(largestChunk?.dimensionAssets === undefined ? {} : {
+      largestChunks: {
+        raw: { file: largestChunk.dimensionAssets.raw, bytes: largestChunk.raw },
+        gzip: { file: largestChunk.dimensionAssets.gzip, bytes: largestChunk.gzip },
+      },
+    }),
     limits: config.limits,
     baseline: baseline.metrics,
     violations: evaluation.violations.map((violation) => ({ ...violation, source: safeSource(violation.source) })),
@@ -58,10 +66,19 @@ function printSection(title, sectionMetrics, results) {
     const raw = result?.dimensions.raw
     const entries = result?.dimensions.entries
     const isPrecache = metric.name === 'pwa-precache'
+    const isLargestChunk = metric.name === 'largest-chunk'
+    const rawCurrent = isLargestChunk
+      ? `${formatKiB(metric.raw)} (${metric.dimensionAssets.raw})`
+      : formatKiB(metric.raw)
+    const gzipCurrent = metric.gzip === undefined
+      ? '-'
+      : isLargestChunk
+        ? `${formatKiB(metric.gzip)} (${metric.dimensionAssets.gzip})`
+        : formatKiB(metric.gzip)
     return [
       metric.name,
-      isPrecache ? `${metric.entries} entries / ${formatKiB(metric.raw)}` : entries ? `${metric.entries} entries` : formatKiB(metric.raw),
-      metric.gzip === undefined ? '-' : formatKiB(metric.gzip),
+      isPrecache ? `${metric.entries} entries / ${formatKiB(metric.raw)}` : entries ? `${metric.entries} entries` : rawCurrent,
+      gzipCurrent,
       isPrecache ? `${entries.baseline} entries / ${formatKiB(raw.baseline)}` : raw ? formatKiB(raw.baseline) : entries ? `${entries.baseline} entries` : '-',
       isPrecache ? `${entries.allowed} entries / ${formatKiB(raw.allowed)}` : raw ? formatKiB(raw.allowed) : entries ? `${entries.allowed} entries` : '-',
       result?.status ?? 'INFO',

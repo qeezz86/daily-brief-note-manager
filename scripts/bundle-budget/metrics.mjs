@@ -5,6 +5,7 @@ import { gzipSync } from 'node:zlib'
 import { BundleBudgetError } from './errors.mjs'
 import { differenceAssets, routeClosure, staticDependencyClosure, unionAssets } from './graph.mjs'
 import { findSourceKey, manifestJavaScriptFiles } from './manifest.mjs'
+import { normalizeSourceKey } from './stable.mjs'
 
 export function isJavaScriptAsset(asset) {
   return typeof asset === 'string' && asset.endsWith('.js') && !asset.endsWith('.js.map')
@@ -124,6 +125,24 @@ function record(name, category, source, assets, sizes, extra = {}) {
   return { name, category, source, assets: [...assets].sort(), ...sizes, ...extra }
 }
 
+function compareChunks(dimension) {
+  return (left, right) => {
+    const sizeDifference = right[dimension] - left[dimension]
+    if (sizeDifference !== 0) return sizeDifference
+    const leftFile = normalizeSourceKey(left.file)
+    const rightFile = normalizeSourceKey(right.file)
+    return leftFile < rightFile ? -1 : leftFile > rightFile ? 1 : 0
+  }
+}
+
+export function selectLargestChunks(chunks) {
+  if (chunks.length === 0) return null
+  return {
+    raw: [...chunks].sort(compareChunks('raw'))[0],
+    gzip: [...chunks].sort(compareChunks('gzip'))[0],
+  }
+}
+
 export async function calculateMetrics(config, manifest, distDirectory) {
   const metrics = []
   const entryAssets = staticDependencyClosure(manifest, [config.entryRoot])
@@ -157,10 +176,18 @@ export async function calculateMetrics(config, manifest, distDirectory) {
     chunks.push({ file: asset, ...sizes })
     if (sizes.raw === 0) throw new BundleBudgetError(`빈 JavaScript chunk가 생성되었습니다: ${asset}`, 'EMPTY_CHUNK')
   }
-  chunks.sort((left, right) => right.raw - left.raw || left.file.localeCompare(right.file))
-  const largest = chunks[0]
+  chunks.sort(compareChunks('raw'))
+  const largest = selectLargestChunks(chunks)
   if (!largest) throw new BundleBudgetError('manifest에 JavaScript asset이 없습니다.', 'NO_JAVASCRIPT_ASSETS')
-  metrics.push(record('largest-chunk', 'largest-chunk', null, [largest.file], largest))
+  const largestAssets = [...new Set([largest.raw.file, largest.gzip.file])].sort()
+  metrics.push(record(
+    'largest-chunk',
+    'largest-chunk',
+    null,
+    largestAssets,
+    { raw: largest.raw.raw, gzip: largest.gzip.gzip },
+    { dimensionAssets: { raw: largest.raw.file, gzip: largest.gzip.file } },
+  ))
   metrics.push(record('total-js', 'total-assets', null, allJs, await measureAssets(distDirectory, allJs)))
 
   const precache = await measurePrecache(distDirectory)

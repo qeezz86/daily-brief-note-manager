@@ -21,6 +21,28 @@ function reportInput(rootDirectory = path.resolve('workspace')) {
   }
 }
 
+function largestChunkReportInput() {
+  const input = reportInput()
+  input.metrics.push({
+    name: 'largest-chunk',
+    category: 'largest-chunk',
+    source: null,
+    raw: 200,
+    gzip: 80,
+    assets: ['assets/raw-HASH.js', 'assets/gzip-HASH.js'],
+    dimensionAssets: { raw: 'assets/raw-HASH.js', gzip: 'assets/gzip-HASH.js' },
+  })
+  input.evaluation.results.push({
+    name: 'largest-chunk',
+    status: 'PASS',
+    dimensions: {
+      raw: { current: 200, baseline: 200, allowed: 220, absolute: 300, excess: 0, increaseRatio: 0, passed: true },
+      gzip: { current: 80, baseline: 80, allowed: 90, absolute: 100, excess: 0, increaseRatio: 0, passed: true },
+    },
+  })
+  return input
+}
+
 describe('bundle budget report', () => {
   const temporaryDirectories = []
   afterEach(async () => {
@@ -32,6 +54,12 @@ describe('bundle budget report', () => {
   it('sets schema version and pass state', () => expect(createReport(reportInput())).toMatchObject({ schemaVersion: 1, pass: true }))
   it('uses a repository-relative manifest path', () => expect(createReport(reportInput()).manifestPath).toBe('dist/.vite/manifest.json'))
   it('keeps hashed output assets in reports', () => expect(JSON.stringify(createReport(reportInput()))).toContain('index-HASH.js'))
+  it('records the raw and gzip maximum asset names', () => {
+    expect(createReport(largestChunkReportInput()).largestChunks).toEqual({
+      raw: { file: 'assets/raw-HASH.js', bytes: 200 },
+      gzip: { file: 'assets/gzip-HASH.js', bytes: 80 },
+    })
+  })
   it('does not expose an absolute source path', () => {
     const input = reportInput()
     input.metrics[0].source = path.join(input.rootDirectory, 'src/main.tsx')
@@ -58,6 +86,14 @@ describe('bundle budget report', () => {
     printHumanReport(input.metrics, input.evaluation)
     expect(log.mock.calls.flat().join('\n')).toContain('| Metric')
     expect(log.mock.calls.flat().join('\n')).not.toContain('\u001b')
+  })
+  it('prints different raw and gzip maximum asset names', () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {})
+    const input = largestChunkReportInput()
+    printHumanReport(input.metrics, input.evaluation)
+    const output = log.mock.calls.flat().join('\n')
+    expect(output).toContain('assets/raw-HASH.js')
+    expect(output).toContain('assets/gzip-HASH.js')
   })
   it('prints detailed failures', () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => {})

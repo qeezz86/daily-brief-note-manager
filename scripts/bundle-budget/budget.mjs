@@ -154,7 +154,12 @@ export function evaluateBudgets(config, metrics, baseline, chunks = []) {
         passed,
       }
       dimensions[dimension] = detail
-      if (!passed) violations.push({ metric: metric.name, dimension, source: metric.source, ...detail })
+      if (!passed) violations.push({
+        metric: metric.name,
+        dimension,
+        source: metric.dimensionAssets?.[dimension] ?? metric.source,
+        ...detail,
+      })
     }
     results.push({ name: metric.name, status: Object.values(dimensions).every(({ passed }) => passed) ? 'PASS' : 'FAIL', dimensions })
   }
