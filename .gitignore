@@ -11,6 +11,7 @@ coverage/
 # Test artifacts
 playwright-report/
 test-results/
+artifacts/bundle-budget-report.json
 
 # Local caches and logs
 *.local

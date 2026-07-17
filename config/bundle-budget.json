@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "units": "bytes",
+  "manifestPaths": ["dist/.vite/manifest.json", "dist/manifest.json"],
+  "reportPath": "artifacts/bundle-budget-report.json",
+  "entryRoot": "src/main.tsx",
+  "routes": [
+    { "name": "login", "source": "src/pages/LoginPage.tsx" },
+    { "name": "dashboard", "source": "src/pages/DashboardPage.tsx" },
+    { "name": "content-list", "source": "src/pages/ContentPage.tsx" },
+    { "name": "content-detail", "source": "src/pages/ContentDetailPage.tsx" },
+    { "name": "news-topic-detail", "source": "src/pages/NewsTopicDetailPage.tsx" },
+    { "name": "briefing-prompts", "source": "src/pages/BriefingPromptsPage.tsx" },
+    { "name": "import", "source": "src/pages/ImportPage.tsx" },
+    { "name": "import-job-detail", "source": "src/pages/ImportJobDetailPage.tsx" },
+    { "name": "backup", "source": "src/pages/BackupPage.tsx" },
+    { "name": "restore-dry-run-plan", "source": "src/pages/BackupRestorePage.tsx" },
+    { "name": "restore-execute", "source": "src/pages/BackupRestoreExecutePage.tsx" },
+    { "name": "restore-job-detail", "source": "src/pages/BackupRestoreJobDetailPage.tsx" }
+  ],
+  "features": [
+    { "name": "backup-generation", "source": "src/features/backups/backupGeneration.module.ts", "route": "backup" },
+    { "name": "restore-validation", "source": "src/features/backups/restoreValidation.module.ts", "route": "restore-dry-run-plan" },
+    { "name": "restore-plan", "source": "src/features/backups/restorePlan.module.ts", "route": "restore-dry-run-plan" },
+    { "name": "restore-execution", "source": "src/features/backups/restoreExecution.module.ts", "route": "restore-execute" },
+    { "name": "import-analysis", "source": "src/features/imports/importAnalysis.module.ts", "route": "import" }
+  ],
+  "limits": {
+    "entry": {
+      "raw": { "absolute": 40960, "minimumHeadroom": 4096 },
+      "gzip": { "absolute": 15360, "minimumHeadroom": 2048 }
+    },
+    "largestChunk": {
+      "raw": { "absolute": 256000, "percentHeadroom": 0.15, "minimumHeadroom": 8192 },
+      "gzip": { "absolute": 76800, "percentHeadroom": 0.15, "minimumHeadroom": 4096 }
+    },
+    "loginClosure": {
+      "raw": { "absolute": 716800, "percentHeadroom": 0.08, "minimumHeadroom": 16384 },
+      "gzip": { "absolute": 215040, "percentHeadroom": 0.08, "minimumHeadroom": 8192 }
+    },
+    "routeClosure": {
+      "raw": { "absolute": 921600, "percentHeadroom": 0.10, "minimumHeadroom": 16384 },
+      "gzip": { "absolute": 286720, "percentHeadroom": 0.10, "minimumHeadroom": 8192 }
+    },
+    "routeIncremental": {
+      "raw": { "absolute": 307200, "percentHeadroom": 0.15, "minimumHeadroom": 8192 },
+      "gzip": { "absolute": 102400, "percentHeadroom": 0.15, "minimumHeadroom": 4096 }
+    },
+    "featureIncremental": {
+      "raw": { "absolute": 256000, "percentHeadroom": 0.15, "minimumHeadroom": 8192 },
+      "gzip": { "absolute": 76800, "percentHeadroom": 0.15, "minimumHeadroom": 4096 }
+    },
+    "totalJs": {
+      "raw": { "absolute": 1280000, "percentHeadroom": 0.10, "minimumHeadroom": 32768 }
+    },
+    "pwaPrecache": {
+      "entries": { "absolute": 90, "minimumHeadroom": 2 },
+      "raw": { "absolute": 1280000, "percentHeadroom": 0.10, "minimumHeadroom": 32768 }
+    }
+  }
+}

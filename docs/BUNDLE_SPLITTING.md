@@ -196,3 +196,11 @@ Phase 4C-1 login의 확인 가능한 최소 주요 합계 628.72 kB(entry, Login
 Vite PWA의 `generateSW`, `autoUpdate`, navigation fallback과 오래된 chunk mismatch 안내를 변경하지 않았다. 81개 route·feature·vendor chunk가 precache되어 설치 전체 다운로드는 1,138.88 KiB로 늘지만, route와 action별 parse·execution 시점은 분리된다. chunk 이름 충돌이나 build 실패는 없다.
 
 Phase 4C-3에는 현재 문서 계산을 자동화하는 entry, largest chunk, 초기 closure와 total JS budget script/CI gate만 남긴다. 이번 단계에서는 budget gate, Workbox cache 전략, 인증 E2E infrastructure, DB schema·migration·RLS·RPC, route URL과 API 계약을 변경하지 않았다.
+
+## Phase 4C-3 manifest budget gate
+
+Phase 4C-3은 Phase 4C-2의 route lazy, vendor group과 feature loader 경계를 변경하지 않고 Vite manifest를 생성한다. `scripts/bundle-budget/`은 source root에서 static import만 재귀 추적하고 dynamic import는 route 또는 feature root로 별도 측정한다. closure 안의 동일 output asset은 한 번만 합산하며 source map, CSS, 이미지, 폰트, JSON과 service worker는 application JS 합계에서 제외한다.
+
+Entry output chunk와 entry static closure를 구분한다. Route closure는 entry static closure와 route root static closure의 합집합이고, route incremental은 이 합집합에서 entry static closure를 뺀 값이다. Feature engine은 standalone closure와 연결 route shell을 제외한 action-time incremental closure를 모두 보고하며 incremental 값에 budget을 적용한다.
+
+정책과 승인 baseline, 명령, CI 및 현재 측정값은 [`BUNDLE_BUDGET.md`](BUNDLE_BUDGET.md)에 기록한다. Rolldown group, chunk filename, source map, Workbox `generateSW`, 인증 및 route 계약은 변경하지 않는다.

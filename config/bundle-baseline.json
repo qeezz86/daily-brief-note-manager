@@ -1,0 +1,137 @@
+{
+  "metrics": {
+    "entry": {
+      "gzip": 7718,
+      "raw": 25194
+    },
+    "feature.backup-generation.incremental": {
+      "gzip": 6683,
+      "raw": 16731
+    },
+    "feature.import-analysis.incremental": {
+      "gzip": 38392,
+      "raw": 127951
+    },
+    "feature.restore-execution.incremental": {
+      "gzip": 52630,
+      "raw": 168335
+    },
+    "feature.restore-plan.incremental": {
+      "gzip": 27853,
+      "raw": 98175
+    },
+    "feature.restore-validation.incremental": {
+      "gzip": 33132,
+      "raw": 112111
+    },
+    "largest-chunk": {
+      "gzip": 50700,
+      "raw": 198470
+    },
+    "pwa-precache": {
+      "entries": 81,
+      "raw": 1166460
+    },
+    "route.backup.closure": {
+      "gzip": 186746,
+      "raw": 636493
+    },
+    "route.backup.incremental": {
+      "gzip": 26862,
+      "raw": 91162
+    },
+    "route.briefing-prompts.closure": {
+      "gzip": 201012,
+      "raw": 680369
+    },
+    "route.briefing-prompts.incremental": {
+      "gzip": 41128,
+      "raw": 135038
+    },
+    "route.content-detail.closure": {
+      "gzip": 172007,
+      "raw": 583053
+    },
+    "route.content-detail.incremental": {
+      "gzip": 12123,
+      "raw": 37722
+    },
+    "route.content-list.closure": {
+      "gzip": 166764,
+      "raw": 564389
+    },
+    "route.content-list.incremental": {
+      "gzip": 6880,
+      "raw": 19058
+    },
+    "route.dashboard.closure": {
+      "gzip": 160409,
+      "raw": 546273
+    },
+    "route.dashboard.incremental": {
+      "gzip": 525,
+      "raw": 942
+    },
+    "route.import-job-detail.closure": {
+      "gzip": 195679,
+      "raw": 664322
+    },
+    "route.import-job-detail.incremental": {
+      "gzip": 35795,
+      "raw": 118991
+    },
+    "route.import.closure": {
+      "gzip": 170026,
+      "raw": 571942
+    },
+    "route.import.incremental": {
+      "gzip": 10142,
+      "raw": 26611
+    },
+    "route.login.closure": {
+      "gzip": 192961,
+      "raw": 654693
+    },
+    "route.login.incremental": {
+      "gzip": 33077,
+      "raw": 109362
+    },
+    "route.news-topic-detail.closure": {
+      "gzip": 174800,
+      "raw": 586540
+    },
+    "route.news-topic-detail.incremental": {
+      "gzip": 14916,
+      "raw": 41209
+    },
+    "route.restore-dry-run-plan.closure": {
+      "gzip": 175062,
+      "raw": 592343
+    },
+    "route.restore-dry-run-plan.incremental": {
+      "gzip": 15178,
+      "raw": 47012
+    },
+    "route.restore-execute.closure": {
+      "gzip": 163221,
+      "raw": 554587
+    },
+    "route.restore-execute.incremental": {
+      "gzip": 3337,
+      "raw": 9256
+    },
+    "route.restore-job-detail.closure": {
+      "gzip": 185385,
+      "raw": 633581
+    },
+    "route.restore-job-detail.incremental": {
+      "gzip": 25501,
+      "raw": 88250
+    },
+    "total-js": {
+      "raw": 1131895
+    }
+  },
+  "units": "bytes",
+  "version": 1
+}
