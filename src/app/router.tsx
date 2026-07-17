@@ -9,34 +9,75 @@ import {
   RequireAuth,
 } from '../features/auth/AuthRouteGuards'
 import { AppLayout } from '../layouts/AppLayout'
-import { LoginPage } from '../pages/LoginPage'
-import { DashboardPage } from '../pages/DashboardPage'
-import { ContentPage } from '../pages/ContentPage'
-import { ContentCreatePage } from '../pages/ContentCreatePage'
-import { ContentDetailPage } from '../pages/ContentDetailPage'
-import { ContentEditPage } from '../pages/ContentEditPage'
 import { NotFoundPage } from '../pages/NotFoundPage'
-import { NewsTopicsPage } from '../pages/NewsTopicsPage'
-import { NewsTopicCreatePage } from '../pages/NewsTopicCreatePage'
-import { NewsTopicDetailPage } from '../pages/NewsTopicDetailPage'
-import { NewsTopicEditPage } from '../pages/NewsTopicEditPage'
-import { NewsUpdateCreatePage } from '../pages/NewsUpdateCreatePage'
-import { NewsUpdateDetailPage } from '../pages/NewsUpdateDetailPage'
-import { NewsUpdateEditPage } from '../pages/NewsUpdateEditPage'
-import { NewsFollowupsPage } from '../pages/NewsFollowupsPage'
-import { NewsFollowupCreatePage } from '../pages/NewsFollowupCreatePage'
-import { NewsFollowupEditPage } from '../pages/NewsFollowupEditPage'
-import { BriefingPromptsPage } from '../pages/BriefingPromptsPage'
-import { BriefingPromptHistoryPage } from '../pages/BriefingPromptHistoryPage'
-import { BriefingPromptRunDetailPage } from '../pages/BriefingPromptRunDetailPage'
-import { ImportPage } from '../pages/ImportPage'
-import { ImportHistoryPage } from '../pages/ImportHistoryPage'
-import { ImportJobDetailPage } from '../pages/ImportJobDetailPage'
-import { BackupPage } from '../pages/BackupPage'
-import { BackupRestorePage } from '../pages/BackupRestorePage'
-import { BackupRestoreExecutePage } from '../pages/BackupRestoreExecutePage'
-import { BackupRestoreJobsPage } from '../pages/BackupRestoreJobsPage'
-import { BackupRestoreJobDetailPage } from '../pages/BackupRestoreJobDetailPage'
+import { RouteErrorFallback } from './RouteErrorFallback'
+import { RouteLoadingFallback } from './RouteLoadingFallback'
+
+type LazyRoute = NonNullable<RouteObject['lazy']>
+
+const lazyLoginPage: LazyRoute = () =>
+  import('../pages/LoginPage').then(({ LoginPage: Component }) => ({ Component }))
+const lazyDashboardPage: LazyRoute = () =>
+  import('../pages/DashboardPage').then(({ DashboardPage: Component }) => ({ Component }))
+const lazyContentPage: LazyRoute = () =>
+  import('../pages/ContentPage').then(({ ContentPage: Component }) => ({ Component }))
+const lazyContentCreatePage: LazyRoute = () =>
+  import('../pages/ContentCreatePage').then(({ ContentCreatePage: Component }) => ({ Component }))
+const lazyContentDetailPage: LazyRoute = () =>
+  import('../pages/ContentDetailPage').then(({ ContentDetailPage: Component }) => ({ Component }))
+const lazyContentEditPage: LazyRoute = () =>
+  import('../pages/ContentEditPage').then(({ ContentEditPage: Component }) => ({ Component }))
+const lazyNewsTopicsPage: LazyRoute = () =>
+  import('../pages/NewsTopicsPage').then(({ NewsTopicsPage: Component }) => ({ Component }))
+const lazyNewsTopicCreatePage: LazyRoute = () =>
+  import('../pages/NewsTopicCreatePage').then(({ NewsTopicCreatePage: Component }) => ({ Component }))
+const lazyNewsTopicDetailPage: LazyRoute = () =>
+  import('../pages/NewsTopicDetailPage').then(({ NewsTopicDetailPage: Component }) => ({ Component }))
+const lazyNewsTopicEditPage: LazyRoute = () =>
+  import('../pages/NewsTopicEditPage').then(({ NewsTopicEditPage: Component }) => ({ Component }))
+const lazyNewsUpdateCreatePage: LazyRoute = () =>
+  import('../pages/NewsUpdateCreatePage').then(({ NewsUpdateCreatePage: Component }) => ({ Component }))
+const lazyNewsUpdateDetailPage: LazyRoute = () =>
+  import('../pages/NewsUpdateDetailPage').then(({ NewsUpdateDetailPage: Component }) => ({ Component }))
+const lazyNewsUpdateEditPage: LazyRoute = () =>
+  import('../pages/NewsUpdateEditPage').then(({ NewsUpdateEditPage: Component }) => ({ Component }))
+const lazyNewsFollowupsPage: LazyRoute = () =>
+  import('../pages/NewsFollowupsPage').then(({ NewsFollowupsPage: Component }) => ({ Component }))
+const lazyNewsFollowupCreatePage: LazyRoute = () =>
+  import('../pages/NewsFollowupCreatePage').then(({ NewsFollowupCreatePage: Component }) => ({ Component }))
+const lazyNewsFollowupEditPage: LazyRoute = () =>
+  import('../pages/NewsFollowupEditPage').then(({ NewsFollowupEditPage: Component }) => ({ Component }))
+const lazyBriefingPromptsPage: LazyRoute = () =>
+  import('../pages/BriefingPromptsPage').then(({ BriefingPromptsPage: Component }) => ({ Component }))
+const lazyBriefingPromptHistoryPage: LazyRoute = () =>
+  import('../pages/BriefingPromptHistoryPage').then(({ BriefingPromptHistoryPage: Component }) => ({ Component }))
+const lazyBriefingPromptRunDetailPage: LazyRoute = () =>
+  import('../pages/BriefingPromptRunDetailPage').then(({ BriefingPromptRunDetailPage: Component }) => ({ Component }))
+const lazyImportPage: LazyRoute = () =>
+  import('../pages/ImportPage').then(({ ImportPage: Component }) => ({ Component }))
+const lazyImportHistoryPage: LazyRoute = () =>
+  import('../pages/ImportHistoryPage').then(({ ImportHistoryPage: Component }) => ({ Component }))
+const lazyImportJobDetailPage: LazyRoute = () =>
+  import('../pages/ImportJobDetailPage').then(({ ImportJobDetailPage: Component }) => ({ Component }))
+const lazyBackupPage: LazyRoute = () =>
+  import('../pages/BackupPage').then(({ BackupPage: Component }) => ({ Component }))
+const lazyBackupRestorePage: LazyRoute = () =>
+  import('../pages/BackupRestorePage').then(({ BackupRestorePage: Component }) => ({ Component }))
+const lazyBackupRestoreExecutePage: LazyRoute = () =>
+  import('../pages/BackupRestoreExecutePage').then(({ BackupRestoreExecutePage: Component }) => ({ Component }))
+const lazyBackupRestoreJobsPage: LazyRoute = () =>
+  import('../pages/BackupRestoreJobsPage').then(({ BackupRestoreJobsPage: Component }) => ({ Component }))
+const lazyBackupRestoreJobDetailPage: LazyRoute = () =>
+  import('../pages/BackupRestoreJobDetailPage').then(({ BackupRestoreJobDetailPage: Component }) => ({ Component }))
+
+function lazyPage(path: string, lazy: LazyRoute): RouteObject {
+  return {
+    path,
+    lazy,
+    hydrateFallbackElement: <RouteLoadingFallback />,
+    errorElement: <RouteErrorFallback />,
+  }
+}
 
 export const routes: RouteObject[] = [
   {
@@ -44,7 +85,9 @@ export const routes: RouteObject[] = [
     children: [
       {
         path: '/login',
-        element: <LoginPage />,
+        lazy: lazyLoginPage,
+        hydrateFallbackElement: <RouteLoadingFallback />,
+        errorElement: <RouteErrorFallback />,
       },
     ],
   },
@@ -58,74 +101,35 @@ export const routes: RouteObject[] = [
             path: '/',
             element: <Navigate to="/dashboard" replace />,
           },
-          {
-            path: '/dashboard',
-            element: <DashboardPage />,
-          },
-          {
-            path: '/content',
-            element: <ContentPage />,
-          },
-          {
-            path: '/content/new',
-            element: <ContentCreatePage />,
-          },
-          {
-            path: '/imports',
-            element: <ImportPage />,
-          },
-          {
-            path: '/imports/new',
-            element: <ImportPage />,
-          },
-          {
-            path: '/imports/history',
-            element: <ImportHistoryPage />,
-          },
-          {
-            path: '/imports/history/:jobId',
-            element: <ImportJobDetailPage />,
-          },
-          {
-            path: '/backups',
-            element: <BackupPage />,
-          },
-          {
-            path: '/backups/new',
-            element: <BackupPage />,
-          },
-          {
-            path: '/backups/restore',
-            element: <BackupRestorePage />,
-          },
-          {
-            path: '/backups/restore/new',
-            element: <BackupRestorePage />,
-          },
-          { path: '/backups/restore/execute', element: <BackupRestoreExecutePage /> },
-          { path: '/backups/restore/jobs', element: <BackupRestoreJobsPage /> },
-          { path: '/backups/restore/jobs/:jobId', element: <BackupRestoreJobDetailPage /> },
-          {
-            path: '/content/:postId',
-            element: <ContentDetailPage />,
-          },
-          {
-            path: '/content/:postId/edit',
-            element: <ContentEditPage />,
-          },
-          { path: '/news-topics', element: <NewsTopicsPage /> },
-          { path: '/news-topics/new', element: <NewsTopicCreatePage /> },
-          { path: '/news-topics/:topicId', element: <NewsTopicDetailPage /> },
-          { path: '/news-topics/:topicId/edit', element: <NewsTopicEditPage /> },
-          { path: '/content/:postId/news-updates/new', element: <NewsUpdateCreatePage /> },
-          { path: '/news-updates/:updateId', element: <NewsUpdateDetailPage /> },
-          { path: '/news-updates/:updateId/edit', element: <NewsUpdateEditPage /> },
-          { path: '/news-followups', element: <NewsFollowupsPage /> },
-          { path: '/news-topics/:topicId/followups/new', element: <NewsFollowupCreatePage /> },
-          { path: '/news-followups/:followupId/edit', element: <NewsFollowupEditPage /> },
-          { path: '/briefing-prompts', element: <BriefingPromptsPage /> },
-          { path: '/briefing-prompts/history', element: <BriefingPromptHistoryPage /> },
-          { path: '/briefing-prompts/history/:runId', element: <BriefingPromptRunDetailPage /> },
+          lazyPage('/dashboard', lazyDashboardPage),
+          lazyPage('/content', lazyContentPage),
+          lazyPage('/content/new', lazyContentCreatePage),
+          lazyPage('/imports', lazyImportPage),
+          lazyPage('/imports/new', lazyImportPage),
+          lazyPage('/imports/history', lazyImportHistoryPage),
+          lazyPage('/imports/history/:jobId', lazyImportJobDetailPage),
+          lazyPage('/backups', lazyBackupPage),
+          lazyPage('/backups/new', lazyBackupPage),
+          lazyPage('/backups/restore', lazyBackupRestorePage),
+          lazyPage('/backups/restore/new', lazyBackupRestorePage),
+          lazyPage('/backups/restore/execute', lazyBackupRestoreExecutePage),
+          lazyPage('/backups/restore/jobs', lazyBackupRestoreJobsPage),
+          lazyPage('/backups/restore/jobs/:jobId', lazyBackupRestoreJobDetailPage),
+          lazyPage('/content/:postId', lazyContentDetailPage),
+          lazyPage('/content/:postId/edit', lazyContentEditPage),
+          lazyPage('/news-topics', lazyNewsTopicsPage),
+          lazyPage('/news-topics/new', lazyNewsTopicCreatePage),
+          lazyPage('/news-topics/:topicId', lazyNewsTopicDetailPage),
+          lazyPage('/news-topics/:topicId/edit', lazyNewsTopicEditPage),
+          lazyPage('/content/:postId/news-updates/new', lazyNewsUpdateCreatePage),
+          lazyPage('/news-updates/:updateId', lazyNewsUpdateDetailPage),
+          lazyPage('/news-updates/:updateId/edit', lazyNewsUpdateEditPage),
+          lazyPage('/news-followups', lazyNewsFollowupsPage),
+          lazyPage('/news-topics/:topicId/followups/new', lazyNewsFollowupCreatePage),
+          lazyPage('/news-followups/:followupId/edit', lazyNewsFollowupEditPage),
+          lazyPage('/briefing-prompts', lazyBriefingPromptsPage),
+          lazyPage('/briefing-prompts/history', lazyBriefingPromptHistoryPage),
+          lazyPage('/briefing-prompts/history/:runId', lazyBriefingPromptRunDetailPage),
           {
             path: '*',
             element: <NotFoundPage />,
