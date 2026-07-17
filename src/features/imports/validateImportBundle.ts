@@ -229,7 +229,18 @@ function validateItem(
     const expectedSlug = post.seriesNo || post.briefingDate
       ? applyCategoryPattern(category.slugPattern, { date: post.briefingDate, seriesNo: post.seriesNo })
       : null
-    if (expectedSlug && post.slug !== expectedSlug) addIssue(issues, issue('POST_SLUG_PATTERN_MISMATCH', 'error', 'slug가 카테고리 설정 패턴과 일치하지 않습니다.', path('slug'), index, expectedSlug))
+    if (expectedSlug && post.slug !== expectedSlug) {
+      addIssue(issues, issue(
+        mode === 'legacy' ? 'POST_LEGACY_SLUG_PATTERN_MISMATCH' : 'POST_SLUG_PATTERN_MISMATCH',
+        mode === 'legacy' ? 'warning' : 'error',
+        mode === 'legacy'
+          ? '기존 WordPress slug가 현재 카테고리 설정과 다릅니다. 승인하면 원본 slug를 보존합니다.'
+          : 'slug가 카테고리 설정 패턴과 일치하지 않습니다.',
+        path('slug'),
+        index,
+        expectedSlug,
+      ))
+    }
   }
 
   const metadata = post.metadata ?? {}

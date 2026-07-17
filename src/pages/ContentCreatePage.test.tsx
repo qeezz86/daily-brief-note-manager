@@ -33,7 +33,7 @@ const savedPost: PostDetail = {
   image_alt: null,
   image_prompt_version: 1,
   image_prompt_updated_at: null,
-  slug: 'ai-column',
+  slug: 'ai-001',
   content_status: 'draft',
   wordpress_url: null,
   created_at: '2026-07-10T01:00:00Z',
@@ -101,7 +101,7 @@ async function fillValidForm() {
   )
   await browserUser.type(screen.getByLabelText('제목'), 'AI 칼럼')
   await browserUser.type(screen.getByLabelText('요약'), 'AI 칼럼 요약')
-  await browserUser.type(screen.getByLabelText('Slug'), 'ai-column')
+  await browserUser.type(screen.getByLabelText('Slug'), 'ai-001')
   return browserUser
 }
 

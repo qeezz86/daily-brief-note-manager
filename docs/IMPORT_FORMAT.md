@@ -123,7 +123,7 @@ Phase 4A-1의 공식 콘텐츠 Import 식별자는 `daily-brief-note-content-imp
 
 파일은 UTF-8 `.json`만 허용하고 BOM을 제거한다. 최대 크기는 20 MB다. `__proto__`, `constructor`, `prototype`, 30단계를 넘는 중첩과 5 MB를 넘는 단일 문자열을 차단한다. HTML은 실행하거나 기본 화면에 렌더링하지 않는다.
 
-`strict`는 신규 입력의 전체 template class 정책을 적용한다. `legacy`는 미등록 class와 inline style을 경고로 낮출 수 있지만 script, iframe, event handler, `javascript:` URL, wrapper·h1 누락과 닫히지 않은 wrapper 같은 치명적·보안 오류는 차단한다. strict validation을 비활성화하지 않는다.
+`strict`는 신규 입력의 전체 template class 정책과 현재 category slug pattern을 적용한다. `legacy`는 미등록 class, inline style과 과거 WordPress slug pattern 차이를 경고로 낮출 수 있고 사용자가 승인하면 원 slug를 보존한다. script, iframe, event handler, `javascript:` URL, wrapper·h1 누락과 닫히지 않은 wrapper 같은 치명적·보안 오류는 두 모드 모두 차단한다. strict validation을 비활성화하지 않는다.
 
 Dry Run 상태는 `ready`, `warning`, `invalid`, `duplicate`다. 결과는 영구 저장하지 않으며 실제 INSERT·UPDATE·DELETE, 자동 수정, 외부 URL fetch와 AI 의미 중복 판정을 수행하지 않는다. DB exact duplicate 후보는 slug, WordPress URL, 뉴스의 category·briefing date unique key, category·series number, 뉴스 topic key, 중국어 normalized original URL처럼 실제 DB unique 정책에 정의된 값만 사용한다. 문자열 후보는 trim하고 빈 값과 중복을 제거한 뒤 최대 100개씩 RLS 범위의 제한 projection batch query로 순차 조회한다. item별 N+1 query, `select('*')`, `owner_id` 입력과 무제한 `Promise.all`은 사용하지 않는다.
 

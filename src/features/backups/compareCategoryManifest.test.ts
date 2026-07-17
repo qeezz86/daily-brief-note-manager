@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { BackupCategoryManifestEntry } from './backupRestore.types'
 import { compareCategoryManifest } from './compareCategoryManifest'
 
-const category: BackupCategoryManifestEntry = { id: 'technology', contentGroup: 'news', name: '과학기술', code: 'TEC', wrapperClass: 'daily-brief-note news-briefing technology', displayIdPattern: '#YYYY-MM-DD-TEC', slugPattern: 'science-tech-briefing-YYYY-MM-DD', sortOrder: 30, enabled: true }
+const category: BackupCategoryManifestEntry = { id: 'technology', contentGroup: 'news', name: '과학기술', code: 'TEC', wrapperClass: 'daily-brief-note news-briefing technology', displayIdPattern: '#YYYY-MM-DD-TEC', slugPattern: 'technology-briefing-YYYY-MM-DD', sortOrder: 30, enabled: true }
 function changed(field: keyof BackupCategoryManifestEntry, value: unknown) { return { ...category, [field]: value } as BackupCategoryManifestEntry }
 
 describe('compareCategoryManifest', () => {
@@ -18,6 +18,10 @@ describe('compareCategoryManifest', () => {
   })
   it('참조하는 category ID가 없으면 error다', () => expect(compareCategoryManifest([category], [], new Set(['technology']))[0].severity).toBe('error'))
   it('참조하지 않는 category ID가 없으면 warning이다', () => expect(compareCategoryManifest([category], [], new Set())[0].severity).toBe('warning'))
+  it('이전 manifest slug pattern은 current category와의 warning으로 분류한다', () => {
+    const legacy = { ...category, slugPattern: 'science-tech-briefing-YYYY-MM-DD' }
+    expect(compareCategoryManifest([legacy], [category], new Set(['technology']))[0]).toMatchObject({ field: 'slugPattern', severity: 'warning' })
+  })
   it('차이를 category와 field 기준으로 결정적 정렬한다', () => {
     const other = { ...category, id: 'ai-column', name: 'AI' }
     const result = compareCategoryManifest([category, other], [{ ...category, name: 'X' }, { ...other, name: 'Y' }], new Set())

@@ -88,6 +88,19 @@ describe('buildRestorePlan', () => {
     const changed = await plan(bundle, [{ section: 'sources', id: bundle.data.sources[0].id, signature: '{}' }])
     expect(changed.analysis.fingerprint).not.toBe(first.analysis.fingerprint); expect(changed.fingerprint.value).not.toBe(first.fingerprint.value)
   })
+  it('이전 category pattern 경고가 있어도 post slug를 바꾸지 않고 fingerprint는 결정적이다', async () => {
+    const bundle = await backupRestoreBundleFixture()
+    bundle.manifest.categoryManifest[0].slugPattern = 'science-tech-briefing-YYYY-MM-DD'
+    bundle.data.posts[0].slug = 'science-tech-briefing-2026-07-15'
+    const current = currentCategoriesFromBundle(bundle)
+    current[0].slugPattern = 'technology-briefing-YYYY-MM-DD'
+    const first = await buildRestorePlan({ bundle, currentCategories: current, lookup: lookup(), policies: policies(), now })
+    const second = await buildRestorePlan({ bundle, currentCategories: current, lookup: lookup(), policies: policies(), now: new Date('2027-01-01T00:00:00Z') })
+    expect(first.status).toBe('warning')
+    expect(first.issues).toEqual(expect.arrayContaining([expect.objectContaining({ code: 'RESTORE_CATEGORY_SLUG_PATTERN_DIFFERENT' })]))
+    expect(bundle.data.posts[0].slug).toBe('science-tech-briefing-2026-07-15')
+    expect(second.fingerprint.value).toBe(first.fingerprint.value)
+  })
   it('plan JSON에 owner와 원문 payload를 포함하지 않는다', async () => {
     const bundle = await backupRestoreBundleFixture('full'); const json = JSON.stringify(await plan(bundle))
     expect(json).not.toMatch(/ownerId|owner_id|htmlBody|promptText|normalizedPayload/)

@@ -12,9 +12,11 @@ import type { ImportNewsTracking } from './importTracking.types'
 
 export const importCategories: ImportCategory[] = [
   { id: 'economy', contentGroup: 'news', name: '경제', code: 'ECO', wrapperClass: 'daily-brief-note news-briefing economy', displayIdPattern: '#YYYY-MM-DD-ECO', slugPattern: 'economy-briefing-YYYY-MM-DD', enabled: true },
+  { id: 'technology', contentGroup: 'news', name: '과학기술', code: 'TEC', wrapperClass: 'daily-brief-note news-briefing technology', displayIdPattern: '#YYYY-MM-DD-TEC', slugPattern: 'technology-briefing-YYYY-MM-DD', enabled: true },
+  { id: 'climate-energy', contentGroup: 'news', name: '환경·에너지', code: 'ENV', wrapperClass: 'daily-brief-note news-briefing climate-energy', displayIdPattern: '#YYYY-MM-DD-ENV', slugPattern: 'climate-energy-briefing-YYYY-MM-DD', enabled: true },
   { id: 'ai-column', contentGroup: 'ai', name: 'AI 칼럼', code: 'AI', wrapperClass: 'daily-brief-note ai-column', displayIdPattern: 'AI-###', slugPattern: 'ai-###', enabled: true },
   { id: 'info-db', contentGroup: 'info_db', name: '정보DB', code: 'INFO', wrapperClass: 'daily-brief-note info-db', displayIdPattern: '정보DB-###', slugPattern: 'info-db-###', enabled: true },
-  { id: 'chinese-study', contentGroup: 'chinese', name: '중국어 학습', code: 'CHINESE', wrapperClass: 'daily-brief-note chinese-study', displayIdPattern: null, slugPattern: 'cctv-chinese-news-study-###', enabled: true },
+  { id: 'chinese-study', contentGroup: 'chinese', name: '중국어 학습', code: 'CHINESE', wrapperClass: 'daily-brief-note chinese-study', displayIdPattern: null, slugPattern: 'cctv-chinese-news-###', enabled: true },
   { id: 'disabled-news', contentGroup: 'news', name: '비활성', code: 'OFF', wrapperClass: 'daily-brief-note news-briefing disabled', displayIdPattern: '#YYYY-MM-DD-OFF', slugPattern: 'disabled-YYYY-MM-DD', enabled: false },
 ]
 

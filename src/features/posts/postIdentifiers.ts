@@ -5,6 +5,10 @@ interface PatternValues {
   seriesNo?: number | null
 }
 
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
 export function applyCategoryPattern(
   pattern: string,
   { date, seriesNo }: PatternValues,
@@ -37,4 +41,20 @@ export function buildSuggestedSlug(
   values: PatternValues,
 ) {
   return applyCategoryPattern(category.slug_pattern, values)
+}
+
+export function matchesCategoryPattern(
+  pattern: string,
+  value: string,
+  { date, seriesNo }: PatternValues,
+) {
+  const datePattern = date ? escapeRegExp(date) : '\\d{4}-\\d{2}-\\d{2}'
+  const seriesPattern = seriesNo !== null && seriesNo !== undefined
+    ? escapeRegExp(String(seriesNo).padStart(3, '0'))
+    : '\\d{3,}'
+  const expression = escapeRegExp(pattern)
+    .replaceAll(escapeRegExp('YYYY-MM-DD'), datePattern)
+    .replaceAll(escapeRegExp('###'), seriesPattern)
+
+  return new RegExp(`^${expression}$`).test(value)
 }

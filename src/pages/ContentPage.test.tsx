@@ -34,7 +34,7 @@ const categories: Category[] = [
     name: '중국어 학습',
     sort_order: 30,
     display_id_pattern: null,
-    slug_pattern: 'cctv-chinese-news-study-###',
+    slug_pattern: 'cctv-chinese-news-###',
     wrapper_class: 'daily-brief-note chinese-study',
   },
 ]
@@ -77,7 +77,7 @@ const posts: PostListItem[] = [
     published_on: '2026-07-08',
     title: 'CCTV 뉴스로 배우는 중국어 #12',
     summary: '중국어 학습 요약',
-    slug: 'cctv-chinese-news-study-012',
+    slug: 'cctv-chinese-news-012',
     content_status: 'ready',
     wordpress_url: null,
     updated_at: '2026-07-08T09:00:00.000Z',

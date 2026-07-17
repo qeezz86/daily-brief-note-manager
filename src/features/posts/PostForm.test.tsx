@@ -17,6 +17,16 @@ const categories: Category[] = [
     wrapper_class: 'daily-brief-note news-briefing economy',
   },
   {
+    id: 'technology', content_group: 'news', name: '과학기술', sort_order: 30,
+    display_id_pattern: '#YYYY-MM-DD-TEC', slug_pattern: 'technology-briefing-YYYY-MM-DD',
+    wrapper_class: 'daily-brief-note news-briefing technology',
+  },
+  {
+    id: 'climate-energy', content_group: 'news', name: '환경·에너지', sort_order: 50,
+    display_id_pattern: '#YYYY-MM-DD-ENV', slug_pattern: 'climate-energy-briefing-YYYY-MM-DD',
+    wrapper_class: 'daily-brief-note news-briefing climate-energy',
+  },
+  {
     id: 'info-db', content_group: 'info_db', name: '정보DB', sort_order: 70,
     display_id_pattern: '정보DB-###', slug_pattern: 'info-db-###', wrapper_class: 'daily-brief-note info-db',
   },
@@ -31,7 +41,7 @@ const categories: Category[] = [
   },
   {
     id: 'chinese-study', content_group: 'chinese', name: '중국어 학습', sort_order: 80,
-    display_id_pattern: null, slug_pattern: 'cctv-chinese-news-study-###',
+    display_id_pattern: null, slug_pattern: 'cctv-chinese-news-###',
     wrapper_class: 'daily-brief-note chinese-study',
   },
 ]
@@ -133,6 +143,30 @@ describe('PostForm', () => {
     ).toBeInTheDocument()
   })
 
+  it.each([
+    ['technology', 'technology-briefing-2026-07-16'],
+    ['climate-energy', 'climate-energy-briefing-2026-07-16'],
+  ])('%s 선택과 날짜 변경 시 slug 미리보기를 갱신한다', async (categoryId, expected) => {
+    const browserUser = userEvent.setup()
+    renderCreateForm()
+    await browserUser.selectOptions(screen.getByLabelText('카테고리'), categoryId)
+    await browserUser.type(screen.getByLabelText('브리핑 날짜'), '2026-07-16')
+    expect(screen.getByLabelText('Slug')).toHaveValue(expected)
+    expect(screen.getByText(new RegExp(`미리보기: ${expected}`))).toBeInTheDocument()
+  })
+
+  it('중국어 학습 current slug 형식 예시를 표시하고 이전 pattern을 거부한다', async () => {
+    const browserUser = userEvent.setup()
+    renderCreateForm()
+    await browserUser.selectOptions(screen.getByLabelText('카테고리'), 'chinese-study')
+    expect(screen.getByText(/형식 예시: cctv-chinese-news-001/)).toBeInTheDocument()
+    await browserUser.type(screen.getByLabelText('제목'), '중국어 학습')
+    await browserUser.type(screen.getByLabelText('요약'), '중국어 학습 요약')
+    await browserUser.type(screen.getByLabelText('Slug'), 'cctv-chinese-news-study-001')
+    await browserUser.click(screen.getByRole('button', { name: '콘텐츠 저장' }))
+    expect(await screen.findByText(/cctv-chinese-news-###/)).toBeInTheDocument()
+  })
+
   it('requires a briefing date after selecting a news category', async () => {
     const browserUser = userEvent.setup()
     renderCreateForm()
@@ -213,6 +247,23 @@ describe('PostForm', () => {
     expect(onSubmit).toHaveBeenCalledWith(
       expect.objectContaining({ htmlBody: '', contentStatus: 'draft' }),
     )
+  })
+
+  it('기존 legacy slug는 unrelated save에서 보존하고 slug 변경에는 current pattern을 요구한다', async () => {
+    const browserUser = userEvent.setup()
+    const onSubmit = vi.fn().mockResolvedValue(undefined)
+    const legacyPost = { ...post, category_id: 'technology', slug: 'science-tech-briefing-2026-07-10' }
+    render(<PostForm mode="edit" categories={categories} post={legacyPost} isSaving={false} submitError={null} onSubmit={onSubmit} />)
+
+    await browserUser.type(screen.getByLabelText('요약'), ' 수정')
+    await browserUser.click(screen.getByRole('button', { name: '변경 사항 저장' }))
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ slug: legacyPost.slug }))
+
+    await browserUser.clear(screen.getByLabelText('Slug'))
+    await browserUser.type(screen.getByLabelText('Slug'), 'science-tech-briefing-2026-07-11')
+    await browserUser.click(screen.getByRole('button', { name: '변경 사항 저장' }))
+    expect(await screen.findByText(/technology-briefing-YYYY-MM-DD/)).toBeInTheDocument()
+    expect(onSubmit).toHaveBeenCalledTimes(1)
   })
 
   it('runs strict validation when a draft contains HTML', async () => {

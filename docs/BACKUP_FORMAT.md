@@ -121,6 +121,8 @@ checksum은 전송·저장 중 우발적 변경을 탐지하기 위한 것이며
 
 Category 호환성에서 ID 누락, `contentGroup` 또는 `code` 의미 차이는 복원 불가다. 표시 이름, wrapper, slug/display ID pattern, 활성 상태와 정렬 차이는 Phase 4B-3에서 정책을 선택할 수 있는 경고다. Category row를 자동 생성하거나 변경하지 않으며 과거 게시물의 display ID와 slug도 변경하지 않는다.
 
+과거 manifest의 `science-tech-briefing-YYYY-MM-DD`, `environment-briefing-YYYY-MM-DD`, `cctv-chinese-news-study-###`는 현재 pattern과의 차이로 경고할 수 있다. 현재 category 설정을 선택해도 백업의 기존 post slug와 WordPress URL은 그대로 복원하며 자동 변환하지 않는다.
+
 DB 조회는 기존 RLS가 적용되는 현재 인증 사용자의 행만 명시적 projection으로 100개씩 확인한다. 후보는 안전한 신규, 동일 데이터, ID 충돌, unique key 충돌, 관계 충돌로 결정적으로 분류한다. partial 또는 unavailable 조회는 경고로 남기며 raw DB 오류, owner ID와 전체 row를 결과에 포함하지 않는다.
 
 Phase 4B-3용 restore analysis JSON에는 checksum fingerprint, schema/profile, category 차이, section·conflict count, preserve·reuse·remap·conflict 후보와 검사 상태만 포함한다. 전체 `htmlBody`, 전체 prompt text, normalized Import payload, 인증 정보와 token은 제외한다. 분석 결과는 복사할 수 있지만 저장하지 않으며 입력이 변경되면 폐기한다.

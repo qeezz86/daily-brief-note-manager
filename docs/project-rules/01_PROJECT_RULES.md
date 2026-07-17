@@ -171,7 +171,23 @@ SNS, 커뮤니티, 카페, 개인 블로그는 단독 사실 근거로 사용하
 
 ---
 
-## 10. 공통 금지 사항
+## 10. URL 슬러그
+
+- 종합: `daily-news-briefing-YYYY-MM-DD`
+- 경제: `economy-briefing-YYYY-MM-DD`
+- 국제: `global-briefing-YYYY-MM-DD`
+- 과학기술: `technology-briefing-YYYY-MM-DD`
+- 사회: `society-briefing-YYYY-MM-DD`
+- 환경·에너지: `climate-energy-briefing-YYYY-MM-DD`
+- AI 칼럼: `ai-###`
+- 정보DB: `info-db-###`
+- 중국어 학습: `cctv-chinese-news-###`
+
+`###`는 최소 3자리로 zero-padding하며 1000 이상은 자릿수를 제한하지 않는다. 카테고리 설정 변경은 이미 발행된 게시물의 slug나 WordPress URL을 자동으로 변경하지 않는다.
+
+---
+
+## 11. 공통 금지 사항
 
 - 사실 미확인 상태에서 단정
 - 없는 출처 생성

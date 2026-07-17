@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { useFieldArray, useForm, useWatch } from 'react-hook-form'
 
 import type { Category } from '../categories/categories.types'
-import { buildSuggestedSlug } from './postIdentifiers'
+import { buildSuggestedSlug, matchesCategoryPattern } from './postIdentifiers'
 import { validateWordPressHtml } from './htmlValidation'
 import {
   postFormSchema,
@@ -148,6 +148,20 @@ export function PostForm({
     setHtmlValidationErrors([])
 
     if (
+      selectedCategory &&
+      (mode === 'create' || dirtyFields.slug) &&
+      !matchesCategoryPattern(selectedCategory.slug_pattern, values.slug, {
+        date: values.briefingDate,
+        seriesNo: post?.series_no,
+      })
+    ) {
+      setError('slug', {
+        message: `slug는 카테고리 설정 패턴(${selectedCategory.slug_pattern})과 일치해야 합니다.`,
+      })
+      return
+    }
+
+    if (
       mode === 'edit' &&
       values.contentStatus !== 'archived' &&
       values.htmlBody.trim() &&
@@ -200,6 +214,12 @@ export function PostForm({
   }
 
   const useWatchTitle = useWatch({ control, name: 'title' })
+  const slugExample = selectedCategory
+    ? buildSuggestedSlug(selectedCategory, {
+      date: briefingDate || 'YYYY-MM-DD',
+      seriesNo: selectedCategory.content_group === 'news' ? null : 1,
+    })
+    : null
 
   useEffect(() => {
     setValue(
@@ -320,7 +340,10 @@ export function PostForm({
             <p className="field-help">
               영문 소문자, 숫자, 단일 하이픈만 사용할 수 있습니다.
               {selectedCategory
-                ? ` 설정 패턴: ${selectedCategory.slug_pattern}`
+                ? ` 설정 패턴: ${selectedCategory.slug_pattern} · ${selectedCategory.content_group === 'news' && briefingDate ? '미리보기' : '형식 예시'}: ${slugExample}`
+                : ''}
+              {mode === 'create' && selectedCategory?.content_group !== 'news'
+                ? ' 실제 번호는 저장 시 원자적으로 발급됩니다.'
                 : ''}
             </p>
           )}

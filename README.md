@@ -139,3 +139,11 @@ supabase/
 ```
 
 제품 요구사항과 상세 규칙은 `docs/` 문서를 기준으로 합니다.
+
+## URL slug 기준
+
+- 과학기술: `technology-briefing-YYYY-MM-DD`
+- 환경·에너지: `climate-energy-briefing-YYYY-MM-DD`
+- 중국어 학습: `cctv-chinese-news-###`
+
+신규 글은 현재 category 설정을 사용합니다. 설정 변경이나 복원 과정에서 이미 발행된 게시물의 slug와 WordPress URL을 자동 변경하지 않습니다.

@@ -6,9 +6,14 @@ describe('mapNormalizedImportItemToPayload', () => {
   it('maps camelCase fields to the explicit RPC payload', () => {
     const payload = mapNormalizedImportItemToPayload(validNewsPost({ publishedAt: '2026-07-12T10:00:00+09:00' }))
     expect(payload.category_id).toBe('economy')
+    expect(payload.validation_mode).toBe('strict')
     expect(payload.published_at).toBe('2026-07-12T10:00:00+09:00')
     expect(payload.seo).toMatchObject({ representative_title: '경제 핵심 뉴스 정리' })
     expect(payload.sources[0]).toMatchObject({ source_name: 'Example', sort_order: 0 })
+  })
+
+  it('명시적 legacy mode를 execution payload에 보존한다', () => {
+    expect(mapNormalizedImportItemToPayload(validNewsPost(), 'legacy').validation_mode).toBe('legacy')
   })
 
   it('does not include owner, internal IDs, or news tracking', () => {

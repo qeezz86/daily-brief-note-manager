@@ -26,7 +26,10 @@ function mapMetadata(value: unknown): Json {
   return Object.keys(mapped).length ? mapped : null
 }
 
-export function mapNormalizedImportItemToPayload(value: unknown): ImportContentPostPayload {
+export function mapNormalizedImportItemToPayload(
+  value: unknown,
+  validationMode: 'strict' | 'legacy' = 'strict',
+): ImportContentPostPayload {
   const item = record(value)
   const seo = record(item.seo)
   const image = record(item.image)
@@ -44,6 +47,7 @@ export function mapNormalizedImportItemToPayload(value: unknown): ImportContentP
   }) : []
 
   return {
+    validation_mode: validationMode,
     category_id: text(item.categoryId).trim(),
     title: text(item.title).trim(),
     summary: text(item.summary).trim(),

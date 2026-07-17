@@ -142,7 +142,9 @@ categories
 | 환경·에너지 | `ENV` | `#YYYY-MM-DD-ENV` | `climate-energy-briefing-YYYY-MM-DD` | `daily-brief-note news-briefing climate-energy` |
 | AI 칼럼 | `AI` | `AI-###` | `ai-###` | `daily-brief-note ai-column` |
 | 정보DB | `INFO` | `정보DB-###` | `info-db-###` | `daily-brief-note info-db` |
-| 중국어 학습 | `CHINESE` | 없음 | `cctv-chinese-news-study-###` | `daily-brief-note chinese-study` |
+| 중국어 학습 | `CHINESE` | 없음 | `cctv-chinese-news-###` | `daily-brief-note chinese-study` |
+
+`###`는 최소 3자리로 zero-padding하며 1000 이상은 그대로 확장한다. 이 설정의 변경은 기존 `posts.slug` 또는 `posts.wordpress_url`을 자동으로 다시 쓰지 않는다.
 
 카테고리 정의 seed와 개발용 샘플 데이터는 분리한다.
 

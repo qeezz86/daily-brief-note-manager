@@ -94,7 +94,7 @@ values
     'CHINESE',
     'daily-brief-note chinese-study',
     null,
-    'cctv-chinese-news-study-###',
+    'cctv-chinese-news-###',
     80,
     true
   )

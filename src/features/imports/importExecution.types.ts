@@ -1,6 +1,7 @@
 import type { Json } from '../../shared/supabase/database.types'
 
 export interface ImportContentPostPayload {
+  validation_mode: 'strict' | 'legacy'
   category_id: string
   title: string
   summary: string

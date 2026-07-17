@@ -1,5 +1,5 @@
 import type { DatabaseClient } from '../../shared/supabase/client'
-import { buildDisplayId } from './postIdentifiers'
+import { buildDisplayId, buildSuggestedSlug } from './postIdentifiers'
 import type {
   CreatePostInput,
   PostDetail,
@@ -223,6 +223,10 @@ export async function createPost(
     date: input.briefingDate,
     seriesNo,
   })
+  const slug = buildSuggestedSlug(input.category, {
+    date: input.briefingDate,
+    seriesNo,
+  })
   const insert: PostInsert = {
     owner_id: input.ownerId,
     category_id: input.category.id,
@@ -233,7 +237,7 @@ export async function createPost(
     title: input.title,
     summary: input.summary,
     html_body: null,
-    slug: input.slug,
+    slug,
     wordpress_url: input.wordpressUrl,
     content_status: input.contentStatus,
     source_import_type: 'manual_entry',

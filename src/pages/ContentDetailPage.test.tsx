@@ -16,7 +16,7 @@ const category: Category = {
   name: '중국어 학습',
   sort_order: 80,
   display_id_pattern: null,
-  slug_pattern: 'cctv-chinese-news-study-###',
+  slug_pattern: 'cctv-chinese-news-###',
   wrapper_class: 'daily-brief-note chinese-study',
 }
 

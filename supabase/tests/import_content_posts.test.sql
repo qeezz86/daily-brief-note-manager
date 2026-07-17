@@ -1,7 +1,7 @@
 begin;
 
 create extension if not exists pgtap with schema extensions;
-select plan(60);
+select plan(65);
 
 insert into auth.users (id, email) values
   ('00000000-0000-0000-0000-0000000004a2', 'import-owner@example.test'),
@@ -28,9 +28,9 @@ declare
 begin
   select * into category_row from public.categories where id = p_category;
   slug_value := replace(category_row.slug_pattern, 'YYYY-MM-DD', p_reference::text);
-  slug_value := replace(slug_value, '###', lpad(coalesce(p_series, 0)::text, 3, '0'));
+  slug_value := replace(slug_value, '###', lpad(coalesce(p_series, 0)::text, greatest(3, char_length(coalesce(p_series, 0)::text)), '0'));
   display_value := case when category_row.display_id_pattern is null then null
-    else replace(replace(category_row.display_id_pattern, 'YYYY-MM-DD', p_reference::text), '###', lpad(coalesce(p_series, 0)::text, 3, '0')) end;
+    else replace(replace(category_row.display_id_pattern, 'YYYY-MM-DD', p_reference::text), '###', lpad(coalesce(p_series, 0)::text, greatest(3, char_length(coalesce(p_series, 0)::text)), '0')) end;
   source_url := case when category_row.content_group = 'chinese'
     then 'https://news.cctv.com/' || to_char(p_reference, 'YYYY/MM/DD') || '/content-' || p_series || '.shtml'
     else 'https://example.com/' || p_category || '/' || p_reference || coalesce('-' || p_series, '') end;
@@ -123,6 +123,24 @@ select lives_ok($$ select public.import_content_post(public.test_import_payload(
 select is((select count(*)::integer from public.tags where owner_id='00000000-0000-0000-0000-0000000004a2' and normalized_name='금리'),1,'56 normalized tag reused');
 select is((select count(*)::integer from public.news_topics where owner_id='00000000-0000-0000-0000-0000000004a2'),0,'57 news topics not imported');
 select is((select count(*)::integer from public.news_updates where owner_id='00000000-0000-0000-0000-0000000004a2'),0,'58 news updates not imported');
+
+select throws_ok($$
+  select public.import_content_post(
+    jsonb_set(public.test_import_payload('technology','2026-08-16'), '{slug}', to_jsonb('science-tech-briefing-2026-08-16'::text))
+    || '{"validation_mode":"strict"}'::jsonb
+  )
+$$,'23514','IMPORT_VALIDATION_FAILED','strict import rejects a deprecated slug pattern');
+select lives_ok($$
+  select public.import_content_post(
+    jsonb_set(public.test_import_payload('technology','2026-08-16'), '{slug}', to_jsonb('science-tech-briefing-2026-08-16'::text))
+    || '{"validation_mode":"legacy"}'::jsonb
+  )
+$$,'explicit legacy import preserves a historical WordPress slug');
+select is((select slug from public.posts where category_id='technology' and briefing_date='2026-08-16'),'science-tech-briefing-2026-08-16','legacy import stores the original slug without rewriting it');
+select lives_ok($$
+  select public.import_content_post(public.test_import_payload('chinese-study','2026-08-17',1000) || '{"validation_mode":"strict"}'::jsonb)
+$$,'strict Chinese import accepts a four-digit series without truncation');
+select is((select slug from public.posts where category_id='chinese-study' and series_no=1000),'cctv-chinese-news-1000','four-digit Chinese series slug is preserved');
 
 set local "request.jwt.claims" = '{"role":"authenticated"}';
 select throws_ok($$ select public.import_content_post(public.test_import_payload('economy','2026-08-12')) $$,'42501','IMPORT_AUTH_REQUIRED','59 missing auth.uid rejected');

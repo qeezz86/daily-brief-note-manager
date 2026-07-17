@@ -77,9 +77,9 @@ SEO 정보 전체를 하나의 코드블록으로 묶지 않는다.
 - 종합: `daily-news-briefing-YYYY-MM-DD`
 - 경제: `economy-briefing-YYYY-MM-DD`
 - 국제: `global-briefing-YYYY-MM-DD`
-- 과학기술: `science-tech-briefing-YYYY-MM-DD`
+- 과학기술: `technology-briefing-YYYY-MM-DD`
 - 사회: `society-briefing-YYYY-MM-DD`
-- 환경: `environment-briefing-YYYY-MM-DD`
+- 환경·에너지: `climate-energy-briefing-YYYY-MM-DD`
 
 ### AI 칼럼
 
@@ -91,7 +91,9 @@ SEO 정보 전체를 하나의 코드블록으로 묶지 않는다.
 
 ### 중국어 학습
 
-`cctv-chinese-news-study-###`
+`cctv-chinese-news-###`
+
+`###`는 최소 3자리로 zero-padding하며 1000 이상은 자릿수를 제한하지 않는다. 이미 발행된 게시물의 slug와 WordPress URL은 규칙 변경만으로 자동 수정하지 않는다.
 
 ---
 

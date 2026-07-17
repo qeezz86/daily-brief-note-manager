@@ -19,6 +19,7 @@ export async function buildPreparedImportItems(input: {
   rawItems: unknown[]
   categories: ImportCategory[]
   approvedWarnings: Set<string>
+  validationMode?: 'strict' | 'legacy'
 }): Promise<PreparedImportJobItem[]> {
   const prepared: PreparedImportJobItem[] = []
   for (let itemIndex = 0; itemIndex < input.items.length; itemIndex += 1) {
@@ -32,7 +33,7 @@ export async function buildPreparedImportItems(input: {
       schemaVersion: 1,
       externalKey,
       contentGroup: category.contentGroup,
-      content: mapNormalizedImportItemToPayload(rawItem),
+      content: mapNormalizedImportItemToPayload(rawItem, input.validationMode),
       tracking: category.contentGroup === 'news' && raw.newsTracking != null
         ? mapImportTrackingPayload(raw.newsTracking) as unknown as Json
         : null,
@@ -60,6 +61,7 @@ export async function prepareImportJob(client: DatabaseClient, input: {
   rawItems: unknown[]
   categories: ImportCategory[]
   approvedWarnings: Set<string>
+  validationMode?: 'strict' | 'legacy'
 }) {
   const prepared = await buildPreparedImportItems(input)
   const sourceFingerprint = await createImportFingerprint({

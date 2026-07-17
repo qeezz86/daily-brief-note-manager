@@ -85,6 +85,16 @@ describe('HTML 검증 재사용', () => {
     const bundle = { ...withPost({ htmlBody: '<div class="daily-brief-note news-briefing economy"><h1 class="old">x</h1></div>' }), validationMode: 'legacy' as const }
     expect(validate(bundle).items[0].issues.find((issue) => issue.code === 'HTML_UNKNOWN_CLASS')?.severity).toBe('warning')
   })
+  it('legacy mode는 이전 WordPress slug를 warning으로 보존한다', () => {
+    const bundle = { ...withPost({ slug: 'science-tech-briefing-2026-07-12', categoryId: 'technology', displayId: '#2026-07-12-TEC', htmlBody: '<div class="daily-brief-note news-briefing technology"><h1>x</h1></div>' }), validationMode: 'legacy' as const }
+    const result = validate(bundle)
+    expect(result.items[0].issues.find((issue) => issue.code === 'POST_LEGACY_SLUG_PATTERN_MISMATCH')?.severity).toBe('warning')
+  })
+  it('strict mode는 이전 slug를 거부하고 current slug를 허용한다', () => {
+    const old = withPost({ slug: 'environment-briefing-2026-07-12', categoryId: 'climate-energy', displayId: '#2026-07-12-ENV', htmlBody: '<div class="daily-brief-note news-briefing climate-energy"><h1>x</h1></div>' })
+    expect(codes(old)).toContain('POST_SLUG_PATTERN_MISMATCH')
+    expect(codes({ ...old, posts: [{ ...old.posts[0], slug: 'climate-energy-briefing-2026-07-12' }] })).not.toContain('POST_SLUG_PATTERN_MISMATCH')
+  })
 })
 
 describe('SEO, 태그, 출처 검증', () => {
@@ -123,11 +133,11 @@ describe('카테고리 metadata', () => {
   it.each(['programName', 'originalUrl', 'verifiedCoreFact'])('중국어 %s 누락을 차단한다', (field) => {
     const metadata = { learningTopic: '경제', programName: 'CCTV', originalTitle: '제목', originalUrl: 'https://news.cctv.com/a', originalPublishedAt: '2026-07-12T00:00:00+08:00', episodeListIncluded: false, verifiedCoreFact: '확인' }
     delete metadata[field as keyof typeof metadata]
-    const post = validNewsPost({ categoryId: 'chinese-study', seriesNo: 1, briefingDate: null, displayId: null, slug: 'cctv-chinese-news-study-001', newsTracking: null, htmlBody: '<div class="daily-brief-note chinese-study"><h1>중국어</h1></div>', metadata, sources: [{ sourceName: 'CCTV', sourceTitle: '제목', sourceUrl: 'https://news.cctv.com/a', sourcePublishedAt: '2026-07-12T00:00:00+08:00', checkedPoint: '확인' }] })
+    const post = validNewsPost({ categoryId: 'chinese-study', seriesNo: 1, briefingDate: null, displayId: null, slug: 'cctv-chinese-news-001', newsTracking: null, htmlBody: '<div class="daily-brief-note chinese-study"><h1>중국어</h1></div>', metadata, sources: [{ sourceName: 'CCTV', sourceTitle: '제목', sourceUrl: 'https://news.cctv.com/a', sourcePublishedAt: '2026-07-12T00:00:00+08:00', checkedPoint: '확인' }] })
     expect(validate(validImportBundle([post])).items[0].status).toBe('invalid')
   })
   it('중국어 display ID를 차단한다', () => {
-    const post = validNewsPost({ categoryId: 'chinese-study', seriesNo: 1, briefingDate: null, displayId: 'BAD', slug: 'cctv-chinese-news-study-001', status: 'draft', newsTracking: null })
+    const post = validNewsPost({ categoryId: 'chinese-study', seriesNo: 1, briefingDate: null, displayId: 'BAD', slug: 'cctv-chinese-news-001', status: 'draft', newsTracking: null })
     expect(codes(validImportBundle([post]))).toContain('CHINESE_DISPLAY_ID_NOT_ALLOWED')
   })
 })

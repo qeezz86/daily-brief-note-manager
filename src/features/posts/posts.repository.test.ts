@@ -37,7 +37,7 @@ const chineseCategory: Category = {
   name: '중국어 학습',
   sort_order: 80,
   display_id_pattern: null,
-  slug_pattern: 'cctv-chinese-news-study-###',
+  slug_pattern: 'cctv-chinese-news-###',
   wrapper_class: 'daily-brief-note chinese-study',
 }
 
@@ -111,7 +111,7 @@ describe('posts repository mutations', () => {
       p_category_id: 'ai-column',
     })
     expect(builder.insert).toHaveBeenCalledWith(
-      expect.objectContaining({ series_no: 7, display_id: 'AI-007' }),
+      expect.objectContaining({ series_no: 7, display_id: 'AI-007', slug: 'ai-007' }),
     )
   })
 

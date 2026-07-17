@@ -8,6 +8,35 @@
 
 ---
 
+## 2026-07-16｜URL 슬러그 규칙 정합성 수정
+
+### 변경 대상
+
+- `README.md`
+- `docs/PRODUCT_SPEC.md`
+- `docs/DATABASE_SCHEMA.md`
+- `docs/IMPORT_FORMAT.md`
+- `docs/BACKUP_FORMAT.md`
+- `docs/project-rules/01_PROJECT_RULES.md`
+- `docs/project-rules/03_SEO_RULES.md`
+- category seed·forward migration과 관련 generator·validator
+
+### 변경 내용
+
+- 과학기술: `science-tech-briefing-YYYY-MM-DD` → `technology-briefing-YYYY-MM-DD`
+- 환경·에너지: `environment-briefing-YYYY-MM-DD` → `climate-energy-briefing-YYYY-MM-DD`
+- 중국어 학습: `cctv-chinese-news-study-###` → `cctv-chinese-news-###`
+
+### 변경 이유
+
+실제 WordPress에서 사용하는 URL slug와 프로젝트 지침, SEO 규칙, category 설정 및 validation을 일치시키기 위함이다.
+
+### 기존 게시물 정책
+
+이미 발행된 게시물의 slug와 WordPress URL은 자동 변경하지 않는다.
+
+---
+
 ## 2026-07-08｜통합 최종본 v1.0
 
 ### 전체 구조

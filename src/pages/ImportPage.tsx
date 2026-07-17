@@ -80,6 +80,7 @@ export function ImportPageContent({ client = supabase, userId = '' }: { client?:
         format: String(root.format ?? ''), schemaVersion: Number(root.schemaVersion),
         sourceName: metadata?.fileName ?? (typeof root.source === 'string' ? root.source : null),
         validationResult: result, items: fresh.items, rawItems: selectedRaw, categories, approvedWarnings,
+        validationMode: root.validationMode === 'legacy' ? 'legacy' : 'strict',
       })
       setMessage(prepared.isExisting ? '동일한 bundle의 기존 작업을 열고 있습니다.' : '영구 Import 작업을 만들었습니다.')
       navigate(`/imports/history/${prepared.jobId}`)
