@@ -1,7 +1,8 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { DatabaseClient } from '../shared/supabase/client'
+import * as backupGenerationModule from '../features/backups/backupGeneration.module'
 import { backupSnapshotFixture } from '../features/backups/backups.fixtures'
 import { BackupPageContent } from './BackupPage'
 
@@ -26,58 +27,91 @@ describe('BackupPageContent', () => {
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined)
   })
 
+  function view() {
+    return render(<BackupPageContent client={client} userId="owner" loadGenerationModule={() => Promise.resolve(backupGenerationModule)} />)
+  }
+
   it('백업 페이지 설명을 렌더링한다', () => {
-    render(<BackupPageContent client={client} userId="owner" />)
+    view()
     expect(screen.getByRole('heading', { name: '백업' })).toBeInTheDocument()
     expect(screen.getByText('Phase 4B-1')).toBeInTheDocument()
   })
   it('core를 기본 선택한다', () => {
-    render(<BackupPageContent client={client} userId="owner" />)
+    view()
     expect(screen.getByRole('radio', { name: /^핵심 데이터/ })).toBeChecked()
   })
   it('full 프로필을 선택하고 용량 안내를 표시한다', async () => {
-    render(<BackupPageContent client={client} userId="owner" />)
+    view()
     await userEvent.click(screen.getByRole('radio', { name: /^전체 데이터/ }))
     expect(screen.getByText(/Import job snapshot과 실행 이력/)).toBeInTheDocument()
   })
   it('예상 count를 표시한다', () => {
-    render(<BackupPageContent client={client} userId="owner" />)
+    view()
     expect(screen.getByText('예상 전체:')).toBeInTheDocument()
     expect(screen.getByText('2 records')).toBeInTheDocument()
   })
+  it('초기 렌더에서는 생성 module을 불러오지 않고 클릭 시 한 번만 불러온다', async () => {
+    let resolve!: (value: typeof backupGenerationModule) => void
+    const loadModule = vi.fn(() => new Promise<typeof backupGenerationModule>((done) => { resolve = done }))
+    render(<BackupPageContent client={client} userId="owner" loadGenerationModule={loadModule} />)
+
+    expect(loadModule).not.toHaveBeenCalled()
+    await userEvent.click(screen.getByRole('button', { name: '백업 생성' }))
+    expect(loadModule).toHaveBeenCalledOnce()
+    expect(screen.getByRole('status')).toHaveTextContent('백업 도구를 불러오는 중입니다.')
+    expect(screen.getByRole('button', { name: '백업 도구 불러오는 중' })).toBeDisabled()
+
+    await act(async () => { resolve(backupGenerationModule) })
+    expect(await screen.findByRole('heading', { name: '백업 manifest' })).toBeInTheDocument()
+  })
+  it('생성 module load 오류를 안전하게 표시하고 다음 클릭에서 재시도한다', async () => {
+    const loadModule = vi.fn()
+      .mockRejectedValueOnce(new Error('private chunk url'))
+      .mockResolvedValueOnce(backupGenerationModule)
+    render(<BackupPageContent client={client} userId="owner" loadGenerationModule={loadModule} />)
+
+    await userEvent.click(screen.getByRole('button', { name: '백업 생성' }))
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('BACKUP_MODULE_LOAD_FAILED')
+    expect(alert).not.toHaveTextContent('private chunk')
+
+    await userEvent.click(screen.getByRole('button', { name: '백업 생성' }))
+    expect(await screen.findByRole('heading', { name: '백업 manifest' })).toBeInTheDocument()
+    expect(loadModule).toHaveBeenCalledTimes(2)
+  })
   it('생성 진행 단계와 완료 manifest를 표시한다', async () => {
-    render(<BackupPageContent client={client} userId="owner" />)
+    view()
     await userEvent.click(screen.getByRole('button', { name: '백업 생성' }))
     expect(await screen.findByRole('heading', { name: '백업 manifest' })).toBeInTheDocument()
     expect(screen.getByText('파일 준비 완료')).toHaveAttribute('aria-current', 'step')
   })
   it('section count와 byte size를 표시한다', async () => {
-    render(<BackupPageContent client={client} userId="owner" />)
+    view()
     await userEvent.click(screen.getByRole('button', { name: '백업 생성' }))
     expect(await screen.findByText(/bytes|KB/)).toBeInTheDocument()
     expect(screen.getAllByText('posts').length).toBeGreaterThan(0)
   })
   it('관계와 checksum 검증 성공을 표시한다', async () => {
-    render(<BackupPageContent client={client} userId="owner" />)
+    view()
     await userEvent.click(screen.getByRole('button', { name: '백업 생성' }))
     expect(await screen.findByText('검증 완료')).toBeInTheDocument()
     expect(screen.getByText('통과')).toBeInTheDocument()
   })
   it('checksum을 표시하고 복사한다', async () => {
-    render(<BackupPageContent client={client} userId="owner" />)
+    view()
     await userEvent.click(screen.getByRole('button', { name: '백업 생성' }))
     await userEvent.click(await screen.findByRole('button', { name: 'checksum 복사' }))
     expect(await screen.findByText('checksum을 복사했습니다.')).toBeInTheDocument()
     expect(navigator.clipboard.writeText).toHaveBeenCalledWith(expect.stringMatching(/^[0-9a-f]{64}$/))
   })
   it('manifest JSON을 복사한다', async () => {
-    render(<BackupPageContent client={client} userId="owner" />)
+    view()
     await userEvent.click(screen.getByRole('button', { name: '백업 생성' }))
     await userEvent.click(await screen.findByRole('button', { name: 'manifest JSON 복사' }))
     expect(await screen.findByText('manifest JSON을 복사했습니다.')).toBeInTheDocument()
   })
   it('JSON 다운로드 버튼으로 최종 내용을 다운로드한다', async () => {
-    render(<BackupPageContent client={client} userId="owner" />)
+    view()
     await userEvent.click(screen.getByRole('button', { name: '백업 생성' }))
     await userEvent.click(await screen.findByRole('button', { name: 'JSON 다운로드' }))
     expect(URL.createObjectURL).toHaveBeenCalledOnce()
@@ -86,7 +120,7 @@ describe('BackupPageContent', () => {
   it('생성 중 중복 실행을 차단한다', async () => {
     let resolve!: (value: ReturnType<typeof backupSnapshotFixture>) => void
     getSnapshotMock.mockReturnValue(new Promise((done) => { resolve = done }))
-    render(<BackupPageContent client={client} userId="owner" />)
+    view()
     const button = screen.getByRole('button', { name: '백업 생성' })
     await userEvent.click(button)
     expect(screen.getByRole('button', { name: '백업 생성 중' })).toBeDisabled()
@@ -96,7 +130,7 @@ describe('BackupPageContent', () => {
   })
   it('생성 오류를 안전한 문구로 표시한다', async () => {
     getSnapshotMock.mockRejectedValue(new Error('raw database secret'))
-    render(<BackupPageContent client={client} userId="owner" />)
+    view()
     await userEvent.click(screen.getByRole('button', { name: '백업 생성' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('무결성 검증에 실패')
     expect(screen.getByRole('alert')).not.toHaveTextContent('raw database')
@@ -107,7 +141,7 @@ describe('BackupPageContent', () => {
     expect(screen.getByRole('button', { name: '백업 생성' })).toBeDisabled()
   })
   it('프로필 변경 시 이전 생성 결과를 지운다', async () => {
-    render(<BackupPageContent client={client} userId="owner" />)
+    view()
     await userEvent.click(screen.getByRole('button', { name: '백업 생성' }))
     await screen.findByRole('heading', { name: '백업 manifest' })
     await userEvent.click(screen.getByRole('radio', { name: /^전체 데이터/ }))

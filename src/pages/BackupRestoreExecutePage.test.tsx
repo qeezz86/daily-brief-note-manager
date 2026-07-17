@@ -1,8 +1,9 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import type { ValidatedBackupBundle } from '../features/backups/backupRestore.types'
+import * as restoreExecutionModule from '../features/backups/restoreExecution.module'
 import type { RestorePlan } from '../features/backups/restorePlan.types'
 import type { DatabaseClient } from '../shared/supabase/client'
 import { BackupRestoreExecutePageContent } from './BackupRestoreExecutePage'
@@ -18,8 +19,12 @@ const jobId = '00000000-0000-4000-8000-000000000001'
 const bundle = { format: 'daily-brief-note-backup', schemaVersion: 1, profile: 'core', checksum: { algorithm: 'SHA-256', value: 'a'.repeat(64) } } as ValidatedBackupBundle
 const plan = { backup: { checksum: 'a'.repeat(64) }, fingerprint: { value: 'b'.repeat(64) }, summary: { expectedCreateRows: 7, expectedReuseRows: 3, expectedSkippedRows: 2, actionCounts: { preserve_id: 4, remap_id: 2 }, sectionCounts: { seriesCounters: 1 } }, executionStages: [{ order: 1 }] } as unknown as RestorePlan
 
-function view(props: { client?: DatabaseClient | null; userId?: string } = {}) {
-  return render(<MemoryRouter initialEntries={['/backups/restore/execute']}><Routes><Route path="/backups/restore/execute" element={<BackupRestoreExecutePageContent client={props.client === undefined ? client : props.client} userId={props.userId ?? 'owner'} />} /><Route path="/backups/restore/jobs/:jobId" element={<p>job detail destination</p>} /></Routes></MemoryRouter>)
+function view(props: {
+  client?: DatabaseClient | null
+  userId?: string
+  loadExecutionModule?: () => Promise<typeof restoreExecutionModule>
+} = {}) {
+  return render(<MemoryRouter initialEntries={['/backups/restore/execute']}><Routes><Route path="/backups/restore/execute" element={<BackupRestoreExecutePageContent client={props.client === undefined ? client : props.client} userId={props.userId ?? 'owner'} loadExecutionModule={props.loadExecutionModule ?? (() => Promise.resolve(restoreExecutionModule))} />} /><Route path="/backups/restore/jobs/:jobId" element={<p>job detail destination</p>} /></Routes></MemoryRouter>)
 }
 async function selectFiles() {
   await userEvent.upload(screen.getByLabelText('원본 backup JSON'), new File(['{}'], 'backup.json', { type: 'application/json' }))
@@ -33,6 +38,37 @@ describe('BackupRestoreExecutePage', () => {
   })
   it('backup과 plan 두 입력을 요구한다', () => { view(); expect(screen.getByRole('button', { name: '실행 직전 재검증' })).toBeDisabled() })
   it('두 파일 선택 후 실행 전 검증을 허용한다', async () => { view(); await selectFiles(); expect(screen.getByRole('button', { name: '실행 직전 재검증' })).toBeEnabled() })
+  it('초기 렌더와 파일 선택만으로는 execution module을 불러오지 않는다', async () => {
+    const loadExecutionModule = vi.fn(() => Promise.resolve(restoreExecutionModule))
+    view({ loadExecutionModule }); await selectFiles()
+    expect(loadExecutionModule).not.toHaveBeenCalled()
+  })
+  it('재검증 클릭 시 execution module을 로딩하고 입력과 중복 실행을 잠근다', async () => {
+    let resolve!: (value: typeof restoreExecutionModule) => void
+    const loadExecutionModule = vi.fn(() => new Promise<typeof restoreExecutionModule>((done) => { resolve = done }))
+    view({ loadExecutionModule }); await selectFiles()
+    await userEvent.click(screen.getByRole('button', { name: '실행 직전 재검증' }))
+
+    expect(screen.getByRole('status')).toHaveTextContent('복원 실행 도구를 불러오는 중입니다.')
+    expect(screen.getByRole('button', { name: '복원 실행 도구 불러오는 중' })).toBeDisabled()
+    expect(screen.getByLabelText('원본 backup JSON')).toBeDisabled()
+    await act(async () => { resolve(restoreExecutionModule) })
+    expect(await screen.findByText('실행 직전 재검증을 통과했습니다.')).toBeInTheDocument()
+  })
+  it('execution module 오류를 안전하게 표시하고 재검증을 재시도한다', async () => {
+    const loadExecutionModule = vi.fn()
+      .mockRejectedValueOnce(new Error('/assets/private-execution.js'))
+      .mockResolvedValueOnce(restoreExecutionModule)
+    view({ loadExecutionModule }); await selectFiles()
+    await userEvent.click(screen.getByRole('button', { name: '실행 직전 재검증' }))
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('RESTORE_MODULE_LOAD_FAILED')
+    expect(alert).not.toHaveTextContent('private-execution')
+    await userEvent.click(screen.getByRole('button', { name: '실행 직전 재검증' }))
+    expect(await screen.findByText('실행 직전 재검증을 통과했습니다.')).toBeInTheDocument()
+    expect(loadExecutionModule).toHaveBeenCalledTimes(2)
+  })
   it('검증 중 파일과 중복 클릭을 잠근다', async () => {
     let resolve!: (value: unknown) => void; mocks.validate.mockReturnValue(new Promise((done) => { resolve = done })); view(); await selectFiles(); await userEvent.click(screen.getByRole('button', { name: '실행 직전 재검증' }))
     expect(screen.getByRole('button', { name: '재검증 중' })).toBeDisabled(); expect(screen.getByLabelText('원본 backup JSON')).toBeDisabled(); resolve({ valid: false, issues: [], bundle: null, plan: null, categories: [] })

@@ -2,6 +2,8 @@ import react from '@vitejs/plugin-react'
 import { configDefaults, defineConfig } from 'vitest/config'
 import { VitePWA } from 'vite-plugin-pwa'
 
+import { manualChunks } from './build/vendorChunks'
+
 export default defineConfig({
   plugins: [
     react(),
@@ -18,6 +20,22 @@ export default defineConfig({
       },
     }),
   ],
+  build: {
+    rolldownOptions: {
+      output: {
+        codeSplitting: {
+          groups: [
+            {
+              name: (moduleId) => manualChunks(moduleId) ?? null,
+              includeDependenciesRecursively: false,
+              priority: 10,
+            },
+          ],
+        },
+        strictExecutionOrder: true,
+      },
+    },
+  },
   test: {
     environment: 'jsdom',
     setupFiles: './src/test/setup.ts',

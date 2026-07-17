@@ -2,11 +2,13 @@
 
 Daily Brief Note의 콘텐츠, SEO 정보, 출처, 뉴스 추적 이력과 생성 프롬프트를 관리하기 위한 비공개 웹앱입니다.
 
-현재 저장소는 Phase 4C-1 단계입니다. `/backups`에서 공식 `core`·`full` JSON 백업을 생성하고, `/backups/restore`에서 read-only Dry Run과 결정적 복원 계획을 만든 뒤 `/backups/restore/execute`에서 원본 backup과 plan을 다시 검증해 core 데이터와 선택한 full Import 운영 이력을 실제 복원할 수 있습니다. `/backups/restore/jobs`는 영구 job·record·attempt, stage 진행률, 수동 retry, 취소·재개를 제공합니다.
+현재 저장소는 Phase 4C-2 단계입니다. `/backups`에서 공식 `core`·`full` JSON 백업을 생성하고, `/backups/restore`에서 read-only Dry Run과 결정적 복원 계획을 만든 뒤 `/backups/restore/execute`에서 원본 backup과 plan을 다시 검증해 core 데이터와 선택한 full Import 운영 이력을 실제 복원할 수 있습니다. `/backups/restore/jobs`는 영구 job·record·attempt, stage 진행률, 수동 retry, 취소·재개를 제공합니다.
 
 복원 계획은 원본 백업과 분리된 `daily-brief-note-restore-plan` schema version 1 JSON입니다. 실행에는 두 파일이 모두 필요하고 checksum·fingerprint·category·DB 충돌을 직전에 다시 확인합니다. record별 transaction이므로 부분 성공할 수 있으며 브라우저가 닫혀 있는 동안 자동 실행하지 않습니다. 기존 row overwrite·merge, 자동 suffix와 restore undo는 지원하지 않습니다. 허용되는 기존 row 변경은 series counter의 단조 증가와 이번 job이 만든 뉴스 update의 previous 연결 완성으로 제한됩니다.
 
 Phase 4C-1에서는 인증 공급자·route guard·공통 `AppLayout`을 초기 entry에 유지하고, 로그인과 보호 페이지를 React Router `route.lazy`로 직접 파일 단위 동적 import합니다. route 로딩 상태와 chunk load 오류 안내를 공통 처리하며 URL, 중첩 route, params와 인증 redirect 정책은 변경하지 않습니다. build baseline 1,078.60 kB(gzip 292.41 kB)이었던 entry는 521.11 kB(gzip 151.16 kB)로 감소했습니다. 자세한 원칙, route inventory와 chunk 결과는 [`docs/BUNDLE_SPLITTING.md`](docs/BUNDLE_SPLITTING.md)를 참고합니다.
+
+Phase 4C-2에서는 실제 production graph에 있던 React·Router·Query·Supabase·Zod만 제한된 vendor chunk로 분리하고, Backup 생성, Restore 검증·계획·실행, Import 분석 엔진을 해당 사용자 동작 시점에 불러옵니다. loader는 성공 promise를 재사용하고 실패 cache를 비워 다음 동작에서 재시도합니다. entry는 25.19 kB(gzip 7.74 kB), 가장 큰 chunk는 198.47 kB이며 500 kB와 circular chunk 경고가 없습니다. PWA의 `generateSW`·`autoUpdate`·navigation fallback 정책은 유지합니다. 자세한 graph, route/action별 전이 크기와 후속 bundle budget 계획은 [`docs/BUNDLE_SPLITTING.md`](docs/BUNDLE_SPLITTING.md)를 참고합니다.
 
 ## 요구 환경
 

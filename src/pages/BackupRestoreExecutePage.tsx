@@ -1,14 +1,19 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../features/auth/useAuth'
-import { parseBackupFile } from '../features/backups/parseBackupFile'
-import { buildPreparedRestoreRecords } from '../features/backups/prepareRestoreJob'
-import { prepareRestoreExecution } from '../features/backups/prepareRestoreExecution'
+import { loadRestoreExecutionModule, type RestoreExecutionModule } from '../features/backups/restoreExecution.loader'
 import type { RestoreExecutionValidation } from '../features/backups/validateRestoreExecution'
-import { validateRestoreExecution } from '../features/backups/validateRestoreExecution'
 import { supabase, type DatabaseClient } from '../shared/supabase/client'
 
-export function BackupRestoreExecutePageContent({ client = supabase, userId = '' }: { client?: DatabaseClient | null; userId?: string }) {
+export function BackupRestoreExecutePageContent({
+  client = supabase,
+  userId = '',
+  loadExecutionModule = loadRestoreExecutionModule,
+}: {
+  client?: DatabaseClient | null
+  userId?: string
+  loadExecutionModule?: () => Promise<RestoreExecutionModule>
+}) {
   const navigate = useNavigate()
   const [backupFile, setBackupFile] = useState<File | null>(null)
   const [planFile, setPlanFile] = useState<File | null>(null)
@@ -16,38 +21,89 @@ export function BackupRestoreExecutePageContent({ client = supabase, userId = ''
   const [recordCount, setRecordCount] = useState(0)
   const [confirmation, setConfirmation] = useState('')
   const [busy, setBusy] = useState(false)
+  const [moduleLoading, setModuleLoading] = useState(false)
+  const [moduleLoadError, setModuleLoadError] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
+  const mountedRef = useRef(true)
 
-  function invalidate() { setValidation(null); setRecordCount(0); setConfirmation(''); setMessage(null) }
+  useEffect(() => {
+    mountedRef.current = true
+    return () => { mountedRef.current = false }
+  }, [])
+
+  function invalidate() {
+    setValidation(null)
+    setRecordCount(0)
+    setConfirmation('')
+    setMessage(null)
+    setModuleLoadError(false)
+  }
   async function validate() {
     if (!client || !userId || !backupFile || !planFile || busy) return
-    setBusy(true); setMessage('backup checksum과 plan fingerprint를 확인하고 현재 DB 충돌을 다시 조회하고 있습니다.')
+    setBusy(true); setModuleLoading(true); setModuleLoadError(false); setMessage(null)
+    let executionModule: RestoreExecutionModule
     try {
-      const backup = await parseBackupFile(backupFile)
+      executionModule = await loadExecutionModule()
+      if (!mountedRef.current) return
+    } catch {
+      if (mountedRef.current) {
+        setModuleLoadError(true)
+        setBusy(false)
+      }
+      return
+    } finally {
+      if (mountedRef.current) setModuleLoading(false)
+    }
+    setMessage('backup checksum과 plan fingerprint를 확인하고 현재 DB 충돌을 다시 조회하고 있습니다.')
+    try {
+      const backup = await executionModule.parseBackupFile(backupFile)
+      if (!mountedRef.current) return
       if (backup.value === null || backup.issues.length) { setValidation({ valid: false, issues: backup.issues.map((issue) => ({ code: issue.code, message: issue.message })), bundle: null, plan: null, categories: [] }); return }
       const planValue = JSON.parse(await planFile.text()) as unknown
-      const checked = await validateRestoreExecution(client, backup.value, planValue)
+      if (!mountedRef.current) return
+      const checked = await executionModule.validateRestoreExecution(client, backup.value, planValue)
+      if (!mountedRef.current) return
       setValidation(checked)
-      if (checked.valid && checked.bundle && checked.plan) setRecordCount((await buildPreparedRestoreRecords(checked.bundle, checked.plan)).length)
+      if (checked.valid && checked.bundle && checked.plan) {
+        const records = await executionModule.buildPreparedRestoreRecords(checked.bundle, checked.plan)
+        if (!mountedRef.current) return
+        setRecordCount(records.length)
+      }
       setMessage(checked.valid ? '실행 직전 재검증을 통과했습니다.' : '실행을 차단한 항목을 확인해 주세요.')
-    } catch { setValidation(null); setMessage('입력 파일을 읽거나 최신 DB 상태를 확인하지 못했습니다.') }
-    finally { setBusy(false) }
+    } catch { if (mountedRef.current) { setValidation(null); setMessage('입력 파일을 읽거나 최신 DB 상태를 확인하지 못했습니다.') } }
+    finally { if (mountedRef.current) setBusy(false) }
   }
   async function execute() {
     if (!client || !validation?.valid || !validation.bundle || !validation.plan || confirmation !== 'RESTORE' || busy) return
-    setBusy(true)
+    setBusy(true); setModuleLoading(true); setModuleLoadError(false)
+    let executionModule: RestoreExecutionModule
     try {
-      const result = await prepareRestoreExecution(client, { bundle: validation.bundle, plan: validation.plan, categories: validation.categories, sourceName: backupFile?.name ?? null, onProgress: setMessage })
+      executionModule = await loadExecutionModule()
+      if (!mountedRef.current) return
+    } catch {
+      if (mountedRef.current) {
+        setModuleLoadError(true)
+        setBusy(false)
+      }
+      return
+    } finally {
+      if (mountedRef.current) setModuleLoading(false)
+    }
+    try {
+      const result = await executionModule.prepareRestoreExecution(client, { bundle: validation.bundle, plan: validation.plan, categories: validation.categories, sourceName: backupFile?.name ?? null, onProgress: (value) => { if (mountedRef.current) setMessage(value) } })
+      if (!mountedRef.current) return
       navigate(`/backups/restore/jobs/${result.jobId}`)
-    } catch { setMessage('restore job 준비를 완료하지 못했습니다. 동일 파일로 다시 실행하면 준비 중인 job에 이어서 등록합니다.') }
-    finally { setBusy(false) }
+    } catch { if (mountedRef.current) setMessage('restore job 준비를 완료하지 못했습니다. 동일 파일로 다시 실행하면 준비 중인 job에 이어서 등록합니다.') }
+    finally { if (mountedRef.current) setBusy(false) }
   }
   const plan = validation?.plan
   const includesOperationalHistory = plan?.policies?.operationalHistory === 'include' && plan?.backup?.profile === 'full'
-  return <section className="content-page backup-page" aria-labelledby="restore-execute-title">
+  return <section className="content-page backup-page" aria-labelledby="restore-execute-title" aria-busy={moduleLoading}>
     <div className="content-page__heading"><div><p className="dashboard__eyebrow">Phase 4B-4B · durable full restore</p><h1 id="restore-execute-title">백업 데이터 실제 복원</h1><p>원본 backup과 별도 restore plan을 다시 선택하고 실행 직전 DB 상태를 재검증합니다.</p></div><Link className="secondary-button" to="/backups/restore/jobs">복원 작업 목록</Link></div>
-    <section className="backup-panel"><h2>실행 입력</h2><label className="field-label" htmlFor="restore-backup-file">원본 backup JSON</label><input id="restore-backup-file" type="file" accept=".json,application/json" disabled={busy} onChange={(event) => { setBackupFile(event.target.files?.[0] ?? null); invalidate() }} /><label className="field-label" htmlFor="restore-plan-file">restore plan JSON</label><input id="restore-plan-file" type="file" accept=".json,application/json" disabled={busy} onChange={(event) => { setPlanFile(event.target.files?.[0] ?? null); invalidate() }} /><div className="backup-actions"><button className="primary-button" type="button" disabled={!backupFile || !planFile || busy || !client || !userId} onClick={() => void validate()}>{busy ? '재검증 중' : '실행 직전 재검증'}</button></div></section>
+    <section className="backup-panel"><h2>실행 입력</h2><label className="field-label" htmlFor="restore-backup-file">원본 backup JSON</label><input id="restore-backup-file" type="file" accept=".json,application/json" disabled={busy} onChange={(event) => { setBackupFile(event.target.files?.[0] ?? null); invalidate() }} /><label className="field-label" htmlFor="restore-plan-file">restore plan JSON</label><input id="restore-plan-file" type="file" accept=".json,application/json" disabled={busy} onChange={(event) => { setPlanFile(event.target.files?.[0] ?? null); invalidate() }} /><div className="backup-actions"><button className="primary-button" type="button" disabled={!backupFile || !planFile || busy || !client || !userId} onClick={() => void validate()}>{moduleLoading ? '복원 실행 도구 불러오는 중' : busy ? '재검증 중' : '실행 직전 재검증'}</button></div></section>
     {!client ? <p className="form-alert" role="alert">Supabase가 설정되지 않아 복원 실행을 준비할 수 없습니다.</p> : null}
+    {moduleLoading ? <p role="status">복원 실행 도구를 불러오는 중입니다.</p> : null}
+    {moduleLoadError ? <p className="form-alert" role="alert">RESTORE_MODULE_LOAD_FAILED 필요한 기능을 불러오지 못했습니다. 네트워크 상태를 확인한 뒤 다시 시도하세요.</p> : null}
     {message ? <p className="form-alert" role="status">{message}</p> : null}
     {validation?.issues.map((issue) => <p className="form-alert" role="alert" key={issue.code}><code>{issue.code}</code> {issue.message}</p>)}
     {validation?.valid && plan ? <>

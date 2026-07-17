@@ -1,9 +1,11 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
 import { backupRestoreBundleFixture, currentCategoriesFromBundle } from '../features/backups/backupRestore.fixtures'
 import type { ValidatedBackupBundle } from '../features/backups/backupRestore.types'
+import * as restorePlanModule from '../features/backups/restorePlan.module'
+import * as restoreValidationModule from '../features/backups/restoreValidation.module'
 import type { DatabaseClient } from '../shared/supabase/client'
 import { BackupRestorePageContent } from './BackupRestorePage'
 
@@ -13,8 +15,13 @@ vi.mock('../features/backups/backupConflicts.repository', () => ({ getBackupRest
 const client = {} as DatabaseClient
 let bundle: ValidatedBackupBundle
 
-function view(props: { client?: DatabaseClient | null; userId?: string } = {}) {
-  return render(<MemoryRouter><BackupRestorePageContent client={props.client === undefined ? client : props.client} userId={props.userId ?? 'owner'} /></MemoryRouter>)
+function view(props: {
+  client?: DatabaseClient | null
+  userId?: string
+  loadValidationModule?: () => Promise<typeof restoreValidationModule>
+  loadPlanModule?: () => Promise<typeof restorePlanModule>
+} = {}) {
+  return render(<MemoryRouter><BackupRestorePageContent client={props.client === undefined ? client : props.client} userId={props.userId ?? 'owner'} loadValidationModule={props.loadValidationModule ?? (() => Promise.resolve(restoreValidationModule))} loadPlanModule={props.loadPlanModule ?? (() => Promise.resolve(restorePlanModule))} /></MemoryRouter>)
 }
 
 function paste(value = JSON.stringify(bundle)) {
@@ -33,6 +40,35 @@ describe('BackupRestorePage', () => {
   })
   it('JSON text를 붙여넣고 검사한다', async () => {
     view(); paste(); await userEvent.click(screen.getByRole('button', { name: '복원 Dry Run 검사' })); expect(await screen.findByRole('heading', { name: '복원 가능' })).toBeInTheDocument()
+  })
+  it('초기 렌더에서는 validator를 불러오지 않고 분석 시작 시 로딩한다', async () => {
+    let resolve!: (value: typeof restoreValidationModule) => void
+    const loadValidationModule = vi.fn(() => new Promise<typeof restoreValidationModule>((done) => { resolve = done }))
+    view({ loadValidationModule }); paste()
+
+    expect(loadValidationModule).not.toHaveBeenCalled()
+    await userEvent.click(screen.getByRole('button', { name: '복원 Dry Run 검사' }))
+    expect(loadValidationModule).toHaveBeenCalledOnce()
+    expect(screen.getByRole('status')).toHaveTextContent('복원 검증 도구를 불러오는 중입니다.')
+    expect(screen.getByLabelText('백업 JSON text')).toBeDisabled()
+
+    await act(async () => { resolve(restoreValidationModule) })
+    expect(await screen.findByRole('heading', { name: '복원 가능' })).toBeInTheDocument()
+  })
+  it('validator load 오류를 안전하게 표시하고 같은 입력으로 재시도한다', async () => {
+    const loadValidationModule = vi.fn()
+      .mockRejectedValueOnce(new Error('assets/private-validator.js'))
+      .mockResolvedValueOnce(restoreValidationModule)
+    view({ loadValidationModule }); paste()
+
+    await userEvent.click(screen.getByRole('button', { name: '복원 Dry Run 검사' }))
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('RESTORE_MODULE_LOAD_FAILED')
+    expect(alert).not.toHaveTextContent('private-validator')
+    expect(screen.getByLabelText('백업 JSON text')).toHaveValue(JSON.stringify(bundle))
+
+    await userEvent.click(screen.getByRole('button', { name: '복원 Dry Run 검사' }))
+    expect(await screen.findByRole('heading', { name: '복원 가능' })).toBeInTheDocument()
   })
   it('JSON parse 오류를 안전한 code로 표시한다', async () => {
     view(); paste('{'); await userEvent.click(screen.getByRole('button', { name: '복원 Dry Run 검사' })); expect(await screen.findByRole('alert')).toHaveTextContent('BACKUP_JSON_PARSE_FAILED')
@@ -85,6 +121,32 @@ describe('BackupRestorePage', () => {
     await userEvent.click(screen.getByRole('button', { name: '복원 계획 만들기' }))
     expect(await screen.findByRole('heading', { name: '실행 입력 준비 완료' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: '복원 정책' })).toBeInTheDocument(); expect(screen.getByText(/UUID v5 remap/)).toBeInTheDocument(); expect(screen.getByRole('heading', { name: 'Dependency stage' })).toBeInTheDocument()
+  })
+  it('Dry Run 완료 전에는 plan module을 불러오지 않고 계획 단계에서만 불러온다', async () => {
+    const loadPlanModule = vi.fn(() => Promise.resolve(restorePlanModule))
+    view({ loadPlanModule }); paste()
+    expect(loadPlanModule).not.toHaveBeenCalled()
+    await userEvent.click(screen.getByRole('button', { name: '복원 Dry Run 검사' }))
+    await screen.findByRole('heading', { name: '복원 가능' })
+    expect(loadPlanModule).not.toHaveBeenCalled()
+    await userEvent.click(screen.getByRole('button', { name: '복원 계획 만들기' }))
+    expect(await screen.findByRole('heading', { name: '실행 입력 준비 완료' })).toBeInTheDocument()
+    expect(loadPlanModule).toHaveBeenCalledOnce()
+  })
+  it('plan module load 실패 뒤 계획 단계에서 재시도한다', async () => {
+    const loadPlanModule = vi.fn()
+      .mockRejectedValueOnce(new Error('raw plan chunk'))
+      .mockResolvedValueOnce(restorePlanModule)
+    view({ loadPlanModule }); paste()
+    await userEvent.click(screen.getByRole('button', { name: '복원 Dry Run 검사' }))
+    await screen.findByRole('heading', { name: '복원 가능' })
+    await userEvent.click(screen.getByRole('button', { name: '복원 계획 만들기' }))
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('RESTORE_MODULE_LOAD_FAILED')
+    expect(alert).not.toHaveTextContent('raw plan chunk')
+    await userEvent.click(screen.getByRole('button', { name: '계획 생성 다시 시도' }))
+    expect(await screen.findByRole('heading', { name: '실행 입력 준비 완료' })).toBeInTheDocument()
   })
   it('정책 변경 시 계획을 stale 처리하고 다시 생성한다', async () => {
     view(); paste(); await userEvent.click(screen.getByRole('button', { name: '복원 Dry Run 검사' })); await screen.findByRole('heading', { name: '복원 가능' }); await userEvent.click(screen.getByRole('button', { name: '복원 계획 만들기' })); await screen.findByRole('heading', { name: '실행 입력 준비 완료' })

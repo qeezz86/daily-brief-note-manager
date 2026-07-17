@@ -118,14 +118,14 @@ describe('authentication foundation', () => {
     renderApp(client, '/content')
 
     expect(
-      await screen.findByRole('heading', { name: '관리자 로그인' }),
+      await screen.findByRole('heading', { name: '관리자 로그인' }, { timeout: 5_000 }),
     ).toBeInTheDocument()
   })
 
   it('protects the news topic route for unauthenticated users', async () => {
     const { client } = createMockClient()
     renderApp(client, '/news-topics')
-    expect(await screen.findByRole('heading', { name: '관리자 로그인' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: '관리자 로그인' }, { timeout: 5_000 })).toBeInTheDocument()
   })
 
   it('shows the configuration error on the news topic route without Supabase', () => {
@@ -157,7 +157,7 @@ describe('authentication foundation', () => {
     const browserUser = userEvent.setup()
     const { auth, client } = createMockClient()
     renderApp(client, '/login')
-    await screen.findByRole('heading', { name: '관리자 로그인' })
+    await screen.findByRole('heading', { name: '관리자 로그인' }, { timeout: 5_000 })
 
     await browserUser.click(
       screen.getByRole('button', { name: '로그인하기' }),
@@ -180,7 +180,7 @@ describe('authentication foundation', () => {
       error: { message: 'Invalid login credentials' },
     })
     renderApp(client, '/login')
-    await screen.findByRole('heading', { name: '관리자 로그인' })
+    await screen.findByRole('heading', { name: '관리자 로그인' }, { timeout: 5_000 })
 
     await browserUser.type(
       screen.getByLabelText('이메일'),
@@ -211,7 +211,7 @@ describe('authentication foundation', () => {
 
     expect(auth.signOut).toHaveBeenCalledOnce()
     expect(
-      await screen.findByRole('heading', { name: '관리자 로그인' }),
+      await screen.findByRole('heading', { name: '관리자 로그인' }, { timeout: 5_000 }),
     ).toBeInTheDocument()
   })
 })

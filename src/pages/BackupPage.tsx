@@ -1,15 +1,16 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '../features/auth/useAuth'
 import { BackupDownloadPanel } from '../features/backups/BackupDownloadPanel'
 import { BackupGenerationProgress } from '../features/backups/BackupGenerationProgress'
 import { BackupManifestSummary } from '../features/backups/BackupManifestSummary'
 import { BackupProfileSelector } from '../features/backups/BackupProfileSelector'
-import { buildBackupBundle } from '../features/backups/buildBackupBundle'
 import { useBackupEstimateQuery } from '../features/backups/backup.queries'
 import { getBackupSnapshot } from '../features/backups/backup.repository'
 import type { BackupProfile, BuiltBackup } from '../features/backups/backup.types'
-import { scanBackupForSecrets } from '../features/backups/scanBackupForSecrets'
-import { validateBackupRelationships } from '../features/backups/validateBackupRelationships'
+import {
+  loadBackupGenerationModule,
+  type BackupGenerationModule,
+} from '../features/backups/backupGeneration.loader'
 import { formatBackupBytes } from '../features/backups/formatBackupBytes'
 import { supabase, type DatabaseClient } from '../shared/supabase/client'
 
@@ -20,16 +21,25 @@ function appVersion() {
 export function BackupPageContent({
   client = supabase,
   userId = '',
+  loadGenerationModule = loadBackupGenerationModule,
 }: {
   client?: DatabaseClient | null
   userId?: string
+  loadGenerationModule?: () => Promise<BackupGenerationModule>
 }) {
   const [profile, setProfile] = useState<BackupProfile>('core')
   const [backup, setBackup] = useState<BuiltBackup | null>(null)
   const [busy, setBusy] = useState(false)
+  const [moduleLoading, setModuleLoading] = useState(false)
   const [currentStep, setCurrentStep] = useState(-1)
   const [error, setError] = useState<string | null>(null)
+  const mountedRef = useRef(true)
   const estimate = useBackupEstimateQuery(client, userId, profile)
+
+  useEffect(() => {
+    mountedRef.current = true
+    return () => { mountedRef.current = false }
+  }, [])
 
   function changeProfile(next: BackupProfile) {
     setProfile(next)
@@ -43,24 +53,45 @@ export function BackupPageContent({
     setBusy(true)
     setBackup(null)
     setError(null)
+    setModuleLoading(true)
+
+    let generationModule: BackupGenerationModule
+    try {
+      generationModule = await loadGenerationModule()
+      if (!mountedRef.current) return
+    } catch {
+      if (mountedRef.current) {
+        setError('BACKUP_MODULE_LOAD_FAILED 필요한 기능을 불러오지 못했습니다. 네트워크 상태를 확인한 뒤 다시 시도하세요.')
+        setBusy(false)
+      }
+      return
+    } finally {
+      if (mountedRef.current) setModuleLoading(false)
+    }
+
     setCurrentStep(0)
     try {
       const snapshot = await getBackupSnapshot(client, profile)
+      if (!mountedRef.current) return
       setCurrentStep(1)
-      if (!validateBackupRelationships(snapshot).valid) throw new Error('relationship')
+      if (!generationModule.validateBackupRelationships(snapshot).valid) throw new Error('relationship')
       setCurrentStep(2)
-      if (scanBackupForSecrets(snapshot).length) throw new Error('secret')
+      if (generationModule.scanBackupForSecrets(snapshot).length) throw new Error('secret')
       setCurrentStep(3)
       await Promise.resolve()
+      if (!mountedRef.current) return
       setCurrentStep(4)
-      const built = await buildBackupBundle(snapshot, { appVersion: appVersion() })
+      const built = await generationModule.buildBackupBundle(snapshot, { appVersion: appVersion() })
+      if (!mountedRef.current) return
       setBackup(built)
       setCurrentStep(5)
     } catch {
-      setCurrentStep(-1)
-      setError('백업 생성 또는 무결성 검증에 실패했습니다. 데이터는 다운로드되지 않았습니다.')
+      if (mountedRef.current) {
+        setCurrentStep(-1)
+        setError('백업 생성 또는 무결성 검증에 실패했습니다. 데이터는 다운로드되지 않았습니다.')
+      }
     } finally {
-      setBusy(false)
+      if (mountedRef.current) setBusy(false)
     }
   }
 
@@ -84,10 +115,11 @@ export function BackupPageContent({
         {estimate.isError ? <p className="form-alert" role="alert">예상 개수를 불러오지 못했습니다.</p> : null}
         {estimate.data ? <><div className="backup-section-counts">{Object.entries(estimate.data.sectionCounts).map(([section, count]) => <span key={section}><code>{section}</code> {count.toLocaleString()}</span>)}</div><p><strong>예상 전체:</strong> {estimate.data.totalRecords.toLocaleString()} records</p></> : null}
       </section>
-      <section className="backup-panel backup-generate">
+      <section className="backup-panel backup-generate" aria-busy={moduleLoading}>
         <div><h2>백업 생성</h2><p>최종 파일은 20 MB부터 경고하며 100 MB를 초과하면 생성하지 않습니다 ({formatBackupBytes(100 * 1024 * 1024)}).</p></div>
-        <button className="primary-button" type="button" disabled={!client || !userId || busy} onClick={() => void generate()}>{busy ? '백업 생성 중' : backup ? '백업 다시 생성' : '백업 생성'}</button>
+        <button className="primary-button" type="button" disabled={!client || !userId || busy} onClick={() => void generate()}>{moduleLoading ? '백업 도구 불러오는 중' : busy ? '백업 생성 중' : backup ? '백업 다시 생성' : '백업 생성'}</button>
       </section>
+      {moduleLoading ? <p role="status">백업 도구를 불러오는 중입니다.</p> : null}
       {currentStep >= 0 ? <BackupGenerationProgress currentStep={currentStep} /> : null}
       {error ? <p className="form-alert" role="alert">{error}</p> : null}
       {backup ? <><BackupManifestSummary backup={backup} /><BackupDownloadPanel backup={backup} /></> : null}

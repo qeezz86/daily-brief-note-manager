@@ -1,9 +1,10 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
 import type { DatabaseClient } from '../shared/supabase/client'
+import * as importAnalysisModule from '../features/imports/importAnalysis.module'
 import { importCategories, validImportBundle } from '../features/imports/imports.fixtures'
 import { ImportPageContent } from './ImportPage'
 
@@ -24,9 +25,9 @@ vi.mock('../features/imports/prepareImportJob', () => ({ prepareImportJob: prepa
 const client = {} as DatabaseClient
 const validText = JSON.stringify(validImportBundle())
 
-function renderPage() {
+function renderPage(loadAnalysisModule: () => Promise<typeof importAnalysisModule> = () => Promise.resolve(importAnalysisModule)) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  return { ...render(<QueryClientProvider client={queryClient}><MemoryRouter><ImportPageContent client={client} userId="owner" /></MemoryRouter></QueryClientProvider>), queryClient }
+  return { ...render(<QueryClientProvider client={queryClient}><MemoryRouter><ImportPageContent client={client} userId="owner" loadAnalysisModule={loadAnalysisModule} /></MemoryRouter></QueryClientProvider>), queryClient }
 }
 
 async function switchToTextAndValidate(text = validText) {
@@ -57,6 +58,35 @@ describe('ImportPageContent', () => {
     await switchToTextAndValidate()
     expect(await screen.findByRole('heading', { name: 'Dry Run 요약' })).toBeInTheDocument()
     expect(screen.getByText('schema v1 · DB 중복 검사 완료')).toBeInTheDocument()
+  })
+  it('초기 렌더에서는 analysis module을 불러오지 않고 Dry Run에서 로딩한다', async () => {
+    let resolve!: (value: typeof importAnalysisModule) => void
+    const loadAnalysisModule = vi.fn(() => new Promise<typeof importAnalysisModule>((done) => { resolve = done }))
+    renderPage(loadAnalysisModule)
+    expect(loadAnalysisModule).not.toHaveBeenCalled()
+
+    const validation = switchToTextAndValidate()
+    expect(await screen.findByRole('status')).toHaveTextContent('가져오기 분석 도구를 불러오는 중입니다.')
+    expect(screen.getByRole('button', { name: '검증 중' })).toBeDisabled()
+    await act(async () => { resolve(importAnalysisModule) })
+    await validation
+    expect(await screen.findByRole('heading', { name: 'Dry Run 요약' })).toBeInTheDocument()
+    expect(loadAnalysisModule).toHaveBeenCalledOnce()
+  })
+  it('analysis module 오류를 안전하게 표시하고 입력을 유지한 채 재시도한다', async () => {
+    const loadAnalysisModule = vi.fn()
+      .mockRejectedValueOnce(new Error('/assets/private-import.js'))
+      .mockResolvedValueOnce(importAnalysisModule)
+    renderPage(loadAnalysisModule)
+    await switchToTextAndValidate()
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('IMPORT_MODULE_LOAD_FAILED')
+    expect(alert).not.toHaveTextContent('private-import')
+    expect(screen.getByLabelText('JSON text')).toHaveValue(validText)
+    await userEvent.click(screen.getByRole('button', { name: 'Dry Run 검증' }))
+    expect(await screen.findByRole('heading', { name: 'Dry Run 요약' })).toBeInTheDocument()
+    expect(loadAnalysisModule).toHaveBeenCalledTimes(2)
   })
 
   it('invalid JSON 오류를 표시한다', async () => {
