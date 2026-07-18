@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { buildBackupBundle } from './buildBackupBundle'
-import { backupSnapshotFixture } from './backups.fixtures'
+import { backupSnapshotFixture, backupSnapshotWithMappingFixture } from './backups.fixtures'
 
 describe('buildBackupBundle', () => {
   it('공식 format과 schema version 1 core bundle을 만든다', async () => {
@@ -36,5 +36,16 @@ describe('buildBackupBundle', () => {
     const one = await buildBackupBundle(backupSnapshotFixture(), { now })
     const two = await buildBackupBundle(backupSnapshotFixture(), { now })
     expect(one.json).toBe(two.json)
+  })
+  it('WordPress taxonomy mapping을 credential 없이 core backup에 포함한다', async () => {
+    const result = await buildBackupBundle(backupSnapshotWithMappingFixture())
+    expect(result.bundle.manifest.sectionNames).toContain('wordpressTaxonomyMappings')
+    expect(result.bundle.data.wordpressTaxonomyMappings).toHaveLength(1)
+    expect(JSON.stringify(result.bundle.data.wordpressTaxonomyMappings)).not.toMatch(/password|authorization|credential/i)
+  })
+  it('기존 schema v1 snapshot은 신규 optional section 없이 계속 생성한다', async () => {
+    const result = await buildBackupBundle(backupSnapshotFixture())
+    expect(result.bundle.manifest.sectionNames).not.toContain('wordpressTaxonomyMappings')
+    expect(result.bundle.data.wordpressTaxonomyMappings).toBeUndefined()
   })
 })

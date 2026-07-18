@@ -75,6 +75,10 @@ Phase 4B-1의 공식 전체 백업 형식은 `daily-brief-note-backup` schema ve
 
 ## 5. Snapshot과 결정적 정렬
 
+Phase 5B부터 core/full snapshot은 `wordpressTaxonomyMappings` section을 포함한다. 각 record는 `id`, `siteOrigin`, `mappingKind`, `localKey`, `wordpressTaxonomy`, WordPress term의 ID/slug/name, `verifiedAt`, 생성·수정 시각만 가진다. owner ID와 WordPress credential은 포함하지 않는다. 복원 시 owner는 현재 인증 사용자로 다시 결합한다.
+
+이 section은 schema version 1의 backward-compatible optional extension이다. section이 없는 기존 version 1 bundle은 기존 sectionNames/count 계약으로 검증하고, 있는 bundle은 manifest count와 `(siteOrigin, mappingKind, localKey)` 중복 및 taxonomy-kind 일치를 추가 검증한다.
+
 RPC는 모든 사용자 data section을 하나의 data-bearing SQL statement에서 읽는다. 각 사용자 소유 table은 `auth.uid()`로 명시적으로 제한하고 RLS를 우회하지 않는다. 동일 snapshot과 동일 metadata로 생성한 canonical payload가 항상 같은 byte sequence를 갖도록 object key를 사전식으로 정렬하고 array는 section별 안정적인 식별자·순서 key로 정렬한다.
 
 ## 6. 관계 검증

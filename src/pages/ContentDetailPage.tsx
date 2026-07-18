@@ -267,6 +267,9 @@ export function ContentDetailPageContent({
 
       <div className="detail-actions">
         <Link className="secondary-link" to="/content">목록으로 돌아가기</Link>
+        <Link className="secondary-link" to={`/content/${post.id}/wordpress-preview`}>
+          WordPress Dry Run
+        </Link>
         <Link className="primary-link primary-link--inline" to={`/content/${post.id}/edit`}>
           수정
         </Link>

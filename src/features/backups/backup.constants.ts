@@ -8,7 +8,7 @@ export const BACKUP_CHECKSUM_ALGORITHM = 'SHA-256' as const
 export const BACKUP_WARNING_BYTES = 20 * 1024 * 1024
 export const BACKUP_HARD_LIMIT_BYTES = 100 * 1024 * 1024
 
-export const CORE_BACKUP_SECTIONS = [
+export const LEGACY_CORE_BACKUP_SECTIONS = [
   'posts',
   'seoData',
   'tags',
@@ -25,6 +25,11 @@ export const CORE_BACKUP_SECTIONS = [
   'generatedPrompts',
 ] as const
 
+export const CORE_BACKUP_SECTIONS = [
+  ...LEGACY_CORE_BACKUP_SECTIONS,
+  'wordpressTaxonomyMappings',
+] as const
+
 export const OPERATIONAL_BACKUP_SECTIONS = [
   'importJobs',
   'importJobItems',
@@ -34,6 +39,11 @@ export const OPERATIONAL_BACKUP_SECTIONS = [
 export const BACKUP_SECTIONS_BY_PROFILE = {
   core: CORE_BACKUP_SECTIONS,
   full: [...CORE_BACKUP_SECTIONS, ...OPERATIONAL_BACKUP_SECTIONS],
+} as const satisfies Record<BackupProfile, readonly string[]>
+
+export const LEGACY_BACKUP_SECTIONS_BY_PROFILE = {
+  core: LEGACY_CORE_BACKUP_SECTIONS,
+  full: [...LEGACY_CORE_BACKUP_SECTIONS, ...OPERATIONAL_BACKUP_SECTIONS],
 } as const satisfies Record<BackupProfile, readonly string[]>
 
 export const BACKUP_GENERATION_STEPS = [

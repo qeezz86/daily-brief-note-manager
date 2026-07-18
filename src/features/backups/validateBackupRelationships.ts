@@ -1,4 +1,4 @@
-import { BACKUP_SECTIONS_BY_PROFILE } from './backup.constants'
+import { BACKUP_SECTIONS_BY_PROFILE, LEGACY_BACKUP_SECTIONS_BY_PROFILE } from './backup.constants'
 import type {
   BackupSnapshot,
   BackupValidationIssue,
@@ -35,7 +35,9 @@ export function validateBackupRelationships(
 ): BackupValidationResult {
   const issues: BackupValidationIssue[] = []
   const data = snapshot.data
-  const expectedSections = BACKUP_SECTIONS_BY_PROFILE[snapshot.profile]
+  const expectedSections = Object.prototype.hasOwnProperty.call(snapshot.sectionCounts, 'wordpressTaxonomyMappings')
+    ? BACKUP_SECTIONS_BY_PROFILE[snapshot.profile]
+    : LEGACY_BACKUP_SECTIONS_BY_PROFILE[snapshot.profile]
   const actualSections = Object.keys(data)
 
   missing(
@@ -69,6 +71,7 @@ export function validateBackupRelationships(
     ['newsUpdates', data.newsUpdates],
     ['newsFollowups', data.newsFollowups],
     ['generatedPrompts', data.generatedPrompts],
+    ['wordpressTaxonomyMappings', data.wordpressTaxonomyMappings ?? []],
     ['importJobs', data.importJobs ?? []],
     ['importJobItems', data.importJobItems ?? []],
     ['importJobItemAttempts', data.importJobItemAttempts ?? []],

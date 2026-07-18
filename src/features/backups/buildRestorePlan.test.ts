@@ -19,7 +19,7 @@ describe('buildRestorePlan', () => {
     expect(result.status).toBe('ready')
     expect(result.recordActions.find((item) => item.section === 'posts')?.action).toBe('preserve_id')
     expect(result.idMap.posts[bundle.data.posts[0].id].targetId).toBe(bundle.data.posts[0].id)
-    expect(result.executionStages.map((stage) => stage.name)).toEqual(['tags', 'posts', 'metadata', 'postTags', 'seriesCounters', 'newsTopics', 'newsStatusHistory', 'newsUpdates', 'newsUpdatePreviousLinks', 'sources', 'newsFollowups', 'generatedPrompts'])
+    expect(result.executionStages.map((stage) => stage.name)).toEqual(['wordpressTaxonomyMappings', 'tags', 'posts', 'metadata', 'postTags', 'seriesCounters', 'newsTopics', 'newsStatusHistory', 'newsUpdates', 'newsUpdatePreviousLinks', 'sources', 'newsFollowups', 'generatedPrompts'])
     expect((await validateRestorePlan(result, bundle)).valid).toBe(true)
   })
   it('ID conflict를 결정적으로 remap하며 정책 변경 시 차단한다', async () => {

@@ -36,6 +36,8 @@ export function buildRestoreCandidates(bundle: ValidatedBackupBundle): RestoreCa
       signature: signature({ topicId: row.topicId, checkText: row.checkText, status: row.status }), dependencies: [`newsTopics:${row.topicId}`], row })),
     ...data.generatedPrompts.map((row) => ({ section: 'generatedPrompts', sourceId: row.id, entityId: row.id, reference: `${row.categoryId}:${row.referenceDate}`, categoryId: row.categoryId, keys: [],
       signature: signature({ categoryId: row.categoryId, requestedPostCount: row.requestedPostCount, actualPostCount: row.actualPostCount, promptMode: row.promptMode, referenceDate: row.referenceDate, closedLookbackDays: row.closedLookbackDays, contextSchemaVersion: row.contextSchemaVersion, contextSnapshot: row.contextSnapshot, promptText: row.promptText, generatedAt: row.generatedAt }), dependencies: [`category:${row.categoryId}`], row })),
+    ...(data.wordpressTaxonomyMappings ?? []).map((row) => ({ section: 'wordpressTaxonomyMappings', sourceId: row.id, entityId: row.id, reference: `${row.mappingKind}:${row.localKey}`, keys: [`mapping:${row.siteOrigin}|${row.mappingKind}|${row.localKey}`],
+      signature: signature({ siteOrigin: row.siteOrigin, mappingKind: row.mappingKind, localKey: row.localKey, wordpressTaxonomy: row.wordpressTaxonomy, wordpressTermId: row.wordpressTermId, wordpressTermSlug: row.wordpressTermSlug, wordpressTermName: row.wordpressTermName }), dependencies: [], row })),
     ...(data.importJobs ?? []).map((row) => ({ section: 'importJobs', sourceId: row.id, entityId: row.id, reference: row.sourceName ?? row.id.slice(0, 8), keys: [`fingerprint:${row.sourceFingerprint}`], signature: signature({ sourceFingerprint: row.sourceFingerprint, status: row.status }), dependencies: [], row })),
     ...(data.importJobItems ?? []).map((row) => ({ section: 'importJobItems', sourceId: row.id, entityId: row.id, reference: row.externalKey, keys: [], signature: signature({ jobId: row.jobId, itemIndex: row.itemIndex, payloadFingerprint: row.payloadFingerprint }), dependencies: [`importJobs:${row.jobId}`, ...(row.postId ? [`posts:${row.postId}`] : [])], row })),
     ...(data.importJobItemAttempts ?? []).map((row) => ({ section: 'importJobItemAttempts', sourceId: row.id, entityId: row.id, reference: `${row.stage}:${row.attemptNo}`, keys: [], signature: signature({ jobItemId: row.jobItemId, stage: row.stage, attemptNo: row.attemptNo, status: row.status }), dependencies: [`importJobItems:${row.jobItemId}`], row })),
@@ -56,4 +58,3 @@ export function matchRestoreCandidate(candidate: RestoreCandidate, records: Exis
   if (keyMatch) return { candidate, existing: keyMatch, conflictType: 'key_conflict' }
   return { candidate, conflictType: 'safe_new' }
 }
-

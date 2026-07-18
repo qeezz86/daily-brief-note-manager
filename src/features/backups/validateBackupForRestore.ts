@@ -1,4 +1,4 @@
-import { BACKUP_FORMAT, BACKUP_SCHEMA_VERSION, BACKUP_SECTIONS_BY_PROFILE } from './backup.constants'
+import { BACKUP_FORMAT, BACKUP_SCHEMA_VERSION, BACKUP_SECTIONS_BY_PROFILE, LEGACY_BACKUP_SECTIONS_BY_PROFILE } from './backup.constants'
 import { backupBundleSchema } from './backup.schema'
 import type { BackupSnapshot } from './backup.types'
 import { analyzeBackupConflicts } from './analyzeBackupConflicts'
@@ -38,8 +38,8 @@ function emptyResult(issues: BackupRestoreIssue[], checksumStatus: BackupRestore
   }
 }
 
-function expectedSectionNames(profile: 'core' | 'full') {
-  return [...BACKUP_SECTIONS_BY_PROFILE[profile]]
+function expectedSectionNames(profile: 'core' | 'full', includesMappings: boolean) {
+  return [...(includesMappings ? BACKUP_SECTIONS_BY_PROFILE[profile] : LEGACY_BACKUP_SECTIONS_BY_PROFILE[profile])]
 }
 
 function sameStringArray(left: unknown, right: string[]) {
@@ -113,7 +113,7 @@ export async function validateBackupForRestore(
   if (!dataObject) addIssue(issues, 'BACKUP_DATA_INVALID', 'error', 'data가 object가 아닙니다.', '$.data', 'data')
   const sectionResults: BackupRestoreResult['sections'] = []
   if (dataObject) {
-    const expected = expectedSectionNames(profile)
+    const expected = expectedSectionNames(profile, Object.prototype.hasOwnProperty.call(dataObject, 'wordpressTaxonomyMappings'))
     const actual = Object.keys(dataObject)
     if (!sameStringArray(actual, expected)) addIssue(issues, 'BACKUP_SECTION_SET_MISMATCH', 'error', 'profile과 data section 구성이 일치하지 않습니다.', '$.data', 'data')
     expected.forEach((section) => {
@@ -127,7 +127,7 @@ export async function validateBackupForRestore(
   }
 
   if (manifest && dataObject) {
-    const expected = expectedSectionNames(profile)
+    const expected = expectedSectionNames(profile, Object.prototype.hasOwnProperty.call(dataObject, 'wordpressTaxonomyMappings'))
     if (manifest.profile !== profile) addIssue(issues, 'BACKUP_MANIFEST_PROFILE_MISMATCH', 'error', 'manifest profile이 최상위 profile과 다릅니다.', '$.manifest.profile', 'manifest')
     if (!sameStringArray(manifest.sectionNames, expected)) addIssue(issues, 'BACKUP_MANIFEST_SECTION_MISMATCH', 'error', 'manifest section 목록 또는 순서가 profile과 다릅니다.', '$.manifest.sectionNames', 'manifest')
     const counts = asObject(manifest.sectionCounts)

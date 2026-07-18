@@ -107,8 +107,8 @@ select results_eq($$ select (item->>'itemOrder')::int from core_snapshot, latera
 select results_eq($$ select item->>'toStatus' from core_snapshot, lateral jsonb_array_elements(value->'data'->'newsStatusHistory') item $$,$$ values ('monitoring'),('active') $$,'42 status history time order');
 select results_eq($$ select (item->>'itemIndex')::int from full_snapshot, lateral jsonb_array_elements(value->'data'->'importJobItems') item $$,$$ values (0),(1) $$,'43 import items index order');
 select results_eq($$ select (item->>'attemptNo')::int from full_snapshot, lateral jsonb_array_elements(value->'data'->'importJobItemAttempts') item $$,$$ values (1),(2) $$,'44 attempts number order');
-select is((select count(*)::int from core_snapshot, lateral jsonb_object_keys(value->'sectionCounts')),14,'45 core section set exact');
-select is((select count(*)::int from full_snapshot, lateral jsonb_object_keys(value->'sectionCounts')),17,'46 full section set exact');
+select is((select count(*)::int from core_snapshot, lateral jsonb_object_keys(value->'sectionCounts')),15,'45 core section set exact');
+select is((select count(*)::int from full_snapshot, lateral jsonb_object_keys(value->'sectionCounts')),18,'46 full section set exact');
 select is((select (value->'sectionCounts'->>'posts')::int from core_snapshot),2,'47 section count exact');
 select is((select (value->>'totalRecords')::int = (select sum(v::text::int) from jsonb_each(value->'sectionCounts') x(k,v)) from core_snapshot),true,'48 total count exact');
 select is((select jsonb_array_length(value->'categoryManifest') from core_snapshot),8,'49 category manifest included');

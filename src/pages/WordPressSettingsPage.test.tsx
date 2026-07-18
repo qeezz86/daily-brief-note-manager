@@ -7,6 +7,8 @@ import { readyWordPressDiagnostics } from '../features/wordpress/wordpressDiagno
 import { WordPressSettingsPage } from './WordPressSettingsPage'
 
 const invoke = vi.fn()
+vi.mock('../features/auth/useAuth', () => ({ useAuth: () => ({ user: { id: 'user-1' } }) }))
+vi.mock('../features/categories/categories.queries', () => ({ useActiveCategoriesQuery: () => ({ data: [], isLoading: false, isError: false }) }))
 vi.mock('../shared/supabase/client', () => ({
   supabase: { functions: { invoke: (...args: unknown[]) => invoke(...args) } },
 }))
@@ -21,7 +23,7 @@ describe('WordPressSettingsPage', () => {
     invoke.mockReset()
     const { container } = renderPage()
     expect(screen.getByRole('heading', { name: 'WordPress 연결' })).toBeInTheDocument()
-    expect(screen.getByRole('status')).toHaveTextContent('아직 연결 진단을 실행하지 않았습니다.')
+    expect(screen.getByText('아직 연결 진단을 실행하지 않았습니다.')).toHaveAttribute('role', 'status')
     expect(screen.getByRole('button', { name: '연결 진단' })).toBeEnabled()
     expect(container.querySelector('input')).toBeNull()
   })
@@ -34,7 +36,7 @@ describe('WordPressSettingsPage', () => {
     renderPage()
     await user.click(screen.getByRole('button', { name: '연결 진단' }))
     expect(screen.getByRole('button', { name: '진단 중' })).toBeDisabled()
-    expect(screen.getByRole('status')).toHaveTextContent('안전하게 확인하고 있습니다')
+    expect(screen.getByText(/안전하게 확인하고 있습니다/)).toHaveAttribute('role', 'status')
     resolveInvoke?.({ data: readyWordPressDiagnostics, error: null })
     expect(await screen.findByRole('heading', { name: '연결 준비됨' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '다시 진단' })).toBeEnabled()

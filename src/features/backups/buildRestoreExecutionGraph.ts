@@ -42,12 +42,12 @@ export function buildRestoreExecutionGraph(bundle: ValidatedBackupBundle, action
   actions.filter((action) => staged.has(action.action)).forEach((action) => bySection.set(action.section, [...(bySection.get(action.section) ?? []), action]))
   const metadata = ['seoData', 'aiMetadata', 'infoDbMetadata', 'chineseMetadata']
   const stageSections: Record<string, string[]> = {
-    tags: ['tags'], posts: ['posts'], metadata, postTags: ['postTags'], seriesCounters: ['seriesCounters'], newsTopics: ['newsTopics'],
+    wordpressTaxonomyMappings: ['wordpressTaxonomyMappings'], tags: ['tags'], posts: ['posts'], metadata, postTags: ['postTags'], seriesCounters: ['seriesCounters'], newsTopics: ['newsTopics'],
     newsStatusHistory: ['newsStatusHistory'], newsUpdates: ['newsUpdates'], newsUpdatePreviousLinks: [], sources: ['sources'], newsFollowups: ['newsFollowups'],
     generatedPrompts: ['generatedPrompts'], importJobs: ['importJobs'], importJobItems: ['importJobItems'], importJobItemAttempts: ['importJobItemAttempts'],
   }
   const dependencies: Record<string, string[]> = {
-    tags: [], posts: [], metadata: ['posts'], postTags: ['tags', 'posts'], seriesCounters: [], newsTopics: [], newsStatusHistory: ['newsTopics'],
+    wordpressTaxonomyMappings: [], tags: [], posts: [], metadata: ['posts'], postTags: ['tags', 'posts'], seriesCounters: [], newsTopics: [], newsStatusHistory: ['newsTopics'],
     newsUpdates: ['posts', 'newsTopics'], newsUpdatePreviousLinks: ['newsUpdates'], sources: ['posts', 'newsUpdates'], newsFollowups: ['newsTopics'],
     generatedPrompts: [], importJobs: [], importJobItems: ['importJobs', 'posts'], importJobItemAttempts: ['importJobItems'],
   }

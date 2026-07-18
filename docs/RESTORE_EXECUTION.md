@@ -14,7 +14,7 @@
 
 ## 데이터 정책
 
-지원 section은 tags, posts, SEO·category metadata, postTags, seriesCounters, news topics·history·updates·previous links, sources, followups, generated prompts와 full/include의 importJobs·importJobItems·importJobItemAttempts다. owner ID는 `auth.uid()`에서 주입하고 explicit column insert만 사용한다.
+지원 section은 WordPress taxonomy mappings, tags, posts, SEO·category metadata, postTags, seriesCounters, news topics·history·updates·previous links, sources, followups, generated prompts와 full/include의 importJobs·importJobItems·importJobItemAttempts다. taxonomy mapping은 첫 core stage에서 복원하며 backup의 owner를 사용하지 않고 현재 restore job owner를 주입한다. owner ID는 `auth.uid()`에서 주입하고 explicit column insert만 사용한다.
 
 기존 row overwrite·merge나 일반 update는 하지 않는다. reuse/skip은 exact 상태를 매번 확인한다. series counter는 `greatest(current, planned)`만 허용한다. previous link는 이 job에서 생성한 update에만 연결한다.
 

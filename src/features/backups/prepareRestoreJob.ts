@@ -12,7 +12,7 @@ const OPERATIONAL = new Set(['importJobs', 'importJobItems', 'importJobItemAttem
 const WRITABLE = new Set(['create', 'preserve_id', 'remap_id'])
 
 const fallbackStage: Record<string, string> = {
-  tags: 'tags', posts: 'posts', seoData: 'metadata', aiMetadata: 'metadata', infoDbMetadata: 'metadata',
+  wordpressTaxonomyMappings: 'wordpressTaxonomyMappings', tags: 'tags', posts: 'posts', seoData: 'metadata', aiMetadata: 'metadata', infoDbMetadata: 'metadata',
   chineseMetadata: 'metadata', postTags: 'postTags', seriesCounters: 'seriesCounters', newsTopics: 'newsTopics',
   newsStatusHistory: 'newsStatusHistory', newsUpdates: 'newsUpdates', sources: 'sources', newsFollowups: 'newsFollowups',
   generatedPrompts: 'generatedPrompts', importJobs: 'importJobs', importJobItems: 'importJobItems',

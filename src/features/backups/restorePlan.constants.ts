@@ -9,13 +9,12 @@ export const RESTORE_UUID_NAMESPACE = '0f53d9b2-c6bb-5c5f-9bd4-63cdd62bb807' as 
 export const RESTORE_ENTITY_SECTIONS = [
   'posts', 'tags', 'sources', 'newsTopics', 'newsStatusHistory', 'newsUpdates',
   'newsFollowups', 'generatedPrompts', 'importJobs', 'importJobItems',
-  'importJobItemAttempts',
+  'importJobItemAttempts', 'wordpressTaxonomyMappings',
 ] as const
 
 export const RESTORE_EXECUTION_STAGE_ORDER = [
-  'tags', 'posts', 'metadata', 'postTags', 'seriesCounters', 'newsTopics',
+  'wordpressTaxonomyMappings', 'tags', 'posts', 'metadata', 'postTags', 'seriesCounters', 'newsTopics',
   'newsStatusHistory', 'newsUpdates', 'newsUpdatePreviousLinks', 'sources',
   'newsFollowups', 'generatedPrompts', 'importJobs', 'importJobItems',
   'importJobItemAttempts',
 ] as const
-

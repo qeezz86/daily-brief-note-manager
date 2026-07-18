@@ -54,7 +54,7 @@
       "raw": { "absolute": 1280000, "percentHeadroom": 0.10, "minimumHeadroom": 32768 }
     },
     "pwaPrecache": {
-      "entries": { "absolute": 90, "minimumHeadroom": 2 },
+      "entries": { "absolute": 90, "minimumHeadroom": 3 },
       "raw": { "absolute": 1280000, "percentHeadroom": 0.10, "minimumHeadroom": 32768 }
     }
   }

@@ -55,6 +55,7 @@ interface InfoRow extends AiRow { reference_date: string | null }
 interface ChineseRow { post_id: string; original_url: string | null; original_title: string | null; learning_topic: string | null }
 interface CounterRow { category_id: string; last_issued_no: number }
 interface HistoryRow { id: string; topic_id: string; to_status: string; changed_at: string }
+interface MappingRow { id: string; site_origin: string; mapping_kind: string; local_key: string; wordpress_taxonomy: string; wordpress_term_id: number; wordpress_term_slug: string; wordpress_term_name: string }
 
 export async function getBackupConflictReferenceData(client: DatabaseClient, bundle: ValidatedBackupBundle): Promise<BackupConflictLookupResult> {
   const data = bundle.data
@@ -103,6 +104,7 @@ export async function getBackupConflictReferenceData(client: DatabaseClient, bun
   })
   const itemQuery = await chunks<string, ItemRow>(unique((data.importJobItems ?? []).map((row) => row.id)), (part) => client.from('import_job_items').select('id, job_id, item_index, payload_fingerprint').in('id', part))
   const attemptQuery = await chunks<string, AttemptRow>(unique((data.importJobItemAttempts ?? []).map((row) => row.id)), (part) => client.from('import_job_item_attempts').select('id, job_item_id, stage, attempt_no, status').in('id', part))
+  const mappingQuery = await chunks<string, MappingRow>(unique((data.wordpressTaxonomyMappings ?? []).map((row) => row.siteOrigin)), (part) => client.from('wordpress_taxonomy_mappings').select('id,site_origin,mapping_kind,local_key,wordpress_taxonomy,wordpress_term_id,wordpress_term_slug,wordpress_term_name').in('site_origin', part))
 
   const records: ExistingRestoreRecord[] = []
   const seenPosts = new Map<string, PostRow>()
@@ -135,8 +137,9 @@ export async function getBackupConflictReferenceData(client: DatabaseClient, bun
   jobQuery.rows.forEach((row) => records.push({ section: 'importJobs', id: row.id, key: `fingerprint:${row.source_fingerprint}`, signature: signature({ sourceFingerprint: row.source_fingerprint, status: row.status }) }))
   itemQuery.rows.forEach((row) => records.push({ section: 'importJobItems', id: row.id, signature: signature({ jobId: row.job_id, itemIndex: row.item_index, payloadFingerprint: row.payload_fingerprint }) }))
   attemptQuery.rows.forEach((row) => records.push({ section: 'importJobItemAttempts', id: row.id, signature: signature({ jobItemId: row.job_item_id, stage: row.stage, attemptNo: row.attempt_no, status: row.status }) }))
+  mappingQuery.rows.forEach((row) => records.push({ section: 'wordpressTaxonomyMappings', id: row.id, key: `mapping:${row.site_origin}|${row.mapping_kind}|${row.local_key}`, signature: signature({ siteOrigin: row.site_origin, mappingKind: row.mapping_kind, localKey: row.local_key, wordpressTaxonomy: row.wordpress_taxonomy, wordpressTermId: row.wordpress_term_id, wordpressTermSlug: row.wordpress_term_slug, wordpressTermName: row.wordpress_term_name }) }))
 
-  const allResults: Array<ChunkResult<unknown>> = [...postQueries, ...tagQueries, ...topicQueries, sourceQuery, updateQuery, followupQuery, promptQuery, postTagQuery, seoQuery, aiQuery, infoQuery, chineseQuery, counterQuery, historyQuery, jobQuery, itemQuery, attemptQuery]
+  const allResults: Array<ChunkResult<unknown>> = [...postQueries, ...tagQueries, ...topicQueries, sourceQuery, updateQuery, followupQuery, promptQuery, postTagQuery, seoQuery, aiQuery, infoQuery, chineseQuery, counterQuery, historyQuery, jobQuery, itemQuery, attemptQuery, mappingQuery]
   const deduped = new Map(records.map((record) => [`${record.section}|${record.id ?? ''}|${record.key ?? ''}`, record]))
   return { databaseCheck: status(allResults), records: [...deduped.values()].sort((left, right) => `${left.section}|${left.id ?? ''}|${left.key ?? ''}`.localeCompare(`${right.section}|${right.id ?? ''}|${right.key ?? ''}`)) }
 }
@@ -158,8 +161,9 @@ export async function getBackupRestoreTargetCollisions(
     chunks<string, { id: string }>(values('importJobs'), (part) => client.from('import_jobs').select('id').in('id', part)),
     chunks<string, { id: string }>(values('importJobItems'), (part) => client.from('import_job_items').select('id').in('id', part)),
     chunks<string, { id: string }>(values('importJobItemAttempts'), (part) => client.from('import_job_item_attempts').select('id').in('id', part)),
+    chunks<string, { id: string }>(values('wordpressTaxonomyMappings'), (part) => client.from('wordpress_taxonomy_mappings').select('id').in('id', part)),
   ])
-  const sections = ['posts', 'tags', 'sources', 'newsTopics', 'newsStatusHistory', 'newsUpdates', 'newsFollowups', 'generatedPrompts', 'importJobs', 'importJobItems', 'importJobItemAttempts']
+  const sections = ['posts', 'tags', 'sources', 'newsTopics', 'newsStatusHistory', 'newsUpdates', 'newsFollowups', 'generatedPrompts', 'importJobs', 'importJobItems', 'importJobItemAttempts', 'wordpressTaxonomyMappings']
   return {
     databaseCheck: status(queries),
     collisions: queries.flatMap((query, index) => query.rows.map((row) => ({ section: sections[index], id: row.id }))),

@@ -37,6 +37,7 @@ const backupDataSchema = z.object({
   newsUpdates: z.array(row({ id, postId: id, topicId: id, previousUpdateId: id.nullable(), itemOrder: z.number().int().positive() })),
   newsFollowups: z.array(row({ id, topicId: id, createdAt: z.string() })),
   generatedPrompts: z.array(row({ id, categoryId: z.string(), contextSnapshot: z.unknown(), generatedAt: z.string() })),
+  wordpressTaxonomyMappings: backupRestoreSectionSchemas.wordpressTaxonomyMappings.optional(),
   importJobs: backupRestoreSectionSchemas.importJobs.optional(),
   importJobItems: backupRestoreSectionSchemas.importJobItems.optional(),
   importJobItemAttempts: backupRestoreSectionSchemas.importJobItemAttempts.optional(),

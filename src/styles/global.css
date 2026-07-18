@@ -1337,6 +1337,20 @@ a {
 .wordpress-capability-table-wrap thead th { color: #53605c; font-size: .8125rem; }
 .wordpress-panel--warning { border-color: #d7c783; background: #fffdf4; }
 .wordpress-panel--warning ul { margin-bottom: 0; padding-left: 20px; line-height: 1.7; }
+.wordpress-taxonomy h3 { margin: 28px 0 12px; }
+.wordpress-taxonomy > input { width: min(100%, 420px); margin-top: 6px; }
+.wordpress-taxonomy__rows { display: grid; gap: 12px; margin-top: 12px; }
+.wordpress-taxonomy__row { display: grid; grid-template-columns: minmax(150px, .7fr) minmax(120px, .45fr) minmax(220px, 1fr) auto; align-items: center; gap: 10px 14px; padding: 14px; border: 1px solid #e1e6e3; border-radius: 7px; background: #fff; }
+.wordpress-taxonomy__row > div:first-child { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; }
+.wordpress-taxonomy__row small { color: #68736f; }
+.wordpress-taxonomy__row .detail-actions { margin: 0; }
+.wordpress-plan { display: grid; gap: 18px; margin-top: 18px; }
+.wordpress-plan__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.wordpress-plan__resolution { padding: 18px; border: 1px solid #d9dfdc; border-radius: 8px; background: #fff; }
+.wordpress-plan__resolution h3 { margin-top: 0; }
+.wordpress-plan__resolution dl { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.wordpress-plan__resolution dd { margin: 3px 0 0; font-weight: 700; }
+.wordpress-payload { max-height: 55vh; overflow: auto; padding: 16px; border-radius: 6px; background: #17201d; color: #edf5f1; white-space: pre; font-size: .8125rem; }
 
 @keyframes loading-spin {
   to {
@@ -1422,6 +1436,9 @@ a {
   .wordpress-page__action { width: 100%; justify-content: center; }
   .wordpress-status dl,
   .wordpress-panel dl { grid-template-columns: 1fr; }
+  .wordpress-taxonomy__row { grid-template-columns: 1fr; }
+  .wordpress-plan__grid { grid-template-columns: 1fr; }
+  .wordpress-plan__resolution dl { grid-template-columns: repeat(2, 1fr); }
 
   .prompt-settings > .primary-button,
   .prompt-panel__heading .secondary-button { width: 100%; }

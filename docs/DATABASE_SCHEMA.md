@@ -503,6 +503,20 @@ foreign key (news_update_id, owner_id)
 - `prompt_text`에는 WordPress HTML 전문, 뉴스 기사 원문, CCTV 원문·전체 자막·전체 번역을 포함하지 않는다.
 - Phase 3B-3부터 새 `context_snapshot`은 기존 `schemaVersion = 1`과 호환되는 선택 필드 `promptTemplateVersion = 1`을 포함한다. 과거 snapshot에는 이 필드가 없을 수 있으며 별도 DB column이나 migration은 사용하지 않는다.
 
+## 10.x WordPress taxonomy mappings
+
+`wordpress_taxonomy_mappings`는 사용자별 WordPress taxonomy 선택을 저장한다.
+
+- 내부 PK: UUID `id`
+- 소유권: `owner_id`, `auth.users` 삭제 시 cascade, RLS로 현재 사용자만 CRUD
+- site: query/path 없는 canonical HTTP(S) root `site_origin`
+- local identity: `mapping_kind`(`category`/`tag`) + `local_key`
+- remote identity snapshot: `wordpress_taxonomy`, 양수 term ID, slug, name, nullable `verified_at`
+- unique: `(owner_id, site_origin, mapping_kind, local_key)`
+- check: category는 `category`, tag는 `post_tag` taxonomy만 허용
+
+credential, Authorization, token과 WordPress 본문은 이 테이블에 저장하지 않는다. mapping 삭제는 로컬 설정만 제거하며 WordPress term을 삭제하지 않는다.
+
 ## 11. 인덱스와 중복 검사 기준
 
 저장 전 중복 검사는 다음 순서를 따른다.

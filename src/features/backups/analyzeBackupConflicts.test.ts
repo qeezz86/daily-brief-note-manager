@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { analyzeBackupConflicts } from './analyzeBackupConflicts'
-import { backupRestoreBundleFixture } from './backupRestore.fixtures'
+import { backupRestoreBundleFixture, backupRestoreBundleWithMappingFixture } from './backupRestore.fixtures'
 import type { BackupConflictLookupResult } from './backupRestore.types'
 
 const lookup = (records: BackupConflictLookupResult['records'], databaseCheck: BackupConflictLookupResult['databaseCheck'] = 'complete'): BackupConflictLookupResult => ({ databaseCheck, records })
@@ -40,5 +40,11 @@ describe('analyzeBackupConflicts', () => {
   it('같은 입력은 결정적으로 같은 결과를 만든다', async () => {
     const bundle = await backupRestoreBundleFixture(); const first = analyzeBackupConflicts(bundle, lookup([])); const second = analyzeBackupConflicts(bundle, lookup([]))
     expect(second).toEqual(first)
+  })
+  it('동일 site/kind/local key의 taxonomy mapping을 key conflict로 분류한다', async () => {
+    const bundle = await backupRestoreBundleWithMappingFixture()
+    const row = bundle.data.wordpressTaxonomyMappings![0]
+    const result = analyzeBackupConflicts(bundle, lookup([{ section: 'wordpressTaxonomyMappings', id: crypto.randomUUID(), key: `mapping:${row.siteOrigin}|${row.mappingKind}|${row.localKey}`, signature: '{}' }]))
+    expect(result.conflicts.some((item) => item.section === 'wordpressTaxonomyMappings' && item.type === 'key_conflict')).toBe(true)
   })
 })

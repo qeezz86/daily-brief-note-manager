@@ -101,6 +101,7 @@ describe('route inventory and lazy modules', () => {
       '/backups/restore/jobs/:jobId',
       '/content/:postId',
       '/content/:postId/edit',
+      '/content/:postId/wordpress-preview',
       '/news-topics/:topicId',
       '/news-topics/:topicId/edit',
       '/content/:postId/news-updates/new',
@@ -117,8 +118,8 @@ describe('route inventory and lazy modules', () => {
     const dynamicPageImports = [...routerSource.matchAll(/import\('\.\.\/pages\/([^']+)'\)/g)]
       .map((match) => match[1])
 
-    expect(dynamicPageImports).toHaveLength(28)
-    expect(new Set(dynamicPageImports)).toHaveLength(28)
+    expect(dynamicPageImports).toHaveLength(29)
+    expect(new Set(dynamicPageImports)).toHaveLength(29)
     expect(routerSource).not.toMatch(/import\('\.\.\/pages'\)/)
     expect(routerSource).not.toMatch(/import\(`\.\.\/pages/)
     expect(routerSource).not.toMatch(/from '\.\.\/pages\/(?!NotFoundPage)/)

@@ -62,3 +62,23 @@ export function backupSnapshotFixture(profile: BackupProfile = 'core'): BackupSn
     data,
   }
 }
+
+export function backupSnapshotWithMappingFixture(profile: BackupProfile = 'core'): BackupSnapshot {
+  const snapshot = backupSnapshotFixture(profile)
+  snapshot.data.wordpressTaxonomyMappings = [{
+    id: 'c0000000-0000-4000-8000-000000000001',
+    siteOrigin: 'https://wordpress.example.com',
+    mappingKind: 'category',
+    localKey: 'economy',
+    wordpressTaxonomy: 'category',
+    wordpressTermId: 17,
+    wordpressTermSlug: 'economy',
+    wordpressTermName: '경제',
+    verifiedAt: '2026-07-15T00:00:00Z',
+    createdAt: '2026-07-15T00:00:00Z',
+    updatedAt: '2026-07-15T00:00:00Z',
+  }]
+  snapshot.sectionCounts.wordpressTaxonomyMappings = 1
+  snapshot.totalRecords += 1
+  return snapshot
+}

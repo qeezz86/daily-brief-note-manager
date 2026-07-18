@@ -72,6 +72,21 @@ export const backupRestoreSectionSchemas = {
     closedLookbackDays: positive, contextSchemaVersion: positive, contextSnapshot: z.unknown(),
     promptText: z.string(), isPinned: z.boolean(), generatedAt: datetime,
   }).strict()),
+  wordpressTaxonomyMappings: z.array(z.object({
+    id, siteOrigin: z.string().url(), mappingKind: z.enum(['category', 'tag']), localKey: z.string().min(1),
+    wordpressTaxonomy: z.enum(['category', 'post_tag']), wordpressTermId: positive,
+    wordpressTermSlug: z.string().min(1), wordpressTermName: z.string().min(1), verifiedAt: nullableDatetime,
+    createdAt: datetime, updatedAt: datetime,
+  }).strict()).superRefine((rows, context) => {
+    const keys = new Set<string>()
+    rows.forEach((row, index) => {
+      const expected = row.mappingKind === 'category' ? 'category' : 'post_tag'
+      if (row.wordpressTaxonomy !== expected) context.addIssue({ code: 'custom', path: [index, 'wordpressTaxonomy'], message: 'mapping kind와 WordPress taxonomy가 일치하지 않습니다.' })
+      const key = `${row.siteOrigin}|${row.mappingKind}|${row.localKey}`
+      if (keys.has(key)) context.addIssue({ code: 'custom', path: [index, 'localKey'], message: '중복 taxonomy mapping key입니다.' })
+      keys.add(key)
+    })
+  }),
   importJobs: z.array(z.object({
     id, format: z.string(), schemaVersion: positive, sourceName: nullableString,
     sourceFingerprint: z.string().regex(/^[0-9a-f]{64}$/),
@@ -129,6 +144,7 @@ export const backupRestoreDataSchema = z.object({
   newsUpdates: backupRestoreSectionSchemas.newsUpdates,
   newsFollowups: backupRestoreSectionSchemas.newsFollowups,
   generatedPrompts: backupRestoreSectionSchemas.generatedPrompts,
+  wordpressTaxonomyMappings: backupRestoreSectionSchemas.wordpressTaxonomyMappings.optional(),
   importJobs: backupRestoreSectionSchemas.importJobs.optional(),
   importJobItems: backupRestoreSectionSchemas.importJobItems.optional(),
   importJobItemAttempts: backupRestoreSectionSchemas.importJobItemAttempts.optional(),

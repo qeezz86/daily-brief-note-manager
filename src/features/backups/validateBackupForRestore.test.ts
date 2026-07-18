@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { backupRestoreBundleFixture, currentCategoriesFromBundle, resignBackup } from './backupRestore.fixtures'
+import { backupRestoreBundleFixture, backupRestoreBundleWithMappingFixture, currentCategoriesFromBundle, resignBackup } from './backupRestore.fixtures'
 import type { BackupConflictLookupResult, ValidatedBackupBundle } from './backupRestore.types'
 import { validateBackupForRestore } from './validateBackupForRestore'
 
@@ -96,6 +96,12 @@ describe('validateBackupForRestore manifest and section schema', () => {
   it('owner_id key를 민감정보로 차단한다', async () => {
     const bundle = await backupRestoreBundleFixture(); (bundle.data.posts[0] as unknown as Record<string, unknown>).owner_id = crypto.randomUUID(); const signed = await resignBackup(bundle)
     expect((await validateBackupForRestore(signed, { currentCategories: currentCategoriesFromBundle(bundle) })).result.issues.some((item) => item.code === 'BACKUP_SENSITIVE_DATA_FOUND')).toBe(true)
+  })
+  it('신규 taxonomy mapping section을 restorable로 검증한다', async () => {
+    const bundle = await backupRestoreBundleWithMappingFixture()
+    const output = await validateBackupForRestore(bundle, { currentCategories: currentCategoriesFromBundle(bundle), lookup: completeLookup })
+    expect(output.result.status).toBe('restorable')
+    expect(output.result.sections.find((section) => section.section === 'wordpressTaxonomyMappings')?.count).toBe(1)
   })
 })
 

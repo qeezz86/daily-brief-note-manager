@@ -1205,6 +1205,51 @@ export type Database = {
         }
         Relationships: []
       }
+      wordpress_taxonomy_mappings: {
+        Row: {
+          created_at: string
+          id: string
+          local_key: string
+          mapping_kind: string
+          owner_id: string
+          site_origin: string
+          updated_at: string
+          verified_at: string | null
+          wordpress_taxonomy: string
+          wordpress_term_id: number
+          wordpress_term_name: string
+          wordpress_term_slug: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          local_key: string
+          mapping_kind: string
+          owner_id: string
+          site_origin: string
+          updated_at?: string
+          verified_at?: string | null
+          wordpress_taxonomy: string
+          wordpress_term_id: number
+          wordpress_term_name: string
+          wordpress_term_slug: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          local_key?: string
+          mapping_kind?: string
+          owner_id?: string
+          site_origin?: string
+          updated_at?: string
+          verified_at?: string | null
+          wordpress_taxonomy?: string
+          wordpress_term_id?: number
+          wordpress_term_name?: string
+          wordpress_term_slug?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -1381,7 +1426,15 @@ export type Database = {
       }
       get_restore_jobs: { Args: { p_limit?: number }; Returns: Json }
       get_user_backup_estimate: { Args: { p_profile?: string }; Returns: Json }
+      get_user_backup_estimate_phase4b: {
+        Args: { p_profile?: string }
+        Returns: Json
+      }
       get_user_backup_snapshot: { Args: { p_profile?: string }; Returns: Json }
+      get_user_backup_snapshot_phase4b: {
+        Args: { p_profile?: string }
+        Returns: Json
+      }
       get_user_backup_snapshot_v1: {
         Args: { p_profile?: string }
         Returns: Json
@@ -1456,6 +1509,13 @@ export type Database = {
         }
         Returns: string
       }
+      restore_apply_record_phase4b: {
+        Args: {
+          p_preserve: boolean
+          p_record: Database["public"]["Tables"]["restore_job_records"]["Row"]
+        }
+        Returns: string
+      }
       restore_canonical_json: { Args: { p_value: Json }; Returns: string }
       restore_import_attempt_exact: {
         Args: {
@@ -1504,11 +1564,21 @@ export type Database = {
         Args: { p_section: string; p_target: string }
         Returns: boolean
       }
+      restore_target_exists_phase4b: {
+        Args: { p_section: string; p_target: string }
+        Returns: boolean
+      }
       restore_validate_import_history_plan: {
         Args: { p_job: Database["public"]["Tables"]["restore_jobs"]["Row"] }
         Returns: undefined
       }
       restore_verify_existing: {
+        Args: {
+          p_record: Database["public"]["Tables"]["restore_job_records"]["Row"]
+        }
+        Returns: boolean
+      }
+      restore_verify_existing_phase4b: {
         Args: {
           p_record: Database["public"]["Tables"]["restore_job_records"]["Row"]
         }

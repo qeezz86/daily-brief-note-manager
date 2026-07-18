@@ -4,6 +4,7 @@ import {
   BACKUP_HARD_LIMIT_BYTES,
   BACKUP_SCHEMA_VERSION,
   BACKUP_SECTIONS_BY_PROFILE,
+  LEGACY_BACKUP_SECTIONS_BY_PROFILE,
   BACKUP_WARNING_BYTES,
 } from './backup.constants'
 import { backupBundleSchema } from './backup.schema'
@@ -45,7 +46,8 @@ export async function buildBackupBundle(
   }
 
   const now = options.now ?? new Date()
-  const sectionNames = [...BACKUP_SECTIONS_BY_PROFILE[snapshot.profile]]
+  const hasMappingSection = Object.prototype.hasOwnProperty.call(snapshot.data, 'wordpressTaxonomyMappings')
+  const sectionNames = [...(hasMappingSection ? BACKUP_SECTIONS_BY_PROFILE[snapshot.profile] : LEGACY_BACKUP_SECTIONS_BY_PROFILE[snapshot.profile])]
   const payload = {
     format: BACKUP_FORMAT,
     schemaVersion: BACKUP_SCHEMA_VERSION,
