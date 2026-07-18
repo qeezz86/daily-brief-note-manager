@@ -40,6 +40,9 @@ export function parseWordPressConfig(environment: EnvironmentSource): WordPressC
   }
 
   const localhost = siteUrl.hostname === 'localhost' || siteUrl.hostname === '127.0.0.1' || siteUrl.hostname === '[::1]'
+  const dockerHost = siteUrl.hostname === 'host.docker.internal'
+  const dockerHostLookalike = siteUrl.hostname.startsWith('host.docker.internal.')
+  const allowedLocalHost = localMode && (localhost || dockerHost)
   const forbiddenHostname = isIpLiteral(siteUrl.hostname)
     || siteUrl.hostname.endsWith('.local')
     || siteUrl.hostname.endsWith('.internal')
@@ -51,8 +54,9 @@ export function parseWordPressConfig(environment: EnvironmentSource): WordPressC
     || siteUrl.hash
     || (!localMode && siteUrl.protocol !== 'https:')
     || (localMode && !['http:', 'https:'].includes(siteUrl.protocol))
-    || (localhost && !localMode)
-    || (forbiddenHostname && !(localhost && localMode))
+    || ((localhost || dockerHost) && !localMode)
+    || dockerHostLookalike
+    || (forbiddenHostname && !allowedLocalHost)
   ) {
     throw new DiagnosticError('WORDPRESS_URL_INVALID', { httpStatus: 500 })
   }

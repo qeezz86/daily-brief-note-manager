@@ -12,7 +12,7 @@ REST discovery, Application Password 인증, 현재 사용자 capability, post t
 
 ## Credential과 인증 경계
 
-Edge Function 환경 secret은 `WORDPRESS_SITE_URL`, `WORDPRESS_USERNAME`, `WORDPRESS_APPLICATION_PASSWORD`, `WORDPRESS_ALLOWED_USER_ID`, `APP_ALLOWED_ORIGINS`다. `WORDPRESS_LOCAL_MODE`는 localhost mock에서만 사용하는 선택값이다.
+Edge Function 환경 secret은 `WORDPRESS_SITE_URL`, `WORDPRESS_USERNAME`, `WORDPRESS_APPLICATION_PASSWORD`, `WORDPRESS_ALLOWED_USER_ID`, `APP_ALLOWED_ORIGINS`다. `WORDPRESS_LOCAL_MODE`는 localhost 또는 Docker host mock에서만 사용하는 선택값이다.
 
 브라우저 입력, React state, local/session storage, Supabase 일반 테이블, Backup/Restore JSON과 로그에는 credential을 넣지 않는다. `supabase/functions/.env.local`과 `.env.*.local`은 Git에서 제외되며 `.env.example`은 placeholder만 포함한다.
 
@@ -22,7 +22,7 @@ Edge Function 환경 secret은 `WORDPRESS_SITE_URL`, `WORDPRESS_USERNAME`, `WORD
 
 `OPTIONS`와 `POST`만 허용한다. CORS는 `APP_ALLOWED_ORIGINS`의 exact origin만 반영하며 wildcard는 금지한다. `authorization`, `apikey`, `content-type`과 `Vary: Origin`을 적용한다.
 
-사이트 URL은 request body가 아니라 server secret에서만 가져온다. URL parser로 HTTPS/root path/userinfo/query/fragment를 검사한다. IP literal과 `.local`/`.internal` hostname은 거부하고 localhost는 명시적 local mode에서만 허용한다. endpoint path와 query는 코드의 고정 union이므로 임의 URL/path/query나 open proxy 호출이 불가능하다.
+사이트 URL은 request body가 아니라 server secret에서만 가져온다. URL parser로 HTTPS/root path/userinfo/query/fragment를 검사한다. IP literal과 `.local`/`.internal` hostname은 거부한다. 예외는 명시적 local mode의 localhost와 정확한 `host.docker.internal`뿐이며, HTTP(S) root URL만 허용한다. `host.docker.internal.evil.example`, 다른 `.internal` host, userinfo, query, fragment와 production mode의 Docker host는 계속 거부한다. endpoint path와 query는 코드의 고정 union이므로 임의 URL/path/query나 open proxy 호출이 불가능하다.
 
 모든 fetch는 `redirect: manual`이다. 모든 3xx를 canonical URL 설정 오류로 처리하고 `Location`을 응답이나 로그에 노출하지 않아 Authorization이 redirect target으로 전달되지 않는다. Production secret에는 공인 WordPress hostname만 사용한다.
 
@@ -53,6 +53,28 @@ discovery와 `users/me`를 순차 확인한 뒤 나머지를 병렬 확인한다
 ```bash
 npm run test:wordpress
 ```
+
+## Phase 5A-R2 authenticated runtime smoke
+
+R2 smoke는 Gateway JWT 검증, Function 내부 `getUser()`, 허용 user UUID 검사와 WordPress read-only client를 하나의 로컬 경로에서 검증한다. Docker Desktop과 `npm run db:start`로 시작한 로컬 Supabase가 전제이며, 실행 중이 아니면 자동 start하거나 key를 출력하지 않고 안전한 prerequisite 안내와 함께 종료한다.
+
+```bash
+npm run smoke:wordpress-runtime
+```
+
+script는 `supabase status -o json`의 machine-readable 결과를 process memory에서만 읽어 local API URL, publishable/anon key와 secret/service-role-equivalent key를 취득한다. key, JWT, refresh token, 임시 이메일·비밀번호와 user UUID는 결과에 출력하거나 repository 파일에 저장하지 않는다. 로컬 Admin API로 random 임시 사용자 두 명을 만들고 email-confirmed 상태로 설정하며, publishable key와 password sign-in으로 각 access token을 발급한다.
+
+Node mock WordPress는 `0.0.0.0`의 동적 port에 bind하고 Edge Runtime에서는 `http://host.docker.internal:<port>`로 접근한다. production client와 같은 7개 endpoint만 제공하고 Basic Authorization을 exact match한다. audit에는 method, pathname, 허용 query key, authorization 존재·일치 boolean과 response status만 남긴다. raw header, decoded username/password와 응답 원문은 기록하지 않는다.
+
+Function은 운영체제 임시 디렉터리의 random `.env` 파일과 함께 다음과 같이 시작한다. smoke는 `--no-verify-jwt`를 사용하지 않아 local Gateway JWT와 Function 내부 사용자 검증을 함께 통과해야 한다.
+
+```text
+supabase functions serve wordpress-diagnostics --env-file <temporary-file>
+```
+
+검증 항목은 허용 사용자 200/ready, 다른 인증 사용자 403 `CALLER_FORBIDDEN`, 비허용 origin 403 `ORIGIN_FORBIDDEN`, 무인증 401, 인증된 GET 405 `METHOD_NOT_ALLOWED`다. 성공 요청 뒤 WordPress audit는 discovery → current user 순서, 고정 path 7개, GET 7건, write·redirect·미허용 path 0건이어야 한다. 진단·오류 응답과 Function 출력은 known-secret assertion을 통과해야 하며 post item/content, WordPress user email과 전체 capability map도 노출되면 실패한다.
+
+성공, 실패 또는 Ctrl+C 후 Function process tree와 mock server를 종료하고 두 Auth 사용자를 삭제하며 임시 env 디렉터리를 제거한다. Supabase CLI가 Function env를 local Edge Runtime container에 보관하므로, serve 전후에 정확한 이 프로젝트의 `supabase_edge_runtime_daily-brief-note-manager` container만 제거해 이전 또는 임시 allowlist/credential이 잔류하지 않게 한다. DB·Auth 등 다른 local container는 건드리지 않는다. 원격 Supabase, 실제 WordPress와 실제 credential은 사용하지 않는다. `WORDPRESS_LOCAL_MODE=true`는 이 로컬 mock 경로 전용이며 원격 배포 secret에는 설정하지 않는다.
 
 Function을 수동으로 serve할 때만 ignored env 파일을 만든다.
 

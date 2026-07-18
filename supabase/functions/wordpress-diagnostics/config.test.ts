@@ -60,6 +60,25 @@ describe('parseWordPressConfig', () => {
     expect(config.siteUrl.origin).toBe('http://localhost:8080')
   })
 
+  it('allows only the exact Docker host root in explicit local mode', () => {
+    const config = parseWordPressConfig(environment({
+      WORDPRESS_SITE_URL: 'http://host.docker.internal:43123/',
+      WORDPRESS_LOCAL_MODE: 'true',
+    }))
+    expect(config.siteUrl.origin).toBe('http://host.docker.internal:43123')
+  })
+
+  it.each([
+    ['http://host.docker.internal:43123/', undefined, 'production mode'],
+    ['http://host.docker.internal.evil.example:43123/', 'true', 'lookalike hostname'],
+    ['http://foo.internal:43123/', 'true', 'arbitrary internal hostname'],
+    ['http://name:password@host.docker.internal:43123/', 'true', 'userinfo'],
+    ['http://host.docker.internal:43123/?target=x', 'true', 'query'],
+    ['http://host.docker.internal:43123/#fragment', 'true', 'fragment'],
+  ])('rejects Docker-host exception misuse: %s (%s)', (siteUrl, localMode) => {
+    expectCode({ WORDPRESS_SITE_URL: siteUrl, WORDPRESS_LOCAL_MODE: localMode }, 'WORDPRESS_URL_INVALID')
+  })
+
   it.each([
     { APP_ALLOWED_ORIGINS: '*' },
     { APP_ALLOWED_ORIGINS: 'https://app.example.com/path' },

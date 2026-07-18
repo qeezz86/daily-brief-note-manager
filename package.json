@@ -13,6 +13,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:wordpress": "vitest run wordpress",
+    "smoke:wordpress-runtime": "node scripts/wordpress-runtime-smoke.mjs",
     "test:e2e": "playwright test",
     "db:start": "supabase start",
     "db:stop": "supabase stop",

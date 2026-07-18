@@ -58,6 +58,7 @@ Phase 4C-3에서는 Vite production manifest로 entry, static closure, 대표 ro
 npm run lint
 npm run test
 npm run test:wordpress
+npm run smoke:wordpress-runtime
 npm run build
 npm run bundle:check
 ```
@@ -75,7 +76,17 @@ Copy-Item supabase/functions/.env.example supabase/functions/.env.local
 npx supabase functions serve wordpress-diagnostics --env-file supabase/functions/.env.local
 ```
 
-실제 WordPress URL이나 Application Password를 채팅, Git, screenshot 또는 브라우저 환경변수에 남기지 마세요. 로컬 mock 기반 검증은 `npm run test:wordpress`로 외부 네트워크 없이 실행합니다. 원격 Function 배포와 secret 설정은 Phase 5A 자동 작업 범위에 포함되지 않습니다.
+실제 WordPress URL이나 Application Password를 채팅, Git, screenshot 또는 브라우저 환경변수에 남기지 마세요. 단위 테스트는 `npm run test:wordpress`로 외부 네트워크 없이 실행합니다. 원격 Function 배포와 secret 설정은 Phase 5A 자동 작업 범위에 포함되지 않습니다.
+
+Phase 5A-R2의 인증 통합 smoke는 Docker Desktop과 실행 중인 로컬 Supabase가 필요합니다. 먼저 `npm run db:start`를 실행한 뒤 다음 명령을 사용합니다.
+
+```bash
+npm run smoke:wordpress-runtime
+```
+
+이 명령은 실제 WordPress나 원격 Supabase에 연결하지 않습니다. 로컬 Auth에 임시 허용·비허용 사용자 두 명을 만들고 access token을 발급한 뒤, `0.0.0.0`에 열린 Node mock WordPress를 Edge Runtime에서 `host.docker.internal`로 호출합니다. 임시 Function env 파일은 운영체제 임시 디렉터리에 권한을 제한해 만들며, JWT·API key·이메일·비밀번호·Authorization은 출력하지 않습니다. 성공하면 허용 사용자 200, 비허용 사용자와 origin 차단, 무인증 차단, GET 차단, WordPress GET 7건·쓰기 0건·누출 없음과 cleanup PASS를 요약합니다. 성공·실패·Ctrl+C 모두 Function과 mock server를 종료하고 임시 사용자와 env 파일을 삭제하며, temporary env가 남지 않도록 이 프로젝트의 local Edge Runtime container도 제거합니다.
+
+`WORDPRESS_LOCAL_MODE=true`는 정확한 `host.docker.internal` 또는 localhost root URL을 로컬 mock 용도로만 허용합니다. 원격 배포에서는 절대 활성화하지 않습니다.
 
 ## Supabase Auth 설정
 
