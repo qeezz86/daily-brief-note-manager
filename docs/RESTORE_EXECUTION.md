@@ -29,3 +29,7 @@ Timestamp 정책은 `preserve`와 `database_default`다. preserve는 backup RFC3
 `/backups/restore/jobs/:jobId`는 새로고침 후 DB 상태에서 이어서 실행한다. 자동 retry와 background worker는 없다. retry 가능한 현재 stage 실패만 수동 재시도한다. 취소는 pending record만 cancelled로 바꾸며 이미 생성된 row는 유지한다. 재개 시 target 충돌을 다시 확인한다. restore undo와 이전 성공 stage 자동 rollback은 지원하지 않는다.
 
 작업 목록과 상세는 실제 record 집계로 진행률을 계산하고 안전한 오류만 표시·복사한다. raw SQLSTATE, constraint 이름, SQL, stack trace와 인증 정보는 저장하거나 반환하지 않는다.
+
+## WordPress publication attempts 제외
+
+Phase 5C의 `wordpress_publication_attempts`는 restore section/candidate가 아니다. Restore는 attempt나 idempotency key를 다시 만들지 않고 WordPress Function을 호출하지 않으며 외부 write를 유발하지 않는다. 콘텐츠 복원 뒤 WordPress draft reconciliation이 필요하면 별도 수동 검토와 새 Dry Run을 사용한다.

@@ -2,7 +2,7 @@ export const POST_ID = '10000000-0000-4000-8000-000000000001'
 export const USER_ID = '20000000-0000-4000-8000-000000000001'
 export const SUPABASE_ORIGIN = 'https://e2e.supabase.co'
 
-const checkedAt = '2026-07-18T06:00:00.000Z'
+export const checkedAt = '2026-07-18T06:00:00.000Z'
 const updatedAt = '2026-07-18T05:00:00.000Z'
 const tagNames = ['워드프레스 연동', '콘텐츠 관리', '검색 최적화', '발행 준비', '자동화 검증']
 

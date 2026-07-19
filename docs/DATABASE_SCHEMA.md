@@ -597,3 +597,16 @@ CSV는 검토와 내보내기 전용이며 전체 관계 복원 형식으로 사
 `import_jobs`의 `restored_from_backup boolean not null default false`, `execution_locked boolean not null default false`, `restore_origin_checksum text null`은 복원 provenance를 기록한다. 일반 job은 false·false·null이며, 신규 복원 job은 true·true·실행 backup SHA-256 checksum이다. check constraint는 일반 job origin 금지와 복원 job의 잠금·checksum 형식을 강제한다. 기존 exact reuse job은 어떤 필드도 갱신하지 않는다.
 
 Import 테이블의 기존 자기 행 SELECT RLS와 직접 write 금지를 유지한다. 운영 restore helper만 빈 `search_path`의 SECURITY DEFINER 문맥에서 `auth.uid()` owner와 명시적 컬럼 목록으로 신규 row를 만든다. 잠금 trigger는 복원된 job·item·attempt의 직접 변경을 거부하고, 기존 Import 실행 RPC wrapper는 append·finalize·content·tracking·cancel·resume 전에 부모 job의 `execution_locked`를 검사한다. 잠금 해제 RPC는 없다.
+# Phase 5C: `wordpress_publication_attempts`
+
+WordPress draft 외부 side effect의 idempotency, 실행 lock과 안전한 감사 이력을 저장한다. `owner_id`와 `(content_id, owner_id)` FK로 소유권을 강제하고 RLS select/received-insert를 owner에게만 허용한다. 일반 UPDATE 권한은 없으며 authenticated에서 execute가 revoke된 `transition_wordpress_publication_attempt_service` security-definer RPC만 고정된 순방향 전이를 수행한다. RPC는 service role을 확인하고 Edge Function이 독립적으로 검증한 owner UUID로 row를 제한한다.
+
+- operation: `create_draft`
+- status: `received`, `validating`, `blocked`, `executing`, `succeeded`, `failed_safe`, `uncertain`
+- `(owner_id, site_origin, idempotency_key)` unique
+- `executing`·`succeeded`·`uncertain`에 대한 content/site/operation partial unique index
+- `succeeded`에는 positive WordPress ID와 `draft` status가 필수
+- terminal row는 역방향 전이가 없다.
+- title, HTML body, excerpt, raw WordPress response와 credential은 저장하지 않는다.
+
+이 table은 Backup snapshot과 Restore candidate에 포함하지 않는다.

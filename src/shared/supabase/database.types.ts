@@ -1205,6 +1205,83 @@ export type Database = {
         }
         Relationships: []
       }
+      wordpress_publication_attempts: {
+        Row: {
+          actual_payload_fingerprint: string | null
+          completed_at: string | null
+          content_id: string
+          created_at: string
+          error_code: string | null
+          error_retryable: boolean | null
+          expected_payload_fingerprint: string
+          expected_source_updated_at: string
+          id: string
+          idempotency_key: string
+          operation: string
+          owner_id: string
+          site_origin: string
+          started_at: string | null
+          status: string
+          updated_at: string
+          wordpress_post_id: number | null
+          wordpress_post_link: string | null
+          wordpress_post_slug: string | null
+          wordpress_post_status: string | null
+        }
+        Insert: {
+          actual_payload_fingerprint?: string | null
+          completed_at?: string | null
+          content_id: string
+          created_at?: string
+          error_code?: string | null
+          error_retryable?: boolean | null
+          expected_payload_fingerprint: string
+          expected_source_updated_at: string
+          id?: string
+          idempotency_key: string
+          operation?: string
+          owner_id: string
+          site_origin: string
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+          wordpress_post_id?: number | null
+          wordpress_post_link?: string | null
+          wordpress_post_slug?: string | null
+          wordpress_post_status?: string | null
+        }
+        Update: {
+          actual_payload_fingerprint?: string | null
+          completed_at?: string | null
+          content_id?: string
+          created_at?: string
+          error_code?: string | null
+          error_retryable?: boolean | null
+          expected_payload_fingerprint?: string
+          expected_source_updated_at?: string
+          id?: string
+          idempotency_key?: string
+          operation?: string
+          owner_id?: string
+          site_origin?: string
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+          wordpress_post_id?: number | null
+          wordpress_post_link?: string | null
+          wordpress_post_slug?: string | null
+          wordpress_post_status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wordpress_publication_attempts_post_owner_fkey"
+            columns: ["content_id", "owner_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id", "owner_id"]
+          },
+        ]
+      }
       wordpress_taxonomy_mappings: {
         Row: {
           created_at: string
@@ -2032,6 +2109,49 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "news_topics"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      transition_wordpress_publication_attempt_service: {
+        Args: {
+          p_actual_payload_fingerprint?: string
+          p_attempt_id: string
+          p_error_code?: string
+          p_error_retryable?: boolean
+          p_expected_status: string
+          p_new_status: string
+          p_owner_id: string
+          p_wordpress_post_id?: number
+          p_wordpress_post_link?: string
+          p_wordpress_post_slug?: string
+          p_wordpress_post_status?: string
+        }
+        Returns: {
+          actual_payload_fingerprint: string | null
+          completed_at: string | null
+          content_id: string
+          created_at: string
+          error_code: string | null
+          error_retryable: boolean | null
+          expected_payload_fingerprint: string
+          expected_source_updated_at: string
+          id: string
+          idempotency_key: string
+          operation: string
+          owner_id: string
+          site_origin: string
+          started_at: string | null
+          status: string
+          updated_at: string
+          wordpress_post_id: number | null
+          wordpress_post_link: string | null
+          wordpress_post_slug: string | null
+          wordpress_post_status: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "wordpress_publication_attempts"
           isOneToOne: true
           isSetofReturn: false
         }

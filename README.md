@@ -2,7 +2,7 @@
 
 Daily Brief Note의 콘텐츠, SEO 정보, 출처, 뉴스 추적 이력과 생성 프롬프트를 관리하기 위한 비공개 웹앱입니다.
 
-현재 저장소는 Phase 5B-R1 단계입니다. 인증된 단일 허용 사용자는 `/settings/wordpress`에서 Supabase Edge Function을 통해 단일 WordPress 사이트의 읽기 전용 리소스를 진단하고 taxonomy를 로컬 설정에 매핑하며, 콘텐츠별 publication payload를 Dry Run으로 검토할 수 있습니다. WordPress credential은 브라우저나 DB에 저장하지 않으며 실제 게시·draft 생성·taxonomy 생성·미디어 업로드·수정·삭제 요청은 수행하지 않습니다. 자세한 보안 경계와 로컬 설정은 [`docs/WORDPRESS_INTEGRATION.md`](docs/WORDPRESS_INTEGRATION.md)를 참고합니다.
+현재 저장소는 Phase 5C 단계입니다. 인증된 단일 허용 사용자는 콘텐츠별 publication payload를 Dry Run으로 검토한 뒤 명시적 확인을 거쳐 WordPress `draft` 1건을 생성할 수 있습니다. 서버는 쓰기 직전에 RLS 범위의 DB 원본, taxonomy, duplicate slug, source `updated_at`과 canonical fingerprint를 다시 검증합니다. WordPress credential은 브라우저나 DB에 저장하지 않으며 publish·update·delete·media·taxonomy write와 자동 재시도는 수행하지 않습니다. 자세한 보안 경계는 [`docs/WORDPRESS_DRAFT_CREATION.md`](docs/WORDPRESS_DRAFT_CREATION.md)를 참고합니다.
 
 Phase 4B의 `/backups`에서는 공식 `core`·`full` JSON 백업을 생성하고, `/backups/restore`에서 read-only Dry Run과 결정적 복원 계획을 만든 뒤 `/backups/restore/execute`에서 원본 backup과 plan을 다시 검증해 core 데이터와 선택한 full Import 운영 이력을 실제 복원할 수 있습니다. `/backups/restore/jobs`는 영구 job·record·attempt, stage 진행률, 수동 retry, 취소·재개를 제공합니다.
 
@@ -59,6 +59,8 @@ npm run lint
 npm run test
 npm run test:wordpress
 npm run smoke:wordpress-runtime
+npm run smoke:wordpress-preview
+npm run smoke:wordpress-draft
 npm run build
 npm run bundle:check
 ```
@@ -90,7 +92,9 @@ npm run smoke:wordpress-runtime
 
 Phase 5B의 `/settings/wordpress`는 기존 WordPress category/tag catalog를 GET-only로 읽어 로컬 category·tag와 명시적으로 매핑합니다. 콘텐츠 상세의 `WordPress Dry Run`은 source-of-truth DB 데이터를 다시 읽어 taxonomy 해석, 전체 공개 상태 범위의 duplicate slug, blockers/warnings, draft payload와 결정적 SHA-256 fingerprint를 표시합니다. WordPress 게시·draft 생성·taxonomy 생성 버튼과 WordPress write request는 없습니다. 계약은 `docs/WORDPRESS_PUBLICATION_PLAN.md`를 따르며 격리 smoke는 `npm run smoke:wordpress-preview`로 실행합니다.
 
-Phase 5B-R1은 위 흐름을 Playwright의 결정적 Supabase/Edge Function interception으로 Chromium과 iPhone 13에서 검증합니다. 테스트는 인증된 콘텐츠 상세 → preview 이동, loading/ready/blocked/warning, payload 복사, taxonomy 매핑 저장·제거 확인, mobile overflow와 게시·draft·전송·업로드 UI 부재를 검사하며 실제 WordPress나 원격 Supabase에 접속하지 않습니다. SEO 태그 원문은 보존하고 NFC·공백 축소 후 공백/하이픈/en dash/em dash/중점/underscore 제거와 locale-independent lowercase를 비교에만 적용합니다. 비교 결과가 같으면 `SEO_TAG_DUPLICATE_NORMALIZED` blocker, 제한적인 포함 관계이면 `SEO_TAG_POSSIBLE_NEAR_DUPLICATE` warning이며 태그를 자동 삭제하거나 병합하지 않습니다. frontend와 Edge Function은 `fixtures/seo-tag-normalization.json` 전체를 각각 실행해 규칙 동등성을 고정합니다.
+Phase 5B-R1은 위 흐름을 Playwright의 결정적 Supabase/Edge Function interception으로 Chromium과 iPhone 13에서 검증합니다. 테스트는 인증된 콘텐츠 상세 → preview 이동, loading/ready/blocked/warning, payload 복사, taxonomy 매핑 저장·제거 확인과 mobile overflow를 검사하며 실제 WordPress나 원격 Supabase에 접속하지 않습니다. SEO 태그 원문은 보존하고 NFC·공백 축소 후 공백/하이픈/en dash/em dash/중점/underscore 제거와 locale-independent lowercase를 비교에만 적용합니다. 비교 결과가 같으면 `SEO_TAG_DUPLICATE_NORMALIZED` blocker, 제한적인 포함 관계이면 `SEO_TAG_POSSIBLE_NEAR_DUPLICATE` warning이며 태그를 자동 삭제하거나 병합하지 않습니다. frontend와 Edge Function은 `fixtures/seo-tag-normalization.json` 전체를 각각 실행해 규칙 동등성을 고정합니다.
+
+Phase 5C는 별도 `wordpress-draft-create` Edge Function과 `wordpress_publication_attempts` 감사/idempotency table을 사용합니다. 허용되는 WordPress write는 요청당 정확히 한 번의 `POST /wp-json/wp/v2/posts`뿐이고 body는 `title`, `content`, `status=draft`, `slug`, `excerpt`, `categories`, `tags`로 고정됩니다. 같은 key replay, 같은 콘텐츠의 성공 기록, 불명확한 결과는 추가 POST 없이 차단합니다. 로컬 검증은 실제 WordPress 대신 mock server를 사용하는 `npm run smoke:wordpress-draft`로 수행합니다.
 
 ## Supabase Auth 설정
 

@@ -156,3 +156,6 @@ Phase 4B-3도 read-only다. 실제 row 생성·수정·삭제, counter update, r
 schema version 1의 `importJobs`는 `restoredFromBackup`, `executionLocked`, `restoreOriginChecksum`을 선택 필드로 정의한다. 필드가 없는 기존 v1은 false·false·null로 해석하고, 새 full 백업은 명시적으로 기록한다. 임의 추가 필드는 허용하지 않는다. 백업의 잠금 값과 무관하게 신규 복원 job은 항상 잠기며, exact reuse된 기존 job은 변경하지 않는다.
 
 운영 이력은 source fingerprint, item index·external key, 부모 job/item과 nullable post 관계, normalized payload fingerprint·금지 key, 상태·timestamp·attempt count를 검증한다. 전체 normalized payload는 restore plan에 넣지 않고 실행 snapshot을 준비할 때 검증된 원본 backup에서 가져온다.
+# Phase 5C WordPress publication attempts
+
+`wordpress_publication_attempts`는 portable content가 아니라 WordPress 외부 side effect의 실행/idempotency 감사 이력이다. `core`와 `full` backup 모두에서 제외한다. attempt ID, WordPress post ID/link, uncertain/failed 상태와 idempotency key를 export하지 않으며 기존 schema version 1 파일 호환성은 바뀌지 않는다.

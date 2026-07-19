@@ -69,4 +69,4 @@ preview smoke는 로컬 Supabase Auth 사용자와 RLS content/mapping fixture, 
 
 ## 후속 단계
 
-실제 draft 생성은 별도 승인·설계 단계다. Phase 5B fingerprint 재검증, source freshness, taxonomy/duplicate 재조회, 명시적 사용자 확인, idempotency와 감사 기록 없이 쓰기 기능을 추가하지 않는다.
+Phase 5C는 이 Dry Run 결과를 비교값으로만 사용해 별도 `wordpress-draft-create` Function에서 draft를 생성한다. preview payload 자체는 전송하거나 신뢰하지 않으며 source freshness, fingerprint, taxonomy/duplicate, 확인, DB idempotency/lock과 감사 기록을 모두 다시 적용한다. 상세 계약은 `docs/WORDPRESS_DRAFT_CREATION.md`를 따른다.

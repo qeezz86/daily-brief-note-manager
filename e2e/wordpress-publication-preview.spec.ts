@@ -1,6 +1,7 @@
 import { expect, test, type Page, type Route } from '@playwright/test'
 import {
   blockedPlan,
+  checkedAt,
   localCategories,
   localTags,
   POST_ID,
@@ -59,12 +60,15 @@ async function fulfillJson(route: Route, body: unknown, status = 200) {
   await route.fulfill({ status, contentType: 'application/json; charset=utf-8', body: JSON.stringify(body) })
 }
 
-async function installBackend(page: Page, plan: PublicationPlanFixture, options: { holdPreview?: boolean; holdMappingSave?: boolean } = {}) {
+async function installBackend(page: Page, plan: PublicationPlanFixture, options: { holdPreview?: boolean; holdMappingSave?: boolean; holdDraft?: boolean; draftOutcome?: 'success' | 'uncertain' } = {}) {
   const previewGate = deferred()
   const mappingSaveGate = deferred()
+  const draftGate = deferred()
   const functionActions: string[] = []
   const restMutations: Array<{ method: string; table: string }> = []
   let mappingRemoved = false
+  let wordpressPostCount = 0
+  let attemptRows: unknown[] = []
 
   await page.route(`${SUPABASE_ORIGIN}/**`, async (route) => {
     const request = route.request()
@@ -86,6 +90,24 @@ async function installBackend(page: Page, plan: PublicationPlanFixture, options:
         return
       }
       await fulfillJson(route, { schemaVersion: 1, ok: false, error: { code: 'INVALID_ACTION', message: '지원하지 않는 action입니다.', retryable: false } }, 400)
+      return
+    }
+    if (url.pathname === '/functions/v1/wordpress-draft-create') {
+      const body = request.postDataJSON() as Record<string, unknown>
+      functionActions.push(String(body.action ?? 'unknown'))
+      expect(Object.keys(body).sort()).toEqual(['action', 'confirmation', 'contentId', 'expectedPayloadFingerprint', 'expectedSourceUpdatedAt', 'idempotencyKey'])
+      expect(body).not.toHaveProperty('payload')
+      expect(body).not.toHaveProperty('status')
+      if (options.holdDraft) await draftGate.promise
+      wordpressPostCount += 1
+      const attemptId = '50000000-0000-4000-8000-000000000001'
+      if (options.draftOutcome === 'uncertain') {
+        attemptRows = [{ id: attemptId, operation: 'create_draft', status: 'uncertain', started_at: checkedAt, completed_at: checkedAt, created_at: checkedAt, wordpress_post_id: null, wordpress_post_status: null, wordpress_post_slug: null, wordpress_post_link: null, error_code: 'WORDPRESS_DRAFT_RESULT_UNCERTAIN', actual_payload_fingerprint: readyPlan.payloadFingerprint }]
+        await fulfillJson(route, { schemaVersion: 1, ok: false, error: { code: 'WORDPRESS_DRAFT_RESULT_UNCERTAIN', message: 'WordPress 초안 생성 결과가 불명확합니다.', retryable: false, attemptId } }, 502)
+        return
+      }
+      attemptRows = [{ id: attemptId, operation: 'create_draft', status: 'succeeded', started_at: checkedAt, completed_at: checkedAt, created_at: checkedAt, wordpress_post_id: 901, wordpress_post_status: 'draft', wordpress_post_slug: sourcePost.slug, wordpress_post_link: 'https://wordpress.example.com/?p=901', error_code: null, actual_payload_fingerprint: readyPlan.payloadFingerprint }]
+      await fulfillJson(route, { schemaVersion: 1, ok: true, operation: 'create-draft', created: true, idempotentReplay: false, attemptId, source: { contentId: POST_ID, sourceUpdatedAt: sourcePost.updated_at, payloadFingerprint: readyPlan.payloadFingerprint }, wordpress: { postId: 901, status: 'draft', slug: sourcePost.slug, link: 'https://wordpress.example.com/?p=901' } }, 201)
       return
     }
     if (!url.pathname.startsWith('/rest/v1/')) {
@@ -127,6 +149,7 @@ async function installBackend(page: Page, plan: PublicationPlanFixture, options:
           : table === 'post_tags' ? sourceTags
             : table === 'tags' ? localTags
               : table === 'wordpress_taxonomy_mappings' ? (mappingRemoved ? taxonomyMappings.slice(0, 1) : taxonomyMappings)
+                : table === 'wordpress_publication_attempts' ? attemptRows
                 : []
     await fulfillJson(route, rows)
   })
@@ -136,6 +159,8 @@ async function installBackend(page: Page, plan: PublicationPlanFixture, options:
     restMutations,
     releasePreview: previewGate.resolve,
     releaseMappingSave: mappingSaveGate.resolve,
+    releaseDraft: draftGate.resolve,
+    wordpressPostCount: () => wordpressPostCount,
   }
 }
 
@@ -148,16 +173,16 @@ function captureBrowserErrors(page: Page) {
 }
 
 async function expectNoWriteButtons(page: Page) {
-  for (const name of ['게시', '발행', '초안 생성', 'WordPress 전송', '업로드', '생성 후 게시']) {
+  for (const name of ['게시', '발행', 'WordPress 전송', '업로드', '생성 후 게시', '업데이트', '삭제', '미디어']) {
     await expect(page.getByRole('button', { name, exact: true })).toHaveCount(0)
   }
 }
 
-test('Chromium: authenticated ready preview renders and copies a GET-only draft payload', async ({ page }, testInfo) => {
+test('Chromium: ready preview confirms and creates exactly one WordPress draft', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'chromium')
   const errors = captureBrowserErrors(page)
   await installAuthenticatedSession(page)
-  const backend = await installBackend(page, readyPlan, { holdPreview: true })
+  const backend = await installBackend(page, readyPlan, { holdPreview: true, holdDraft: true })
 
   await page.goto(`/content/${POST_ID}`)
   await expect(page.getByRole('heading', { level: 1, name: sourcePost.title })).toBeVisible()
@@ -174,7 +199,7 @@ test('Chromium: authenticated ready preview renders and copies a GET-only draft 
   await expect(page.getByRole('heading', { name: 'Draft 생성 준비 완료' })).toBeVisible()
   await expect(page.getByText('dry-run', { exact: true })).toBeVisible()
   await expect(page.getByText('아니요', { exact: true })).toBeVisible()
-  await expect(page.getByText(readyPlan.payloadFingerprint)).toBeVisible()
+  await expect(page.getByText(readyPlan.payloadFingerprint).first()).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Category mapping' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Tag mapping' })).toBeVisible()
   await expect(page.getByText('동일 slug 글이 없습니다.')).toBeVisible()
@@ -188,10 +213,45 @@ test('Chromium: authenticated ready preview renders and copies a GET-only draft 
   await expect(page.getByText('Payload를 복사했습니다.')).toBeVisible()
   expect(await page.evaluate(() => sessionStorage.getItem('e2e-copied-payload'))).toBe(JSON.stringify(readyPlan.payload, null, 2))
 
+  await page.getByRole('button', { name: 'WordPress 초안 생성 준비' }).click()
+  const dialog = page.getByRole('dialog', { name: 'WordPress 외부 변경 확인' })
+  await expect(dialog).toBeVisible()
+  const finalButton = dialog.getByRole('button', { name: '초안 1건 생성' })
+  await expect(finalButton).toBeDisabled()
+  await dialog.getByRole('checkbox').check()
+  await finalButton.click()
+  await expect(dialog.getByRole('button', { name: '초안 생성 요청 중' })).toBeDisabled()
+  backend.releaseDraft()
+  await expect(page.getByRole('heading', { name: 'WordPress 초안 생성 완료' })).toBeVisible()
+  await expect(page.getByText('901', { exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'WordPress 초안 생성 완료' }).locator('..')).toContainText('draft')
+  await expect(page.getByRole('link', { name: 'WordPress에서 초안 확인' })).toHaveAttribute('rel', 'noopener noreferrer')
+  await expect(page.getByRole('button', { name: 'WordPress 초안 생성 준비' })).toBeDisabled()
+  expect(backend.wordpressPostCount()).toBe(1)
+
   await expectNoWriteButtons(page)
-  expect(backend.functionActions).toEqual(['prepare-publication'])
+  expect(backend.functionActions).toEqual(['prepare-publication', 'create-draft'])
   expect(backend.restMutations).toEqual([])
   expect(errors.consoleErrors).toEqual([])
+  expect(errors.pageErrors).toEqual([])
+})
+
+test('Chromium: uncertain result blocks retry and requires manual reconciliation', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'chromium')
+  const errors = captureBrowserErrors(page)
+  await installAuthenticatedSession(page)
+  const backend = await installBackend(page, readyPlan, { draftOutcome: 'uncertain' })
+  await page.goto(`/content/${POST_ID}/wordpress-preview`)
+  await page.getByRole('button', { name: 'Dry Run 실행' }).click()
+  await page.getByRole('button', { name: 'WordPress 초안 생성 준비' }).click()
+  const dialog = page.getByRole('dialog')
+  await dialog.getByRole('checkbox').check()
+  await dialog.getByRole('button', { name: '초안 1건 생성' }).click()
+  await expect(page.getByText('다시 생성하지 마세요.')).toBeVisible()
+  await expect(page.getByText(/WordPress 관리자에서/).first()).toBeVisible()
+  await expect(page.getByRole('button', { name: /재시도/ })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'WordPress 초안 생성 준비' })).toBeDisabled()
+  expect(backend.wordpressPostCount()).toBe(1)
   expect(errors.pageErrors).toEqual([])
 })
 
@@ -276,13 +336,20 @@ test('iPhone: warning preview remains readable, scroll-safe, and touch-copyable'
   await expect(page.getByRole('heading', { name: 'Category mapping' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Tag mapping' })).toBeVisible()
   await expect(page.locator('.wordpress-payload')).toBeVisible()
-  await expect(page.getByText(warningPlan.payloadFingerprint)).toBeVisible()
+  await expect(page.getByText(warningPlan.payloadFingerprint).first()).toBeVisible()
 
   const copyButton = page.getByRole('button', { name: 'Payload 복사' })
   const copyBox = await copyButton.boundingBox()
   expect(copyBox?.height ?? 0).toBeGreaterThanOrEqual(40)
   await copyButton.click()
   await expect(page.getByText('Payload를 복사했습니다.')).toBeVisible()
+  await page.getByRole('button', { name: 'WordPress 초안 생성 준비' }).click()
+  const confirmation = page.getByRole('dialog', { name: 'WordPress 외부 변경 확인' })
+  await expect(confirmation).toBeVisible()
+  await expect(confirmation.getByRole('button', { name: '초안 1건 생성' })).toBeDisabled()
+  const confirmationButtonBox = await confirmation.getByRole('button', { name: '초안 1건 생성' }).boundingBox()
+  expect(confirmationButtonBox?.height ?? 0).toBeGreaterThanOrEqual(40)
+  await confirmation.getByRole('button', { name: '취소' }).click()
   await expectNoWriteButtons(page)
 
   const layout = await page.evaluate(() => {

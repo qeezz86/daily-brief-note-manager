@@ -18,6 +18,12 @@ Phase 5B-R1은 Chromium과 iPhone viewport에서 이 publication preview와 taxo
 
 기존 `wordpress-diagnostics`는 연결 진단용으로 유지하며 preview Function과 독립 배포·rollback할 수 있다. 두 Function 모두 같은 server-only credential 경계, caller allowlist, exact CORS와 SSRF/redirect 정책을 공유한다.
 
+## Phase 5C draft creation
+
+`wordpress-draft-create`는 preview와 분리된 write Function이다. 브라우저는 content ID, reviewed source timestamp/fingerprint, 한 operation 동안 고정된 UUID idempotency key와 exact confirmation만 보낸다. Function은 caller JWT/anon key로 RLS가 적용된 DB 원본을 다시 읽고 capability, 전체 taxonomy catalog, mapping, HTML/SEO/tag validation과 duplicate slug를 다시 확인한다. 브라우저의 직접 상태 전환을 막기 위해 server-only service role은 allowlisted attempt transition RPC 하나에만 사용하며, RPC도 service role과 검증된 owner UUID를 다시 확인한다.
+
+PostgreSQL partial unique index와 allowlisted transition RPC로 execution lock을 획득한 요청만 `POST /wp-json/wp/v2/posts`를 최대 1회 수행한다. status는 code-owned `draft` literal이다. timeout, connection close, invalid/oversized/non-draft 응답은 재호출하지 않고 `uncertain`을 기록한다. 자세한 계약은 `docs/WORDPRESS_DRAFT_CREATION.md`를 따른다.
+
 ## Credential과 인증 경계
 
 Edge Function 환경 secret은 `WORDPRESS_SITE_URL`, `WORDPRESS_USERNAME`, `WORDPRESS_APPLICATION_PASSWORD`, `WORDPRESS_ALLOWED_USER_ID`, `APP_ALLOWED_ORIGINS`다. `WORDPRESS_LOCAL_MODE`는 localhost 또는 Docker host mock에서만 사용하는 선택값이다.
