@@ -76,11 +76,11 @@ const requiredQueries = new Map([
   ['/wp-json/wp/v2/types', new Map([['context', 'edit']])],
   ['/wp-json/wp/v2/statuses', new Map([['context', 'edit']])],
   ['/wp-json/wp/v2/categories', new Map([
-    ['context', 'edit'], ['per_page', '100'], ['page', '1'], ['hide_empty', 'false'],
+    ['context', 'view'], ['per_page', '100'], ['page', '1'], ['hide_empty', 'false'],
     ['_fields', 'id,name,slug,parent,count'],
   ])],
   ['/wp-json/wp/v2/tags', new Map([
-    ['context', 'edit'], ['per_page', '100'], ['page', '1'], ['hide_empty', 'false'],
+    ['context', 'view'], ['per_page', '100'], ['page', '1'], ['hide_empty', 'false'],
     ['_fields', 'id,name,slug,count'],
   ])],
   ['/wp-json/wp/v2/posts', new Map([

@@ -4,7 +4,7 @@ import { DiagnosticError } from './errors.ts'
 import { parseWordPressConfig } from './config.ts'
 
 const validValues: Record<string, string> = {
-  WORDPRESS_SITE_URL: 'https://wordpress.example.com/',
+  WORDPRESS_SITE_URL: 'https://wordpress.example.com',
   WORDPRESS_USERNAME: 'api-user',
   WORDPRESS_APPLICATION_PASSWORD: 'abcd efgh ijkl',
   WORDPRESS_ALLOWED_USER_ID: '11111111-1111-4111-8111-111111111111',
@@ -45,6 +45,7 @@ describe('parseWordPressConfig', () => {
   it.each([
     ['not-a-url', 'invalid URL'],
     ['http://wordpress.example.com', 'production HTTP'],
+    ['https://wordpress.example.com/', 'trailing slash'],
     ['https://name:password@wordpress.example.com', 'userinfo'],
     ['https://wordpress.example.com?target=x', 'query'],
     ['https://wordpress.example.com#fragment', 'fragment'],
@@ -56,13 +57,13 @@ describe('parseWordPressConfig', () => {
 
   it('allows localhost only in explicit local mode', () => {
     expectCode({ WORDPRESS_SITE_URL: 'http://localhost:8080' }, 'WORDPRESS_URL_INVALID')
-    const config = parseWordPressConfig(environment({ WORDPRESS_SITE_URL: 'http://localhost:8080/', WORDPRESS_LOCAL_MODE: 'true' }))
+    const config = parseWordPressConfig(environment({ WORDPRESS_SITE_URL: 'http://localhost:8080', WORDPRESS_LOCAL_MODE: 'true' }))
     expect(config.siteUrl.origin).toBe('http://localhost:8080')
   })
 
   it('allows only the exact Docker host root in explicit local mode', () => {
     const config = parseWordPressConfig(environment({
-      WORDPRESS_SITE_URL: 'http://host.docker.internal:43123/',
+      WORDPRESS_SITE_URL: 'http://host.docker.internal:43123',
       WORDPRESS_LOCAL_MODE: 'true',
     }))
     expect(config.siteUrl.origin).toBe('http://host.docker.internal:43123')

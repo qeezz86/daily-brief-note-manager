@@ -48,7 +48,8 @@ export function parseWordPressConfig(environment: EnvironmentSource): WordPressC
     || siteUrl.hostname.endsWith('.internal')
 
   if (
-    siteUrl.username
+    values.WORDPRESS_SITE_URL.endsWith('/')
+    || siteUrl.username
     || siteUrl.password
     || siteUrl.search
     || siteUrl.hash

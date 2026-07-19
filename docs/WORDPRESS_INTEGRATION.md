@@ -48,11 +48,13 @@ Edge Function 환경 secret은 `WORDPRESS_SITE_URL`, `WORDPRESS_USERNAME`, `WORD
 - `GET /wp-json/wp/v2/users/me?context=edit`
 - `GET /wp-json/wp/v2/types?context=edit`
 - `GET /wp-json/wp/v2/statuses?context=edit`
-- `GET /wp-json/wp/v2/categories?context=edit&per_page=100&page=1&hide_empty=false&_fields=...`
-- `GET /wp-json/wp/v2/tags?context=edit&per_page=100&page=1&hide_empty=false&_fields=...`
+- `GET /wp-json/wp/v2/categories?context=view&per_page=100&page=1&hide_empty=false&_fields=...`
+- `GET /wp-json/wp/v2/tags?context=view&per_page=100&page=1&hide_empty=false&_fields=...`
 - `GET /wp-json/wp/v2/posts?context=edit&per_page=1&page=1&_fields=id,slug,status,modified_gmt`
 
 discovery와 `users/me`를 순차 확인한 뒤 나머지를 병렬 확인한다. 응답에 post item/body는 포함하지 않는다. 사용자는 ID/display name/roles만, capability는 `edit_posts`, `publish_posts`, `upload_files`, `manage_categories`, `edit_others_posts`, `delete_posts`만 boolean으로 반환한다. email, username과 전체 capability map은 제외한다.
+
+실제 draft 생성과 기존 built-in category/tag term 할당에 필요한 최소 capability는 `edit_posts`다. draft에는 `publish_posts`, media write가 없으므로 `upload_files`, taxonomy 생성·수정이 없고 catalog가 `context=view`이므로 `manage_categories`가 필요하지 않다. 다만 plugin, custom role 또는 capability filter가 WordPress core 계약을 바꿀 수 있으므로 실사이트 diagnostics와 read-only preview 결과가 최종 gate다.
 
 ## 결과, 오류와 로그
 
@@ -100,3 +102,13 @@ npx supabase functions serve wordpress-diagnostics --env-file supabase/functions
 실제 사이트에서는 전용 Application Password를 생성해 password manager에만 저장하고 chat/Git/screenshot에 남기지 않는다. ignored env 또는 배포 secret에 URL, username, password, 허용 user UUID와 origin을 설정한 뒤 인증된 `/settings/wordpress`에서 사용자가 진단을 실행한다. 사용하지 않으면 WordPress 관리자에서 해당 Application Password를 폐기한다.
 
 Phase 5A 구현 과정에서는 실제 WordPress 호출/쓰기, 원격 Supabase deploy와 remote secret 설정을 수행하지 않는다.
+
+## Production deployment readiness
+
+Phase 5C-R1은 세 Function의 `verify_jwt=true`, server-only credential, migration/RLS/RPC/idempotency, fixed draft endpoint와 forbidden write를 로컬 정적으로 검사한다.
+
+```bash
+npm run check:wordpress-production-readiness
+```
+
+원격 migration, Function/secret/frontend 배포, 실제 read-only 진단과 승인된 단일 draft smoke의 순서는 `docs/WORDPRESS_PRODUCTION_DEPLOYMENT_RUNBOOK.md`를 따른다. R1에서는 이 원격 명령과 실제 WordPress 요청을 실행하지 않는다.

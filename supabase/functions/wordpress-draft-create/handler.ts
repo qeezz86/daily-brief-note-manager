@@ -104,6 +104,20 @@ async function recordWordPressFailure(database: AttemptDatabase, attemptId: stri
   throw new DraftError(error.code, error.httpStatus, false, attemptId)
 }
 
+async function recordAuditFailureAfterWordPress(database: AttemptDatabase, attemptId: string, fingerprint: string): Promise<never> {
+  try {
+    await database.transition({
+      attemptId, expectedStatus: 'executing', newStatus: 'uncertain', actualPayloadFingerprint: fingerprint,
+      errorCode: 'AUDIT_RECORD_FAILED', errorRetryable: false,
+    })
+  } catch {
+    // The first transition may have committed even if its response was lost, or
+    // the database may be unavailable. The durable execution lock still blocks
+    // another WordPress POST; manual reconciliation is the only safe response.
+  }
+  throw new DraftError('WORDPRESS_DRAFT_RESULT_UNCERTAIN', 502, false, attemptId)
+}
+
 function mapDiagnostic(error: DiagnosticError): DraftError {
   if (error.code === 'ORIGIN_FORBIDDEN') return new DraftError('ORIGIN_FORBIDDEN', 403)
   return new DraftError('CONFIG_MISSING', 500)
@@ -219,7 +233,7 @@ export function createWordPressDraftHandler(dependencies: Dependencies) {
           actualPayloadFingerprint: plan.payloadFingerprint, wordpressPostId: wordpressResult.postId,
           wordpressPostStatus: 'draft', wordpressPostSlug: wordpressResult.slug, wordpressPostLink: wordpressResult.link,
         })
-      } catch { throw new DraftError('AUDIT_RECORD_FAILED', 500, false, attempt.id) }
+      } catch { return await recordAuditFailureAfterWordPress(database, attempt.id, plan.payloadFingerprint) }
       return json(success(attempt, true), 201, headers)
     } catch (error) {
       const safe = safeDraftError(error)

@@ -64,7 +64,7 @@ async function startMockWordPress(username, password) {
     if (status !== 200) return sendJson(response, status, { code: 'mock_failure' })
     if (url.pathname.endsWith('/categories') || url.pathname.endsWith('/tags')) {
       const page = Number(url.searchParams.get('page'))
-      const valid = url.searchParams.get('context') === 'edit' && url.searchParams.get('per_page') === '100' && url.searchParams.get('hide_empty') === 'false' && url.searchParams.get('order') === 'asc' && url.searchParams.get('orderby') === 'id' && [1, 2].includes(page)
+      const valid = url.searchParams.get('context') === 'view' && url.searchParams.get('per_page') === '100' && url.searchParams.get('hide_empty') === 'false' && url.searchParams.get('order') === 'asc' && url.searchParams.get('orderby') === 'id' && [1, 2].includes(page)
       if (!valid) return sendJson(response, 404, { code: 'mock_query' })
       const pages = url.pathname.endsWith('/categories') ? categoryPages : tagPages
       const total = pages.flat().length

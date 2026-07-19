@@ -26,8 +26,8 @@ const endpointPaths: Record<WordPressEndpoint, { path: string; query?: Record<st
   user: { path: 'wp-json/wp/v2/users/me', query: { context: 'edit' } },
   types: { path: 'wp-json/wp/v2/types', query: { context: 'edit' } },
   statuses: { path: 'wp-json/wp/v2/statuses', query: { context: 'edit' } },
-  categories: { path: 'wp-json/wp/v2/categories', query: { context: 'edit', per_page: '100', page: '1', hide_empty: 'false', _fields: 'id,name,slug,parent,count' } },
-  tags: { path: 'wp-json/wp/v2/tags', query: { context: 'edit', per_page: '100', page: '1', hide_empty: 'false', _fields: 'id,name,slug,count' } },
+  categories: { path: 'wp-json/wp/v2/categories', query: { context: 'view', per_page: '100', page: '1', hide_empty: 'false', _fields: 'id,name,slug,parent,count' } },
+  tags: { path: 'wp-json/wp/v2/tags', query: { context: 'view', per_page: '100', page: '1', hide_empty: 'false', _fields: 'id,name,slug,count' } },
   posts: { path: 'wp-json/wp/v2/posts', query: { context: 'edit', per_page: '1', page: '1', _fields: 'id,slug,status,modified_gmt' } },
 }
 

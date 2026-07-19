@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 1,
+  "requiredMigrations": [
+    "20260718120000_wordpress_taxonomy_mappings.sql",
+    "20260719120000_wordpress_draft_creation.sql",
+    "20260719130000_harden_wordpress_draft_transition.sql"
+  ],
+  "requiredFunctions": [
+    "wordpress-diagnostics",
+    "wordpress-publication-preview",
+    "wordpress-draft-create"
+  ],
+  "platformProvidedEnvironment": [
+    "SUPABASE_URL",
+    "SUPABASE_ANON_KEY",
+    "SUPABASE_SERVICE_ROLE_KEY"
+  ],
+  "requiredSecrets": [
+    "WORDPRESS_SITE_URL",
+    "WORDPRESS_USERNAME",
+    "WORDPRESS_APPLICATION_PASSWORD",
+    "WORDPRESS_ALLOWED_USER_ID",
+    "APP_ALLOWED_ORIGINS"
+  ],
+  "forbiddenProductionSecrets": [
+    "WORDPRESS_LOCAL_MODE"
+  ],
+  "requiredReadOnlyChecks": [
+    "rest-discovery",
+    "wp-v2-namespace",
+    "application-password-advertisement",
+    "authenticated-users-me",
+    "required-capabilities",
+    "post-type",
+    "statuses",
+    "categories-full-catalog",
+    "tags-full-catalog",
+    "posts-read",
+    "duplicate-slug",
+    "taxonomy-mapping-revalidation",
+    "publication-preview",
+    "zero-blockers",
+    "warning-review",
+    "fingerprint-recorded"
+  ],
+  "requiredDraftChecks": [
+    "migration-complete",
+    "functions-deployed",
+    "function-version-confirmed",
+    "secrets-confirmed",
+    "local-mode-absent",
+    "diagnostics-ready",
+    "owner-matches",
+    "taxonomy-ready",
+    "duplicate-slug-zero",
+    "publication-plan-ready",
+    "source-updated-at-matches",
+    "fingerprint-matches",
+    "no-succeeded-or-uncertain-attempt",
+    "backup-confirmed",
+    "automatic-retry-disabled",
+    "single-content-single-request",
+    "explicit-user-confirmation"
+  ],
+  "forbiddenWriteOperations": [
+    "publish-post",
+    "update-post",
+    "delete-post",
+    "media-write",
+    "taxonomy-write"
+  ],
+  "allowedWordPressWrite": {
+    "method": "POST",
+    "path": "/wp-json/wp/v2/posts",
+    "maximumRequests": 1
+  },
+  "expectedDraftStatus": "draft",
+  "placeholders": [
+    "<PROJECT_REF>",
+    "<WORDPRESS_SITE_URL>",
+    "<WORDPRESS_ALLOWED_USER_ID>",
+    "<PRODUCTION_APP_ORIGIN>",
+    "<PRODUCTION_DEPLOYMENT_COMMIT>"
+  ]
+}

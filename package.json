@@ -13,6 +13,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:wordpress": "vitest run wordpress",
+    "check:wordpress-production-readiness": "node scripts/check-wordpress-production-readiness.mjs",
     "smoke:wordpress-runtime": "node scripts/wordpress-runtime-smoke.mjs",
     "smoke:wordpress-preview": "node scripts/wordpress-preview-smoke.mjs",
     "smoke:wordpress-draft": "node scripts/wordpress-draft-smoke.mjs",

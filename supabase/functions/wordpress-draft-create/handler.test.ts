@@ -23,8 +23,9 @@ function env(name: string) {
   return ({ WORDPRESS_SITE_URL: 'https://wordpress.example.com', WORDPRESS_USERNAME: 'wp-user', WORDPRESS_APPLICATION_PASSWORD: 'wp-pass', WORDPRESS_ALLOWED_USER_ID: ownerId, APP_ALLOWED_ORIGINS: 'https://app.example.com' } as Record<string, string>)[name]
 }
 
-function makeDatabase(sourceValue: SourceContent | null = source) {
+function makeDatabase(sourceValue: SourceContent | null = source, options: { failSucceededTransition?: boolean } = {}) {
   let attempt: PublicationAttempt | null = null
+  let succeededTransitionFailed = false
   const transitions: string[] = []
   const database: AttemptDatabase = {
     loadContent: vi.fn(async () => sourceValue), readContentUpdatedAt: vi.fn(async () => sourceValue?.updatedAt ?? null),
@@ -45,6 +46,10 @@ function makeDatabase(sourceValue: SourceContent | null = source) {
     transition: vi.fn(async (input) => {
       if (!attempt) throw new Error('missing')
       transitions.push(`${input.expectedStatus}->${input.newStatus}`)
+      if (input.newStatus === 'succeeded' && options.failSucceededTransition && !succeededTransitionFailed) {
+        succeededTransitionFailed = true
+        throw new Error('audit write failed')
+      }
       attempt = {
         ...attempt, status: input.newStatus, actualPayloadFingerprint: input.actualPayloadFingerprint ?? attempt.actualPayloadFingerprint,
         wordpressPostId: input.wordpressPostId ?? null, wordpressPostStatus: input.wordpressPostStatus ?? null,
@@ -138,6 +143,18 @@ describe('WordPress draft create handler', () => {
     const second = await handler(request(fingerprint))
     expect(second.status).toBe(409)
     expect(await second.json()).toMatchObject({ error: { code: 'MANUAL_RECONCILIATION_REQUIRED' } })
+    expect(fetchMock.mock.calls.filter((call) => call[1]?.method === 'POST')).toHaveLength(1)
+  })
+
+  it('records uncertain when WordPress succeeds but the success audit transition fails', async () => {
+    const fixture = makeDatabase(source, { failSucceededTransition: true })
+    const fetchMock = wordpressFetch()
+    const handler = createWordPressDraftHandler({ environment: { get: env }, verifyCaller: vi.fn(async () => ({ id: ownerId })), createDatabase: () => fixture.database, fetchImpl: fetchMock })
+    const response = await handler(request(await expectedFingerprint()))
+    expect(response.status).toBe(502)
+    expect(await response.json()).toMatchObject({ error: { code: 'WORDPRESS_DRAFT_RESULT_UNCERTAIN' } })
+    expect(fixture.transitions).toEqual(['received->validating', 'validating->executing', 'executing->succeeded', 'executing->uncertain'])
+    expect(fixture.current()).toMatchObject({ status: 'uncertain', errorCode: 'AUDIT_RECORD_FAILED' })
     expect(fetchMock.mock.calls.filter((call) => call[1]?.method === 'POST')).toHaveLength(1)
   })
 

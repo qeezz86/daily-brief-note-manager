@@ -101,7 +101,7 @@ export function createPublicationWordPressClient(options: Options): PublicationW
     getCatalogPage(taxonomy, page) {
       if (!Number.isInteger(page) || page < 1 || page > 20) throw new PublicationError('WORDPRESS_CATALOG_INCOMPLETE', { httpStatus: 502 })
       const fields = taxonomy === 'categories' ? 'id,name,slug,parent,count' : 'id,name,slug,count'
-      return read(`wp-json/wp/v2/${taxonomy}`, { context: 'edit', page: String(page), per_page: '100', hide_empty: 'false', order: 'asc', orderby: 'id', _fields: fields }, true)
+      return read(`wp-json/wp/v2/${taxonomy}`, { context: 'view', page: String(page), per_page: '100', hide_empty: 'false', order: 'asc', orderby: 'id', _fields: fields }, true)
     },
     async getStatuses() {
       const response = await read('wp-json/wp/v2/statuses', { context: 'edit', _fields: 'slug' })

@@ -51,7 +51,7 @@ describe('createWordPressClient', () => {
   })
 
   it.each([
-    ['categories', 'context=edit', 'per_page=100', '_fields=id%2Cname%2Cslug%2Cparent%2Ccount'],
+    ['categories', 'context=view', 'per_page=100', '_fields=id%2Cname%2Cslug%2Cparent%2Ccount'],
     ['tags', 'hide_empty=false', 'page=1', '_fields=id%2Cname%2Cslug%2Ccount'],
     ['posts', 'per_page=1', 'context=edit', '_fields=id%2Cslug%2Cstatus%2Cmodified_gmt'],
   ] as const)('builds the fixed %s query', async (endpoint, first, second, third) => {

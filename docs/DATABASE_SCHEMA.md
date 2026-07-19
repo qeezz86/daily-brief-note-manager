@@ -19,7 +19,7 @@
 - `categories`는 애플리케이션이 제공하는 공용 설정·참조 데이터이며 사용자 소유 데이터가 아니다. 초기값은 별도 category seed로 관리한다.
 - `categories`를 제외한 이 문서의 데이터 테이블은 사용자 소유 테이블이며 각 행에 `owner_id`를 직접 둔다.
 - 사용자 소유 테이블에는 RLS를 활성화하고 `auth.uid()`에 해당하는 데이터만 조회·생성·수정·삭제할 수 있게 한다.
-- 브라우저에는 Supabase anon key만 사용하며 service role key를 노출하지 않는다.
+- 브라우저에는 Supabase publishable key만 사용한다. legacy anon key는 전환 기간에만 허용하며 service role/secret key를 노출하지 않는다.
 - 외래 키, unique, check constraint, index, 삭제 동작은 migration에서 명시한다.
 - 이미 발행된 `display_id`와 `slug`는 카테고리 설정 변경 시 자동으로 다시 쓰지 않는다.
 - 이미지 파일, URL, 바이너리, 크기, 해상도, 스토리지 정보는 저장하지 않는다.
