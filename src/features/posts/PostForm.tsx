@@ -18,6 +18,7 @@ import {
   tagComparisonKey,
   validateHtmlSources,
 } from './publicationFields'
+import { findSeoTagComparisons, normalizeSeoTagForComparison } from './seoTagComparison'
 import {
   contentStatuses,
   type PostDetail,
@@ -133,6 +134,9 @@ export function PostForm({
   const htmlBody = useWatch({ control, name: 'htmlBody' })
   const contentStatus = useWatch({ control, name: 'contentStatus' })
   const tags = useWatch({ control, name: 'tags' }) ?? []
+  const nearDuplicateTags = findSeoTagComparisons(tags).filter(
+    (comparison) => comparison.relation === 'possible_near_duplicate',
+  )
   const sources = useWatch({ control, name: 'sources' }) ?? []
   const selectedCategory = categories.find(
     (category) => category.id === categoryId,
@@ -195,14 +199,19 @@ export function PostForm({
   function addTag() {
     const normalized = normalizeTag(tagInput)
     if (!normalized) return
+    const normalizedDuplicate = tags.find(
+      (tag) => normalizeSeoTagForComparison(tag) === normalizeSeoTagForComparison(normalized),
+    )
     const error = isBrandTag(normalized)
       ? 'Daily Brief Note는 태그로 사용할 수 없습니다.'
       : selectedCategory && tagComparisonKey(normalized) === tagComparisonKey(selectedCategory.name)
         ? '카테고리명은 태그로 사용할 수 없습니다.'
         : tagComparisonKey(normalized) === tagComparisonKey(useWatchTitle)
           ? '제목 전체를 태그로 사용할 수 없습니다.'
-          : tags.some((tag) => tagComparisonKey(tag) === tagComparisonKey(normalized))
-            ? '동일한 태그가 이미 입력되어 있습니다.'
+          : normalizedDuplicate
+            ? tagComparisonKey(normalizedDuplicate) === tagComparisonKey(normalized)
+              ? '동일한 태그가 이미 입력되어 있습니다.'
+              : `공백·구분자·대소문자를 정규화하면 "${normalizedDuplicate}" 태그와 중복됩니다.`
             : null
     if (error) {
       setTagInputError(error)
@@ -437,6 +446,16 @@ export function PostForm({
               <p className="field-help">현재 {tags.length}개 · 발행 준비·발행됨은 5~8개</p>
               {tagInputError ? <p className="field-error" role="alert">{tagInputError}</p> : null}
               {errors.tags ? <p className="field-error">{errors.tags.message ?? errors.tags.root?.message}</p> : null}
+              {nearDuplicateTags.length ? (
+                <div className="field-warning" role="status">
+                  <strong>가능한 근접 중복을 확인해 주세요.</strong>
+                  <ul>{nearDuplicateTags.map((comparison) => (
+                    <li key={`${comparison.leftIndex}-${comparison.rightIndex}`}>
+                      원문 태그 "{comparison.left}" / "{comparison.right}" · 자동 수정하지 않습니다.
+                    </li>
+                  ))}</ul>
+                </div>
+              ) : null}
               {tags.length > 0 ? (
                 <ul className="tag-list" aria-label="등록된 태그">
                   {tags.map((tag, index) => (

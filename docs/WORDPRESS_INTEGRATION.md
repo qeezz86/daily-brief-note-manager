@@ -14,6 +14,8 @@ REST discovery, Application Password 인증, 현재 사용자 capability, post t
 
 Phase 5B는 별도 `wordpress-publication-preview` Edge Function에서 전체 category/tag catalog와 duplicate slug를 GET으로만 확인하고, 사용자 RLS 데이터에서 결정적 draft payload를 만든다. mapping 설정은 Supabase에 저장하지만 WordPress에는 쓰지 않는다. 상세 요청·응답·검증·fingerprint 계약은 `docs/WORDPRESS_PUBLICATION_PLAN.md`를 따른다.
 
+Phase 5B-R1은 Chromium과 iPhone viewport에서 이 publication preview와 taxonomy UI를 deterministic interception으로 회귀 검증한다. 실제 WordPress·원격 Supabase·실제 credential은 사용하지 않으며 WordPress write는 0건이다. SEO 태그의 공백·구분자·대소문자 비교용 정규화는 원문이나 taxonomy payload를 바꾸지 않고 normalized duplicate blocker와 제한적인 near-duplicate warning만 추가한다. UI에는 자동 태그 수정이나 게시·draft 생성·전송·업로드 action이 없다.
+
 기존 `wordpress-diagnostics`는 연결 진단용으로 유지하며 preview Function과 독립 배포·rollback할 수 있다. 두 Function 모두 같은 server-only credential 경계, caller allowlist, exact CORS와 SSRF/redirect 정책을 공유한다.
 
 ## Credential과 인증 경계

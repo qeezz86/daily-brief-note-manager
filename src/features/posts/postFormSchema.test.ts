@@ -242,6 +242,16 @@ describe('postFormSchema', () => {
     }
   })
 
+  it.each([
+    ['AI 도구', 'AI도구'],
+    ['생성형-AI', '생성형 AI'],
+    ['워드프레스_연동', '워드프레스 연동'],
+  ])('rejects comparison-only duplicate tags: %s / %s', (left, right) => {
+    const result = postFormSchema.safeParse({ ...validValues, tags: [left, right] })
+    expect(result.success).toBe(false)
+    if (!result.success) expect(result.error.issues.map((issue) => issue.message).join(' ')).toContain('정규화하면 중복')
+  })
+
   it('rejects partially entered, invalid, and duplicate source URLs', () => {
     const result = postFormSchema.safeParse({
       ...validValues,

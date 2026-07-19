@@ -337,6 +337,24 @@ describe('PostForm', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('카테고리명')
   })
 
+  it('blocks separator-only duplicates and shows conservative near-duplicate guidance without auto-fixing', async () => {
+    const browserUser = userEvent.setup()
+    render(
+      <PostForm mode="edit" categories={categories} post={post} postTags={[
+        { id: 'tag-1', name: 'AI 도구' },
+        { id: 'tag-2', name: '워드프레스 연동' },
+        { id: 'tag-3', name: '워드프레스 연동법' },
+      ]} isSaving={false} submitError={null} onSubmit={vi.fn().mockResolvedValue(undefined)} />,
+    )
+    expect(screen.getByRole('status')).toHaveTextContent('가능한 근접 중복')
+    expect(screen.getByRole('status')).toHaveTextContent('워드프레스 연동')
+    expect(screen.queryByRole('button', { name: /자동 수정|병합/ })).not.toBeInTheDocument()
+    const input = screen.getByLabelText('태그 추가')
+    await browserUser.type(input, 'AI도구{Enter}')
+    expect(screen.getByRole('alert')).toHaveTextContent('정규화하면')
+    expect(screen.getByText('AI 도구')).toBeInTheDocument()
+  })
+
   it('adds, reorders, and removes source rows', async () => {
     const browserUser = userEvent.setup()
     render(

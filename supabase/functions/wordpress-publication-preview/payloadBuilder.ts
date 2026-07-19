@@ -1,4 +1,5 @@
 import { canonicalJson, sha256, uniqueSortedIntegers } from './normalization.ts'
+import { findSeoTagComparisons } from './seoTagComparison.ts'
 import type { PlanIssue, PublicationPayload, SourceContent } from './schemas.ts'
 
 export const MAX_CONTENT_BYTES = 1_500_000
@@ -52,6 +53,17 @@ export async function buildPayload(content: SourceContent, categoryIds: number[]
   if (content.tags.length < 5 || content.tags.length > 8) blockers.push({ code: 'SEO_TAG_COUNT_INVALID', message: 'SEO 태그는 5~8개여야 합니다.' })
   const tagKeys = content.tags.map((tag) => tag.name.normalize('NFC').trim().replace(/\s+/g, ' ').toLowerCase())
   if (new Set(tagKeys).size !== tagKeys.length) blockers.push({ code: 'SEO_TAG_DUPLICATE', message: '중복 SEO 태그가 있습니다.' })
+  const tagComparisons = findSeoTagComparisons(content.tags.map((tag) => tag.name))
+  tagComparisons.forEach((comparison) => {
+    const detail = `원문 태그 "${comparison.left}" / "${comparison.right}"`
+    if (comparison.relation === 'normalized_duplicate') {
+      if (tagKeys[comparison.leftIndex] !== tagKeys[comparison.rightIndex]) {
+        blockers.push({ code: 'SEO_TAG_DUPLICATE_NORMALIZED', message: '공백·구분자·대소문자를 정규화하면 중복되는 SEO 태그가 있습니다.', detail })
+      }
+      return
+    }
+    warnings.push({ code: 'SEO_TAG_POSSIBLE_NEAR_DUPLICATE', message: '서로 포함 관계인 SEO 태그가 실질적으로 겹칠 수 있습니다.', detail })
+  })
   const categoryKey = content.categoryName.normalize('NFC').trim().replace(/\s+/g, ' ').toLowerCase()
   if (tagKeys.some((tag) => tag === categoryKey || tag.replace(/[\s-]+/g, '') === 'dailybriefnote')) {
     blockers.push({ code: 'SEO_TAG_FORBIDDEN', message: '카테고리명 또는 Daily Brief Note 브랜드명은 SEO 태그로 사용할 수 없습니다.' })

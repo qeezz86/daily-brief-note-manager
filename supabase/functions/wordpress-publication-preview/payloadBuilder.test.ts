@@ -17,6 +17,25 @@ describe('publication payload builder', () => {
   it('deprecated/불일치 slug를 차단한다', async () => expect((await buildPayload({ ...valid, slug: 'science-tech-briefing-2026-07-18' }, [], [])).blockers.some((item) => item.code === 'SLUG_INVALID')).toBe(true))
   it('태그 5개 미만을 차단한다', async () => expect((await buildPayload({ ...valid, tags: valid.tags.slice(0, 4) }, [], [])).blockers.some((item) => item.code === 'SEO_TAG_COUNT_INVALID')).toBe(true))
   it('중복 태그를 차단한다', async () => expect((await buildPayload({ ...valid, tags: [...valid.tags.slice(0, 4), { ...valid.tags[0], id: crypto.randomUUID() }] }, [], [])).blockers.some((item) => item.code === 'SEO_TAG_DUPLICATE')).toBe(true))
+  it('구분자 제거 후 중복되는 태그 쌍을 원문과 함께 차단한다', async () => {
+    const tags = ['생성형-AI', '생성형 AI', '검색', '에이전트', '자동화'].map((name) => ({ id: crypto.randomUUID(), name, normalizedName: name.toLowerCase() }))
+    const result = await buildPayload({ ...valid, tags }, [1], [2, 3, 4, 5, 6])
+    expect(result.blockers).toContainEqual(expect.objectContaining({ code: 'SEO_TAG_DUPLICATE_NORMALIZED', detail: '원문 태그 "생성형-AI" / "생성형 AI"' }))
+    expect(result.payload.tags).toEqual([2, 3, 4, 5, 6])
+    expect(result.payload.title).toBe(valid.representativeTitle)
+  })
+  it('exact duplicate가 앞서도 separator-only duplicate blocker를 유지한다', async () => {
+    const tags = ['생성형 AI', '생성형 AI', '생성형-AI', '검색', '자동화'].map((name) => ({ id: crypto.randomUUID(), name, normalizedName: name.toLowerCase() }))
+    const result = await buildPayload({ ...valid, tags }, [1], [2, 3, 4, 5])
+    expect(result.blockers.map((issue) => issue.code)).toEqual(expect.arrayContaining(['SEO_TAG_DUPLICATE', 'SEO_TAG_DUPLICATE_NORMALIZED']))
+  })
+  it('제한적인 포함 관계는 warning만 만들고 ready payload를 보존한다', async () => {
+    const tags = ['워드프레스 연동', '워드프레스 연동법', '검색', '콘텐츠', '자동화'].map((name) => ({ id: crypto.randomUUID(), name, normalizedName: name.toLowerCase() }))
+    const result = await buildPayload({ ...valid, tags }, [1], [2, 3, 4, 5, 6])
+    expect(result.blockers).toEqual([])
+    expect(result.warnings).toContainEqual(expect.objectContaining({ code: 'SEO_TAG_POSSIBLE_NEAR_DUPLICATE', detail: '원문 태그 "워드프레스 연동" / "워드프레스 연동법"' }))
+    expect(result.payload.tags).toEqual([2, 3, 4, 5, 6])
+  })
   it.each(['경제', 'Daily Brief Note', 'DailyBriefNote'])('금지 SEO 태그 %s를 차단한다', async (name) => {
     const tags = [{ ...valid.tags[0], name, normalizedName: name.toLowerCase() }, ...valid.tags.slice(1)]
     expect((await buildPayload({ ...valid, tags }, [], [])).blockers.some((item) => item.code === 'SEO_TAG_FORBIDDEN')).toBe(true)

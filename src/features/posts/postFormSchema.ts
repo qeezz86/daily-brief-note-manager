@@ -11,6 +11,7 @@ import {
   normalizeTag,
   tagComparisonKey,
 } from './publicationFields'
+import { findSeoTagComparisons } from './seoTagComparison'
 
 const slugPattern = /^(?!-)(?!.*--)[a-z0-9]+(?:-[a-z0-9]+)*$/
 const difficultyValues = ['beginner', 'intermediate', 'advanced'] as const
@@ -127,6 +128,16 @@ export const postFormSchema = z
       if (new Set(tagKeys).size !== tagKeys.length) {
         context.addIssue({ code: 'custom', message: '동일한 태그가 이미 입력되어 있습니다.', path: ['tags'] })
       }
+      const separatorDuplicates = findSeoTagComparisons(normalizedTags).filter((comparison) =>
+        comparison.relation === 'normalized_duplicate' &&
+        tagComparisonKey(comparison.left) !== tagComparisonKey(comparison.right))
+      separatorDuplicates.forEach((comparison) => {
+        context.addIssue({
+          code: 'custom',
+          message: `공백·구분자·대소문자를 정규화하면 중복되는 태그입니다: "${comparison.left}" / "${comparison.right}"`,
+          path: ['tags'],
+        })
+      })
       normalizedTags.forEach((tag, index) => {
         if (tag.length > MAX_TAG_LENGTH) {
           context.addIssue({ code: 'custom', message: `태그는 ${MAX_TAG_LENGTH}자 이하로 입력해 주세요.`, path: ['tags', index] })

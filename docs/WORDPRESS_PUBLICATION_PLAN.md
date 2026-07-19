@@ -32,12 +32,32 @@ mapping에는 term ID, slug, name, 검증 시각만 저장한다. username, Appl
 
 Blocker에는 필수 제목·HTML·wrapper·h1·slug·SEO/tag 규칙, 위험 HTML, payload 크기, mapping 누락/모호/오래됨, duplicate slug, 검사 중 source 변경이 포함된다. 권장 meta 길이, 내부 출처 링크, h1-title 차이는 warning이다. blocker가 하나라도 있으면 `readyForDraftCreation=false`지만 검토용 payload는 그대로 표시한다.
 
+## SEO 태그 비교 정책
+
+태그 원문과 입력 순서는 수정하지 않는다. 비교 키에만 Unicode NFC, 앞뒤 공백 제거, 연속 whitespace 축소, 일반 공백·ASCII hyphen·en dash·em dash·중점·underscore 제거와 locale-independent lowercase를 순서대로 적용한다. 한글·중국어·숫자는 그대로 유지하며 transliteration, 형태소 분석, 외부 AI 판정을 사용하지 않는다.
+
+- 기존 exact duplicate blocker `SEO_TAG_DUPLICATE`는 유지한다.
+- 새 비교 키가 같고 기존 exact key는 다른 쌍은 `SEO_TAG_DUPLICATE_NORMALIZED` blocker다.
+- 한 비교 키가 다른 키 전체를 포함하고 짧은 키가 4자 이상, 길이 차이가 1~3자인 경우에만 `SEO_TAG_POSSIBLE_NEAR_DUPLICATE` warning을 만든다.
+- 숫자만 달라지는 쌍, 짧은 일반어, 단순 공통 단어만 공유하는 쌍은 near warning에서 제외한다.
+- issue에는 문제가 된 두 원문 태그를 입력 순서대로 표시하며 warning 중복은 제거한다.
+- payload `tags`는 기존 taxonomy resolution의 ID 배열을 사용하고 원문 태그를 자동 삭제·병합하지 않는다.
+
+브라우저와 Edge Function은 bundle 경계를 유지한 별도 순수 함수를 사용하되 `fixtures/seo-tag-normalization.json`의 같은 전체 fixture를 실행한다. 한쪽 규칙만 변경하면 해당 동등성 테스트가 실패한다. fixture는 test에서만 읽으므로 production browser bundle과 Edge Function bundle에 포함되지 않는다.
+
 ## UI와 운영
 
 - `/settings/wordpress`: GET-only catalog 새로고침과 명시적 category/tag mapping 저장·제거
 - `/content/:postId/wordpress-preview`: source, mapping 해석, duplicate, blockers/warnings, byte size, fingerprint와 escaped payload JSON
 - UI에는 게시, 발행, WordPress draft 생성 버튼이 없다.
 - content `updated_at`이 plan 기준과 달라지면 stale로 표시하고 다시 실행해야 한다.
+- normalized duplicate와 possible near duplicate는 원문 태그 쌍과 콘텐츠 편집 링크를 표시한다. 자동 수정 action은 제공하지 않는다.
+
+## Phase 5B-R1 브라우저 회귀
+
+`e2e/wordpress-publication-preview.spec.ts`는 production 우회 코드 없이 Supabase 공개 HTTP 경계를 Playwright에서 interception한다. 실제 response schema를 통과하는 ready, blocked, warning publication plan과 taxonomy catalog, duplicate slug fixture를 사용한다. Chromium은 인증된 콘텐츠 상세 → Dry Run, loading, payload·fingerprint·복사, blocker와 taxonomy 이동, 매핑 저장 loading·제거 확인을 검증한다. iPhone 13 project는 warning과 taxonomy/payload 접근성, fingerprint wrapping, 내부 JSON scroll, touch copy, navigation 비가림과 page-level horizontal overflow 부재를 검증한다. 두 project 모두 console error, pageerror와 게시·발행·draft 생성·WordPress 전송·업로드 버튼 부재를 명시적으로 확인한다.
+
+E2E는 실제 WordPress, 실제 Edge Function과 원격 Supabase를 호출하지 않는다. taxonomy mapping mutation도 intercepted Supabase fixture에만 적용되며 test data를 DB에 남기지 않는다. WordPress write request는 0건이다.
 
 ```bash
 npm run test:wordpress
