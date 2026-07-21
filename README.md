@@ -2,7 +2,9 @@
 
 Daily Brief Note의 콘텐츠, SEO 정보, 출처, 뉴스 추적 이력과 생성 프롬프트를 관리하기 위한 비공개 웹앱입니다.
 
-현재 저장소는 Phase 5C-R1 production readiness 단계입니다. 인증된 단일 허용 사용자는 콘텐츠별 publication payload를 Dry Run으로 검토한 뒤 명시적 확인을 거쳐 WordPress `draft` 1건을 생성할 수 있습니다. 서버는 쓰기 직전에 RLS 범위의 DB 원본, taxonomy, duplicate slug, source `updated_at`과 canonical fingerprint를 다시 검증합니다. WordPress credential은 브라우저나 DB에 저장하지 않으며 publish·update·delete·media·taxonomy write와 자동 재시도는 수행하지 않습니다. 실제 원격 배포와 단일 draft smoke는 별도 승인 아래 [`docs/WORDPRESS_PRODUCTION_DEPLOYMENT_RUNBOOK.md`](docs/WORDPRESS_PRODUCTION_DEPLOYMENT_RUNBOOK.md)를 따릅니다.
+현재 저장소는 Phase 5C-R2A fresh Supabase baseline deployment planning 단계입니다. Read-only inspection으로 원격 DB가 application object와 migration history가 없는 fresh project이고 로컬 migration 22개 전부가 pending임을 확인했습니다. Machine-readable whitelist와 offline checker는 [`config/supabase-fresh-project-baseline.json`](config/supabase-fresh-project-baseline.json), 전체 승인·검증 정책은 [`docs/SUPABASE_FRESH_PROJECT_BASELINE.md`](docs/SUPABASE_FRESH_PROJECT_BASELINE.md)를 따릅니다. 이 planning 단계는 원격 DB, Function, secret, frontend와 WordPress를 변경하지 않습니다.
+
+인증된 단일 허용 사용자는 콘텐츠별 publication payload를 Dry Run으로 검토한 뒤 명시적 확인을 거쳐 WordPress `draft` 1건을 생성할 수 있습니다. 서버는 쓰기 직전에 RLS 범위의 DB 원본, taxonomy, duplicate slug, source `updated_at`과 canonical fingerprint를 다시 검증합니다. WordPress credential은 브라우저나 DB에 저장하지 않으며 publish·update·delete·media·taxonomy write와 자동 재시도는 수행하지 않습니다. 실제 원격 배포와 단일 draft smoke는 별도 승인 아래 [`docs/WORDPRESS_PRODUCTION_DEPLOYMENT_RUNBOOK.md`](docs/WORDPRESS_PRODUCTION_DEPLOYMENT_RUNBOOK.md)를 따릅니다.
 
 Phase 4B의 `/backups`에서는 공식 `core`·`full` JSON 백업을 생성하고, `/backups/restore`에서 read-only Dry Run과 결정적 복원 계획을 만든 뒤 `/backups/restore/execute`에서 원본 backup과 plan을 다시 검증해 core 데이터와 선택한 full Import 운영 이력을 실제 복원할 수 있습니다. `/backups/restore/jobs`는 영구 job·record·attempt, stage 진행률, 수동 retry, 취소·재개를 제공합니다.
 
@@ -58,6 +60,7 @@ Phase 4C-3에서는 Vite production manifest로 entry, static closure, 대표 ro
 npm run lint
 npm run test
 npm run test:wordpress
+npm run check:supabase-fresh-baseline
 npm run check:wordpress-production-readiness
 npm run smoke:wordpress-runtime
 npm run smoke:wordpress-preview
@@ -67,6 +70,8 @@ npm run bundle:check
 ```
 
 `npm run build:budget`은 production build와 budget 검사를 연속 실행합니다. 의도된 bundle 변화의 원인을 검토한 뒤에만 `npm run bundle:baseline`으로 기존 `dist`의 승인 baseline을 갱신하고, 생성된 `config/bundle-baseline.json` diff를 코드 리뷰에 포함합니다.
+
+`npm run check:supabase-fresh-baseline`은 migration 22개와 category seed whitelist, 금지 SQL·literal, runbook deployment mode, sanitized fresh fixture의 exact plan을 로컬 파일만으로 검증합니다. Protected env를 읽거나 network, linked Supabase CLI 또는 원격 명령을 실행하지 않습니다.
 
 Bundle budget CI는 Supabase module을 포함한 production graph를 일정하게 만들기 위해 로컬 주소와 비밀정보가 아닌 공개 placeholder key를 build-time 환경변수로 사용합니다. CI는 앱을 실행하거나 원격 Supabase에 연결하지 않으며 실제 credential이나 GitHub secret을 저장하지 않습니다. Raw 최대 chunk와 gzip 최대 chunk는 서로 다른 asset일 수 있으므로 각각 독립적으로 측정합니다.
 

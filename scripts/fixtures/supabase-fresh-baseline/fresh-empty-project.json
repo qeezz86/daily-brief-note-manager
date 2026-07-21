@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "remoteState": {
+    "migrationHistoryPresent": false,
+    "migrationHistoryRows": 0,
+    "appliedMigrations": [],
+    "pendingMigrationSet": "all",
+    "applicationTables": [],
+    "applicationFunctions": [],
+    "remoteOnlyMigrations": [],
+    "unexpectedObjects": [],
+    "historyMatchesSchema": true
+  },
+  "deploymentPlan": {
+    "plannedMigrationSet": "all",
+    "includeSeed": true,
+    "seedFiles": ["01_categories.sql"],
+    "seedSafety": "verified"
+  }
+}
