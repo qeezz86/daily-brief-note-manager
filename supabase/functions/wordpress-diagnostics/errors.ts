@@ -22,6 +22,38 @@ export const diagnosticErrorCodes = [
 
 export type DiagnosticErrorCode = typeof diagnosticErrorCodes[number]
 
+export const diagnosticEndpoints = [
+  'discovery',
+  'user',
+  'types',
+  'statuses',
+  'categories',
+  'tags',
+  'posts',
+] as const
+
+export type DiagnosticEndpoint = typeof diagnosticEndpoints[number]
+
+export const diagnosticFailurePhases = [
+  'content_length_header',
+  'response_body_limit',
+  'content_type',
+  'json_parse',
+  'upstream_status',
+] as const
+
+export type DiagnosticFailurePhase = typeof diagnosticFailurePhases[number]
+
+export interface DiagnosticMetadata {
+  endpoint: DiagnosticEndpoint
+  failurePhase: DiagnosticFailurePhase
+  upstreamStatus: number
+  contentType: string
+  contentLength: number | null
+  bytesReceived: number
+  responseOverLimit: boolean
+}
+
 const defaultMessages: Record<DiagnosticErrorCode, string> = {
   METHOD_NOT_ALLOWED: '허용되지 않은 요청 방식입니다.',
   INVALID_REQUEST: '진단 요청 형식이 올바르지 않습니다.',
@@ -44,26 +76,77 @@ const defaultMessages: Record<DiagnosticErrorCode, string> = {
   DIAGNOSTIC_INCOMPLETE: 'WordPress 진단을 완료하지 못했습니다.',
 }
 
+function safeNonNegativeInteger(value: number): number {
+  return Number.isSafeInteger(value) && value >= 0 ? value : 0
+}
+
+function safeContentLength(value: number | null): number | null {
+  if (value === null) return null
+  return Number.isSafeInteger(value) && value >= 0 ? value : null
+}
+
+function safeContentType(value: string): string {
+  const normalized = value.trim().toLowerCase().slice(0, 127)
+
+  return /^[a-z0-9!#$&^_.+-]+\/[a-z0-9!#$&^_.+-]+$/.test(normalized)
+    ? normalized
+    : 'unknown'
+}
+
+function safeDiagnosticMetadata(
+  value: DiagnosticMetadata | undefined,
+): DiagnosticMetadata | undefined {
+  if (!value) return undefined
+
+  return {
+    endpoint: value.endpoint,
+    failurePhase: value.failurePhase,
+    upstreamStatus: safeNonNegativeInteger(value.upstreamStatus),
+    contentType: safeContentType(value.contentType),
+    contentLength: safeContentLength(value.contentLength),
+    bytesReceived: safeNonNegativeInteger(value.bytesReceived),
+    responseOverLimit: value.responseOverLimit === true,
+  }
+}
+
 export class DiagnosticError extends Error {
   readonly code: DiagnosticErrorCode
   readonly httpStatus: number
   readonly retryable: boolean
+  readonly diagnostics?: DiagnosticMetadata
 
-  constructor(code: DiagnosticErrorCode, options: { httpStatus?: number; retryable?: boolean } = {}) {
+  constructor(
+    code: DiagnosticErrorCode,
+    options: {
+      httpStatus?: number
+      retryable?: boolean
+      diagnostics?: DiagnosticMetadata
+    } = {},
+  ) {
     super(defaultMessages[code])
     this.name = 'DiagnosticError'
     this.code = code
     this.httpStatus = options.httpStatus ?? 500
     this.retryable = options.retryable ?? false
+    this.diagnostics = safeDiagnosticMetadata(options.diagnostics)
   }
 }
 
 export function asDiagnosticError(error: unknown): DiagnosticError {
   if (error instanceof DiagnosticError) return error
-  return new DiagnosticError('DIAGNOSTIC_INCOMPLETE', { httpStatus: 500, retryable: true })
+
+  return new DiagnosticError(
+    'DIAGNOSTIC_INCOMPLETE',
+    {
+      httpStatus: 500,
+      retryable: true,
+    },
+  )
 }
 
 export function safeErrorBody(error: DiagnosticError) {
+  const diagnostics = error.diagnostics
+
   return {
     schemaVersion: 1 as const,
     ok: false as const,
@@ -71,6 +154,19 @@ export function safeErrorBody(error: DiagnosticError) {
       code: error.code,
       message: error.message,
       retryable: error.retryable,
+      ...(diagnostics
+        ? {
+            diagnostics: {
+              endpoint: diagnostics.endpoint,
+              failure_phase: diagnostics.failurePhase,
+              upstream_status: diagnostics.upstreamStatus,
+              content_type: diagnostics.contentType,
+              content_length: diagnostics.contentLength,
+              bytes_received: diagnostics.bytesReceived,
+              response_over_limit: diagnostics.responseOverLimit,
+            },
+          }
+        : {}),
     },
   }
 }
