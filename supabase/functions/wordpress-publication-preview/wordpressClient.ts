@@ -104,7 +104,7 @@ export function createPublicationWordPressClient(options: Options): PublicationW
       return read(`wp-json/wp/v2/${taxonomy}`, { context: 'view', page: String(page), per_page: '100', hide_empty: 'false', order: 'asc', orderby: 'id', _fields: fields }, true)
     },
     async getStatuses() {
-      const response = await read('wp-json/wp/v2/statuses', { context: 'edit', _fields: 'slug' })
+      const response = await read('wp-json/wp/v2/statuses', { context: 'edit' })
       if (!response.data || typeof response.data !== 'object' || Array.isArray(response.data)) throw new PublicationError('WORDPRESS_READ_FAILED', { httpStatus: 502 })
       return Object.keys(response.data as Record<string, unknown>).sort()
     },
