@@ -35,6 +35,54 @@ function structuralHtmlIssues(html: string, wrapper: string) {
   return issues
 }
 
+function decodeHtmlAttribute(value: string): string {
+  return value
+    .replace(/&amp;/gi, '&')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+}
+
+function sourceHtmlIssues(html: string, sources: SourceContent['sources']): PlanIssue[] {
+  const values = sources ?? []
+  if (!values.length) return [{ code: 'SOURCE_MISSING', message: '출처 레코드가 없습니다.' }]
+
+  const urls: string[] = []
+  for (const source of values) {
+    if (!source.name.trim() || !source.title.trim() || !source.url.trim() || !source.checkedPoint.trim()) {
+      return [{ code: 'SOURCE_INVALID', message: '출처 필수 필드가 완성되지 않았습니다.' }]
+    }
+    let parsed: URL
+    try { parsed = new URL(source.url.trim()) } catch {
+      return [{ code: 'SOURCE_INVALID', message: '출처 URL 형식이 올바르지 않습니다.' }]
+    }
+    if (!['http:', 'https:'].includes(parsed.protocol) || parsed.username || parsed.password) {
+      return [{ code: 'SOURCE_INVALID', message: '출처 URL은 credential 없는 HTTP 또는 HTTPS URL이어야 합니다.' }]
+    }
+    urls.push(parsed.href)
+  }
+  if (new Set(urls).size !== urls.length) {
+    return [{ code: 'SOURCE_INVALID', message: '중복된 출처 URL이 있습니다.' }]
+  }
+
+  const sections = [...html.matchAll(/<section\b[^>]*\sid\s*=\s*(['"])sources\1[^>]*>([\s\S]*?)<\/section>/gi)]
+  const sourceIdCount = (html.match(/\sid\s*=\s*(['"])sources\1/gi) ?? []).length
+  if (sections.length !== 1 || sourceIdCount !== 1) {
+    return [{ code: 'SOURCE_SECTION_INVALID', message: 'HTML에는 section#sources가 정확히 하나 있어야 합니다.' }]
+  }
+
+  const hrefs = [...sections[0][2].matchAll(/<a\b[^>]*\shref\s*=\s*(['"])(.*?)\1[^>]*>/gi)]
+    .map((match) => decodeHtmlAttribute(match[2].trim()))
+    .map((value) => {
+      try { return new URL(value).href } catch { return value }
+    })
+  const missing = urls.filter((url) => !hrefs.includes(url))
+  return missing.length
+    ? [{ code: 'SOURCE_HTML_MISMATCH', message: '저장된 출처 URL이 HTML 출처 섹션에 없습니다.', detail: `${missing.length}개 URL 불일치` }]
+    : []
+}
+
 function expectedSlug(content: SourceContent): string {
   return content.slugPattern
     .replace('YYYY-MM-DD', content.briefingDate ?? content.publishedOn ?? '')
@@ -46,8 +94,10 @@ export async function buildPayload(content: SourceContent, categoryIds: number[]
   const warnings: PlanIssue[] = []
   const title = content.representativeTitle?.trim() ?? ''
   const html = content.htmlBody ?? ''
+  if (content.contentStatus !== 'ready') blockers.push({ code: 'CONTENT_NOT_READY', message: '발행 준비 상태의 콘텐츠만 WordPress 초안을 만들 수 있습니다.' })
   if (!title) blockers.push({ code: 'TITLE_MISSING', message: 'SEO 대표 제목이 없습니다.' })
   blockers.push(...structuralHtmlIssues(html, content.wrapperClass))
+  blockers.push(...sourceHtmlIssues(html, content.sources))
   if (!content.slug || content.slug !== expectedSlug(content)) blockers.push({ code: 'SLUG_INVALID', message: '현재 카테고리 설정과 slug가 일치하지 않습니다.' })
   if (!content.metaDescription.trim()) blockers.push({ code: 'SEO_META_MISSING', message: '메타 설명이 없습니다.' })
   if (content.tags.length < 5 || content.tags.length > 8) blockers.push({ code: 'SEO_TAG_COUNT_INVALID', message: 'SEO 태그는 5~8개여야 합니다.' })

@@ -3,7 +3,8 @@
   "requiredMigrations": [
     "20260718120000_wordpress_taxonomy_mappings.sql",
     "20260719120000_wordpress_draft_creation.sql",
-    "20260719130000_harden_wordpress_draft_transition.sql"
+    "20260719130000_harden_wordpress_draft_transition.sql",
+    "20260724190000_harden_wordpress_publication_attempt_retention.sql"
   ],
   "requiredFunctions": [
     "wordpress-diagnostics",

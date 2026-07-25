@@ -2,7 +2,7 @@
 
 Daily Brief Note의 콘텐츠, SEO 정보, 출처, 뉴스 추적 이력과 생성 프롬프트를 관리하기 위한 비공개 웹앱입니다.
 
-현재 저장소는 Phase 5C-R2A fresh Supabase baseline deployment planning 단계입니다. Read-only inspection으로 원격 DB가 application object와 migration history가 없는 fresh project이고 로컬 migration 22개 전부가 pending임을 확인했습니다. Machine-readable whitelist와 offline checker는 [`config/supabase-fresh-project-baseline.json`](config/supabase-fresh-project-baseline.json), 전체 승인·검증 정책은 [`docs/SUPABASE_FRESH_PROJECT_BASELINE.md`](docs/SUPABASE_FRESH_PROJECT_BASELINE.md)를 따릅니다. 이 planning 단계는 원격 DB, Function, secret, frontend와 WordPress를 변경하지 않습니다.
+현재 저장소는 Phase 5C-R2 WordPress draft hardening 단계입니다. 로컬 migration inventory는 23개이며, 앞 22개가 적용된 운영 환경에는 마지막 publication-attempt retention migration 1개만 별도 승인 아래 적용합니다. Machine-readable whitelist와 offline checker는 [`config/supabase-fresh-project-baseline.json`](config/supabase-fresh-project-baseline.json), 전체 승인·검증 정책은 [`docs/SUPABASE_FRESH_PROJECT_BASELINE.md`](docs/SUPABASE_FRESH_PROJECT_BASELINE.md)를 따릅니다. 이 로컬 hardening Gate는 원격 DB, Function, secret, frontend와 WordPress를 변경하지 않습니다.
 
 인증된 단일 허용 사용자는 콘텐츠별 publication payload를 Dry Run으로 검토한 뒤 명시적 확인을 거쳐 WordPress `draft` 1건을 생성할 수 있습니다. 서버는 쓰기 직전에 RLS 범위의 DB 원본, taxonomy, duplicate slug, source `updated_at`과 canonical fingerprint를 다시 검증합니다. WordPress credential은 브라우저나 DB에 저장하지 않으며 publish·update·delete·media·taxonomy write와 자동 재시도는 수행하지 않습니다. 실제 원격 배포와 단일 draft smoke는 별도 승인 아래 [`docs/WORDPRESS_PRODUCTION_DEPLOYMENT_RUNBOOK.md`](docs/WORDPRESS_PRODUCTION_DEPLOYMENT_RUNBOOK.md)를 따릅니다.
 

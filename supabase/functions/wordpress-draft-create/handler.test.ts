@@ -9,13 +9,15 @@ const contentId = '5c100000-0000-4000-8000-000000000001'
 const idempotencyKey = '5c300000-0000-4000-8000-000000000001'
 const updatedAt = '2026-07-19T00:00:00Z'
 const tagNames = ['금리 정책', '통화 정책', '경제 전망', '물가 동향', '금융 시장']
+const sourceUrl = 'https://source.example.test/economy'
 const source: SourceContent = {
   id: contentId, categoryId: 'economy', categoryName: '경제', contentGroup: 'news',
   wrapperClass: 'daily-brief-note news-briefing economy', slugPattern: 'economy-briefing-YYYY-MM-DD',
   seriesNo: null, briefingDate: '2026-07-19', publishedOn: null, contentStatus: 'ready', updatedAt,
   representativeTitle: '대표 제목', metaDescription: '가'.repeat(130),
-  htmlBody: '<div class="daily-brief-note news-briefing economy"><h1>대표 제목</h1></div>',
+  htmlBody: `<div class="daily-brief-note news-briefing economy"><h1>대표 제목</h1><a href="#sources">출처</a><section id="sources"><h2>출처</h2><a href="${sourceUrl}">Source</a></section></div>`,
   slug: 'economy-briefing-2026-07-19',
+  sources: [{ name: 'Example', title: 'Economy source', url: sourceUrl, checkedPoint: '테스트 출처 확인' }],
   tags: tagNames.map((name, index) => ({ id: `00000000-0000-4000-8000-0000000000${index + 10}`, name, normalizedName: name })),
 }
 
@@ -23,12 +25,20 @@ function env(name: string) {
   return ({ WORDPRESS_SITE_URL: 'https://wordpress.example.com', WORDPRESS_USERNAME: 'wp-user', WORDPRESS_APPLICATION_PASSWORD: 'wp-pass', WORDPRESS_ALLOWED_USER_ID: ownerId, APP_ALLOWED_ORIGINS: 'https://app.example.com' } as Record<string, string>)[name]
 }
 
-function makeDatabase(sourceValue: SourceContent | null = source, options: { failSucceededTransition?: boolean } = {}) {
+function makeDatabase(sourceValue: SourceContent | null = source, options: { failSucceededTransition?: boolean; planSourceUpdatedAt?: string } = {}) {
   let attempt: PublicationAttempt | null = null
   let succeededTransitionFailed = false
+  let loadContentCount = 0
   const transitions: string[] = []
   const database: AttemptDatabase = {
-    loadContent: vi.fn(async () => sourceValue), readContentUpdatedAt: vi.fn(async () => sourceValue?.updatedAt ?? null),
+    loadContent: vi.fn(async () => {
+      loadContentCount += 1
+      if (sourceValue && loadContentCount >= 2 && options.planSourceUpdatedAt) {
+        return { ...sourceValue, updatedAt: options.planSourceUpdatedAt }
+      }
+      return sourceValue
+    }),
+    readContentUpdatedAt: vi.fn(async () => options.planSourceUpdatedAt ?? sourceValue?.updatedAt ?? null),
     loadMappings: vi.fn(async () => [] as TaxonomyMapping[]),
     findByIdempotency: vi.fn(async () => attempt),
     findContentGuard: vi.fn(async () => attempt && ['executing', 'succeeded', 'uncertain'].includes(attempt.status) ? attempt : null),
@@ -130,6 +140,16 @@ describe('WordPress draft create handler', () => {
       expect(await response.json()).toMatchObject({ error: { code: body.code } })
       expect(fetchMock.mock.calls.filter((call) => call[1]?.method === 'POST')).toHaveLength(0)
     }
+  })
+
+  it('blocks when the rebuilt plan source timestamp differs from the reviewed timestamp', async () => {
+    const fixture = makeDatabase(source, { planSourceUpdatedAt: '2026-07-19T00:00:01Z' })
+    const fetchMock = wordpressFetch()
+    const handler = createWordPressDraftHandler({ environment: { get: env }, verifyCaller: vi.fn(async () => ({ id: ownerId })), createDatabase: () => fixture.database, fetchImpl: fetchMock })
+    const response = await handler(request(await expectedFingerprint()))
+    expect(response.status).toBe(409)
+    expect(await response.json()).toMatchObject({ error: { code: 'SOURCE_CHANGED' } })
+    expect(fetchMock.mock.calls.filter((call) => call[1]?.method === 'POST')).toHaveLength(0)
   })
 
   it('records an uncertain sent request and never resends the same key', async () => {

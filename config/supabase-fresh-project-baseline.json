@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "deploymentMode": "fresh-project-baseline",
-  "migrationCount": 22,
+  "migrationCount": 23,
   "migrations": [
     {
       "version": "20260710080000",
@@ -310,6 +310,20 @@
       "seedDependency": null,
       "freshProjectApplicable": true,
       "existingProjectApplicable": "incremental-wordpress-migration-3-of-3"
+    },
+    {
+      "version": "20260724190000",
+      "filename": "20260724190000_harden_wordpress_publication_attempt_retention.sql",
+      "purpose": "Retain WordPress draft audit and idempotency records by changing the content foreign key from cascade delete to restrict delete.",
+      "majorObjects": ["wordpress_publication_attempts_post_owner_fkey"],
+      "dependsOn": ["20260719130000"],
+      "destructiveStatements": ["DROP CONSTRAINT followed by equivalent RESTRICT foreign key replacement"],
+      "dataRewrite": "none",
+      "affectsRls": false,
+      "affectsRpc": false,
+      "seedDependency": null,
+      "freshProjectApplicable": true,
+      "existingProjectApplicable": "incremental-wordpress-hardening-1-of-1"
     }
   ],
   "seedFiles": ["01_categories.sql"],
@@ -319,5 +333,5 @@
   "expectedWordPressTables": ["wordpress_taxonomy_mappings", "wordpress_publication_attempts"],
   "expectedFunctions": ["append_import_job_items", "append_restore_job_records", "cancel_import_job", "cancel_restore_job", "create_import_job", "create_news_followup", "create_news_update", "create_restore_job", "finalize_import_job", "finalize_restore_job", "get_import_job", "get_import_job_items", "get_import_jobs", "get_news_briefing_prompt_context", "get_restore_job", "get_restore_job_records", "get_restore_jobs", "get_user_backup_estimate", "get_user_backup_snapshot", "import_content_post", "import_news_tracking_for_post", "issue_series_no", "reorder_news_updates", "resolve_news_followup", "resume_cancelled_import_job", "resume_cancelled_restore_job", "run_import_job_item_content", "run_import_job_item_tracking", "run_restore_job_record", "save_ai_publication_bundle", "save_chinese_publication_bundle", "save_info_db_publication_bundle", "save_news_briefing_prompt_run", "save_post_editor", "save_post_publication_bundle", "set_news_briefing_prompt_run_pinned", "transition_news_topic_status", "transition_wordpress_publication_attempt_service", "update_news_followup", "update_news_update"],
   "forbiddenRemoteCommandsDuringPlanning": ["supabase link", "supabase migration list --linked", "supabase db push --linked", "supabase db pull", "supabase migration repair", "supabase db reset --linked", "supabase secrets set", "supabase secrets unset", "supabase functions deploy"],
-  "requiredPostDeploymentChecks": ["migration-history-22", "expected-public-tables", "rls-enabled", "policy-inventory", "expected-rpcs", "rpc-security-type", "rpc-search-path", "rpc-execute-privileges", "unique-indexes", "partial-unique-execution-guard", "category-count-8", "category-ids", "initial-user-content-zero", "wordpress-taxonomy-mappings-zero", "wordpress-publication-attempts-zero"]
+  "requiredPostDeploymentChecks": ["migration-history-23", "expected-public-tables", "rls-enabled", "policy-inventory", "expected-rpcs", "rpc-security-type", "rpc-search-path", "rpc-execute-privileges", "unique-indexes", "partial-unique-execution-guard", "category-count-8", "category-ids", "initial-user-content-zero", "wordpress-taxonomy-mappings-zero", "wordpress-publication-attempts-zero"]
 }

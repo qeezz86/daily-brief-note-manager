@@ -52,3 +52,13 @@ Attempts/idempotency는 외부 side effect 이력이므로 Backup/Restore에서 
 `npm run smoke:wordpress-draft`는 실행 중인 local Supabase, 임시 Auth 사용자/RLS fixtures, local Edge Runtime과 mock WordPress를 연결한다. 성공 POST, replay, same-content, stale/fingerprint, caller/origin과 uncertain replay guard, draft-only body, 금지 method 0건과 secret leakage를 검사하고 fixture를 정리한다. 실제 WordPress와 원격 Supabase는 사용하지 않는다.
 
 원격 배포 전 정적 검사와 실제 단일 draft 운영 절차는 `docs/WORDPRESS_PRODUCTION_DEPLOYMENT_RUNBOOK.md`를 따른다. `WORDPRESS_LOCAL_MODE`는 production secret에 설정하지 않고 세 Function 모두 Gateway JWT 검증과 Function 내부 `getUser()`를 유지한다.
+
+## Phase 5C-R2 hardening
+
+- WordPress draft 계획은 `content_status=ready`를 서버 blocker로 강제한다.
+- DB source 레코드의 필수 출처 필드와 HTML의 단일 `section#sources` 안 URL 일치를 draft 직전에 재검증한다.
+- 재생성된 plan의 `source.updatedAt`은 preview에서 확인한 timestamp와 WordPress POST 직전에 다시 exact 비교한다.
+- WordPress 성공 link는 설정된 site origin과 정확히 일치해야 한다.
+- attempt history 조회가 성공하기 전에는 UI 생성 버튼을 활성화하지 않으며 하나의 Dry Run에서는 submit을 한 번만 허용한다.
+- 브라우저가 Function 결과를 해석하지 못하면 `CLIENT_RESULT_UNCERTAIN`으로 취급하고 attempt history 확인 전 재클릭을 차단한다.
+- publication attempt가 존재하는 콘텐츠 삭제는 RESTRICT하며 archive 또는 별도 reconciliation을 사용한다.

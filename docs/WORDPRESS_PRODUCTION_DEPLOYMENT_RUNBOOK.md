@@ -572,3 +572,9 @@ Supabase DB:
 - 실제 실행 결과를 사용자와 운영 책임자가 승인
 
 Manual prerequisite가 남아 있거나 결과가 uncertain이면 Phase 5D에 진입하지 않는다.
+
+## 25. Phase 5C-R2 Draft Hardening Forward Migration
+
+Phase 5C-R2 hardening 이후 fresh baseline은 migration 23개다. 기존 운영 환경이 앞 22개를 정확히 적용한 상태라면 마지막 1개인 `20260724190000_harden_wordpress_publication_attempt_retention.sql`만 별도 승인 아래 적용한다. 이 migration은 `wordpress_publication_attempts`의 content/owner foreign key를 `ON DELETE CASCADE`에서 `ON DELETE RESTRICT`로 교체해 WordPress 외부 side effect 감사와 idempotency 기록이 콘텐츠 삭제로 사라지지 않게 한다.
+
+이 forward migration 적용 전에는 저장소·원격 migration history가 정확히 22+1 상태인지 읽기 전용으로 확인한다. 적용 후에는 migration history 23개, constraint delete action `RESTRICT`, 기존 RLS·service-role transition RPC·partial execution guard 유지 여부를 검증한다. migration 역적용, attempt 삭제 또는 콘텐츠 강제 삭제는 자동 rollback에 포함하지 않는다.

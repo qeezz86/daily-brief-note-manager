@@ -44,7 +44,7 @@ function record(value: unknown): Record<string, unknown> {
   return value as Record<string, unknown>
 }
 
-function parseResult(value: unknown, expectedSlug: string): WordPressDraftResult {
+function parseResult(value: unknown, expectedSlug: string, expectedOrigin: string): WordPressDraftResult {
   const item = record(value)
   if (!Number.isSafeInteger(item.id) || Number(item.id) <= 0
     || item.status !== 'draft' || item.slug !== expectedSlug || typeof item.link !== 'string') {
@@ -52,7 +52,9 @@ function parseResult(value: unknown, expectedSlug: string): WordPressDraftResult
   }
   let link: URL
   try { link = new URL(item.link) } catch { throw new DraftError('WORDPRESS_DRAFT_RESPONSE_INVALID', 502) }
-  if (link.protocol !== 'https:' || link.username || link.password) throw new DraftError('WORDPRESS_DRAFT_RESPONSE_INVALID', 502)
+  if (link.protocol !== 'https:' || link.username || link.password || link.origin !== expectedOrigin) {
+    throw new DraftError('WORDPRESS_DRAFT_RESPONSE_INVALID', 502)
+  }
   return { postId: Number(item.id), status: 'draft', slug: expectedSlug, link: link.href }
 }
 
@@ -117,7 +119,7 @@ export function createWordPressDraftClient(options: Options): DraftWordPressClie
         if ([400, 401, 403, 404, 409].includes(response.status)) throw new DraftError('WORDPRESS_DRAFT_REJECTED', 424)
         throw new DraftError('WORDPRESS_DRAFT_RESULT_UNCERTAIN', response.status === 504 ? 504 : 502)
       }
-      try { return parseResult(data, payload.slug) }
+      try { return parseResult(data, payload.slug, options.baseUrl.origin) }
       catch { throw new DraftError('WORDPRESS_DRAFT_RESPONSE_INVALID', 502) }
     },
   }

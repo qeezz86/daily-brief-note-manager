@@ -167,7 +167,7 @@ export async function checkWordPressProductionReadiness(options = {}) {
     const relativePath = `supabase/migrations/${name}`
     return await exists(path.join(root, relativePath)) ? read(root, relativePath) : ''
   }))
-  const [mappingSql, attemptSql, hardeningSql] = migrationSources
+  const [mappingSql, attemptSql, hardeningSql, retentionSql] = migrationSources
   const requiredSql = [
     [mappingSql, 'create table public.wordpress_taxonomy_mappings', 'taxonomy mapping table'],
     [mappingSql, 'enable row level security', 'taxonomy mapping RLS'],
@@ -179,9 +179,10 @@ export async function checkWordPressProductionReadiness(options = {}) {
     [hardeningSql, "set search_path = ''", 'fixed search_path'],
     [hardeningSql, "auth.role()) <> 'service_role'", 'service-role assertion'],
     [hardeningSql, 'to service_role', 'service-role grant'],
+    [retentionSql, 'on delete restrict', 'publication attempt retention foreign key'],
   ]
   for (const [source, needle, label] of requiredSql) if (!source.toLowerCase().includes(needle.toLowerCase())) migrationContractIssues.push(`missing ${label}`)
-  const migrationText = `${mappingSql}\n${attemptSql}\n${hardeningSql}`
+  const migrationText = `${mappingSql}\n${attemptSql}\n${hardeningSql}\n${retentionSql}`
   if (/\b(?:drop\s+table|truncate\s+table|delete\s+from)\b/i.test(migrationText)) migrationContractIssues.push('destructive data operation found')
   if (/update\s+public\.(?:posts|wordpress_taxonomy_mappings)\b/i.test(migrationText)) migrationContractIssues.push('historical content or mapping rewrite found')
   if (/password|authorization|credential/i.test(attemptSql.replace(/contains no article body or credential/gi, ''))) migrationContractIssues.push('credential-like publication attempt column or logic found')

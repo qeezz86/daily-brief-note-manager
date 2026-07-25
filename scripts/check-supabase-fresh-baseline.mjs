@@ -91,14 +91,14 @@ function seedSafetyIssues(relativePath, source, allowedTables) {
 
 export function classifyRemoteState(inspection, manifest) {
   const filenames = manifest.migrations.map((migration) => migration.filename)
-  const baseline = filenames.slice(0, -3)
-  const incremental = filenames.slice(-3)
+  const baseline = filenames.slice(0, -1)
+  const incremental = filenames.slice(-1)
   const state = inspection.remoteState ?? inspection
   const migrationSet = (values, setName) => {
     if (Array.isArray(values)) return values
     if (setName === 'all') return filenames
-    if (setName === 'baseline-19') return baseline
-    if (setName === 'wordpress-incremental-3') return incremental
+    if (setName === 'baseline-22') return baseline
+    if (setName === 'wordpress-hardening-1') return incremental
     return []
   }
   const applied = migrationSet(state.appliedMigrations, state.appliedMigrationSet)
@@ -133,7 +133,7 @@ export function validateDeploymentPlan(inspection, manifest, mode = classifyRemo
     ? plan.plannedMigrations
     : plan.plannedMigrationSet === 'all'
       ? filenames
-      : plan.plannedMigrationSet === 'wordpress-incremental-3'
+      : plan.plannedMigrationSet === 'wordpress-hardening-1'
         ? filenames.slice(-3)
         : []
   const issues = []
@@ -165,7 +165,7 @@ export async function checkSupabaseFreshBaseline(options = {}) {
   const migrationIssues = []
   if (manifest.schemaVersion !== 1) migrationIssues.push('manifest schemaVersion must be 1')
   if (manifest.deploymentMode !== 'fresh-project-baseline') migrationIssues.push('manifest deploymentMode is invalid')
-  if (manifest.migrationCount !== 22 || manifest.migrations.length !== 22) migrationIssues.push('manifest must contain exactly 22 migrations')
+  if (manifest.migrationCount !== 23 || manifest.migrations.length !== 23) migrationIssues.push('manifest must contain exactly 23 migrations')
   if (!same(migrationFiles, expectedMigrationFiles)) migrationIssues.push('migration directory does not exactly match the ordered manifest')
   if (migrationFiles.some((filename) => !filename.endsWith('.sql'))) migrationIssues.push('migration directory contains a non-SQL file')
   const versions = manifest.migrations.map((migration) => migration.version)
@@ -174,7 +174,7 @@ export async function checkSupabaseFreshBaseline(options = {}) {
     if (migration.filename !== `${migration.version}_${migration.filename.slice(15)}`) migrationIssues.push(`${migration.filename}: version and filename disagree`)
   }
   if (expectedMigrationFiles[0] !== '20260710080000_initial_schema.sql') migrationIssues.push('first migration must be the initial schema')
-  if (expectedMigrationFiles.at(-1) !== '20260719130000_harden_wordpress_draft_transition.sql') migrationIssues.push('last migration must be transition hardening')
+  if (expectedMigrationFiles.at(-1) !== '20260724190000_harden_wordpress_publication_attempt_retention.sql') migrationIssues.push('last migration must be publication attempt retention hardening')
   checks.push(result('migration inventory', migrationIssues))
 
   const migrationSafety = []
@@ -204,8 +204,8 @@ export async function checkSupabaseFreshBaseline(options = {}) {
     'Fresh Baseline Post-Deployment Verification', 'Auth User Bootstrap Timing', 'Recovery and Forward-Fix Policy',
   ]
   const runbookIssues = runbookHeadings.filter((heading) => !runbook.includes(heading)).map((heading) => `runbook missing ${heading}`)
-  if (!runbook.includes('22')) runbookIssues.push('runbook does not state the 22-migration baseline')
-  if (!runbook.includes('마지막 3개')) runbookIssues.push('runbook does not preserve the three-migration incremental path')
+  if (!runbook.includes('23')) runbookIssues.push('runbook does not state the 23-migration baseline')
+  if (!runbook.includes('마지막 1개')) runbookIssues.push('runbook does not preserve the one-migration hardening path')
   checks.push(result('runbook modes', runbookIssues))
 
   const inspection = options.inspection ?? await readJson(root, options.fixture ?? 'scripts/fixtures/supabase-fresh-baseline/fresh-empty-project.json')

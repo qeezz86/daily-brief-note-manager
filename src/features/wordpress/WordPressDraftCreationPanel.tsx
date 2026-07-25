@@ -1,4 +1,6 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
+
+import { canPrepareWordPressDraft } from './WordPressDraftCreationPanel.logic'
 import type { DatabaseClient } from '../../shared/supabase/client'
 import type { PublicationPlan } from './wordpressPublicationPreview.schema'
 import { useWordPressDraftCreateMutation, useWordPressPublicationAttemptsQuery } from './wordpressDraftCreate.queries'
@@ -17,22 +19,35 @@ export function WordPressDraftCreationPanel({
   const [open, setOpen] = useState(false)
   const [confirmed, setConfirmed] = useState(false)
   const [idempotencyKey, setIdempotencyKey] = useState<string | null>(null)
+  const [submitted, setSubmitted] = useState(false)
+  const submitStarted = useRef(false)
 
   const guardedAttempt = attempts.data?.find((attempt) => ['succeeded', 'uncertain', 'executing'].includes(attempt.status))
-  const ready = plan.readyForDraftCreation && !stale && !guardedAttempt && !createDraft.isPending
+  const ready = canPrepareWordPressDraft({
+    planReady: plan.readyForDraftCreation,
+    stale,
+    attemptsLoaded: attempts.isSuccess,
+    guarded: Boolean(guardedAttempt),
+    pending: createDraft.isPending,
+    submitted,
+  })
   const error = createDraft.error instanceof WordPressDraftServiceError ? createDraft.error : null
   const uncertain = error?.code === 'WORDPRESS_DRAFT_TIMEOUT_UNCERTAIN'
     || error?.code === 'WORDPRESS_DRAFT_RESULT_UNCERTAIN'
     || error?.code === 'WORDPRESS_DRAFT_RESPONSE_INVALID'
     || error?.code === 'MANUAL_RECONCILIATION_REQUIRED'
+    || error?.code === 'CLIENT_RESULT_UNCERTAIN'
 
   function prepare() {
+    if (!ready) return
     if (!idempotencyKey) setIdempotencyKey(crypto.randomUUID())
     setOpen(true)
   }
 
   function submit() {
-    if (!confirmed || !idempotencyKey || !ready) return
+    if (!confirmed || !idempotencyKey || !ready || submitStarted.current) return
+    submitStarted.current = true
+    setSubmitted(true)
     createDraft.mutate({
       contentId: plan.source.contentId, expectedSourceUpdatedAt: plan.source.updatedAt,
       expectedPayloadFingerprint: plan.payloadFingerprint, idempotencyKey,
@@ -53,6 +68,8 @@ export function WordPressDraftCreationPanel({
         <div><dt>Fingerprint</dt><dd><code>{plan.payloadFingerprint}</code></dd></div>
       </dl>
       {guardedAttempt ? <p className="form-alert" role="alert">{guardedAttempt.status === 'uncertain' ? '결과가 불명확한 기록이 있습니다. 다시 생성하지 말고 WordPress 관리자에서 slug를 확인하세요.' : '이미 생성되었거나 실행 중인 초안 기록이 있어 새 생성을 차단했습니다.'}</p> : null}
+      {attempts.isError ? <p className="form-alert" role="alert">초안 이력을 확인하지 못해 새 생성을 차단했습니다.</p> : null}
+      {submitted ? <p className="form-alert" role="status">이 Dry Run에서는 초안 생성 요청을 이미 한 번 제출했습니다. 새로 실행하지 마세요.</p> : null}
       <button className="primary-button" type="button" disabled={!ready} onClick={prepare}>WordPress 초안 생성 준비</button>
     </section>
 

@@ -10,6 +10,7 @@ type PostRow = {
 }
 type CategoryRow = { id: string; name: string; content_group: SourceContent['contentGroup']; wrapper_class: string; slug_pattern: string }
 type SeoRow = { representative_title: string | null; meta_description: string }
+type SourceRow = { source_name: string; source_title: string; source_url: string; checked_point: string }
 type MappingRow = {
   id: string; site_origin: string; mapping_kind: 'category' | 'tag'; local_key: string; wordpress_taxonomy: 'category' | 'post_tag'
   wordpress_term_id: number; wordpress_term_slug: string; wordpress_term_name: string; verified_at: string | null
@@ -28,14 +29,16 @@ export function createCallerDatabase(client: SupabaseClient): CallerDatabase {
       if (!postResult.data) return null
       const post = postResult.data as unknown as PostRow
 
-      const [categoryResult, seoResult, tagResult] = await Promise.all([
+      const [categoryResult, seoResult, tagResult, sourceResult] = await Promise.all([
         client.from('categories').select('id,name,content_group,wrapper_class,slug_pattern').eq('id', post.category_id).maybeSingle(),
         client.from('seo_data').select('representative_title,meta_description').eq('post_id', contentId).maybeSingle(),
         client.from('post_tags').select('tag_id,tags!inner(id,name,normalized_name)').eq('post_id', contentId).order('tag_id', { ascending: true }),
+        client.from('sources').select('source_name,source_title,source_url,checked_point').eq('post_id', contentId).order('sort_order', { ascending: true }),
       ])
       if (categoryResult.error) databaseFailure(categoryResult.error)
       if (seoResult.error) databaseFailure(seoResult.error)
       if (tagResult.error) databaseFailure(tagResult.error)
+      if (sourceResult.error) databaseFailure(sourceResult.error)
       if (!categoryResult.data) throw new PublicationError('PREVIEW_INCOMPLETE', { httpStatus: 500 })
       const category = categoryResult.data as unknown as CategoryRow
       const seo = seoResult.data as unknown as SeoRow | null
@@ -43,13 +46,19 @@ export function createCallerDatabase(client: SupabaseClient): CallerDatabase {
         const nested = Array.isArray(row.tags) ? row.tags[0] : row.tags
         return nested ? [{ id: nested.id, name: nested.name, normalizedName: nested.normalized_name }] : []
       })
+      const sources = ((sourceResult.data ?? []) as unknown as SourceRow[]).map((row) => ({
+        name: row.source_name,
+        title: row.source_title,
+        url: row.source_url,
+        checkedPoint: row.checked_point,
+      }))
       void siteOrigin
       return {
         id: post.id, categoryId: category.id, categoryName: category.name, contentGroup: category.content_group,
         wrapperClass: category.wrapper_class, slugPattern: category.slug_pattern, seriesNo: post.series_no,
         briefingDate: post.briefing_date, publishedOn: post.published_on, contentStatus: post.content_status,
         updatedAt: post.updated_at, representativeTitle: seo?.representative_title ?? null,
-        metaDescription: seo?.meta_description ?? '', htmlBody: post.html_body, slug: post.slug, tags,
+        metaDescription: seo?.meta_description ?? '', htmlBody: post.html_body, slug: post.slug, sources, tags,
       }
     },
     async readContentUpdatedAt(contentId) {

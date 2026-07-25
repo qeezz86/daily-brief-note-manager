@@ -33,9 +33,9 @@ export async function createWordPressDraft(client: DatabaseClient | null, input:
   if (result.error) {
     const parsed = wordpressDraftErrorSchema.safeParse(await errorPayload(result.error))
     if (parsed.success) throw new WordPressDraftServiceError(parsed.data.error.code, parsed.data.error.message, parsed.data.error.attemptId)
-    throw new WordPressDraftServiceError('UNKNOWN', 'WordPress 초안 생성 결과를 확인하지 못했습니다.')
+    throw new WordPressDraftServiceError('CLIENT_RESULT_UNCERTAIN', 'WordPress 초안 생성 결과를 안전하게 확인하지 못했습니다. 다시 생성하지 말고 초안 이력을 먼저 확인하세요.')
   }
   const parsed = wordpressDraftSuccessSchema.safeParse(result.data)
-  if (!parsed.success) throw new WordPressDraftServiceError('INVALID_RESPONSE', 'WordPress 초안 응답을 안전하게 확인하지 못했습니다.')
+  if (!parsed.success) throw new WordPressDraftServiceError('CLIENT_RESULT_UNCERTAIN', 'WordPress 초안 응답을 안전하게 확인하지 못했습니다. 다시 생성하지 말고 초안 이력을 먼저 확인하세요.')
   return parsed.data
 }

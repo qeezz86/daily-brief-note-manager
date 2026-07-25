@@ -37,6 +37,7 @@ describe('WordPress draft write client', () => {
     ['publish status', { ...success, status: 'publish' }, 'WORDPRESS_DRAFT_RESPONSE_INVALID'],
     ['wrong slug', { ...success, slug: 'other' }, 'WORDPRESS_DRAFT_RESPONSE_INVALID'],
     ['javascript link', { ...success, link: 'javascript:alert(1)' }, 'WORDPRESS_DRAFT_RESPONSE_INVALID'],
+    ['cross-origin link', { ...success, link: 'https://other.example.com/?p=91' }, 'WORDPRESS_DRAFT_RESPONSE_INVALID'],
   ])('rejects %s success response', async (_name, response, expected) => {
     const client = createWordPressDraftClient({ baseUrl: new URL('https://wordpress.example.com'), username: 'user', applicationPassword: 'pass', fetchImpl: vi.fn(async () => json(response, 201)) })
     await expect(client.createDraft(payload)).rejects.toMatchObject({ code: expected })

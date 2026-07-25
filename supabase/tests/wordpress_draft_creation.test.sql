@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(33);
+select plan(34);
 
 select has_table('public', 'wordpress_publication_attempts', '1 attempts table exists');
 select has_column('public', 'wordpress_publication_attempts', 'idempotency_key', '2 idempotency column exists');
@@ -95,6 +95,17 @@ select is((select count(*) from public.wordpress_publication_attempts), 3::bigin
 select is(current_setting('request.jwt.claims')::jsonb->>'sub', '00000000-0000-4000-8000-000000005c01', '30 owner auth context remains explicit');
 select is((select proconfig from pg_proc where oid='public.transition_wordpress_publication_attempt_service(uuid,uuid,text,text,text,bigint,text,text,text,text,boolean)'::regprocedure), array['search_path=""'], '31 service transition search_path is fixed');
 select ok(position('wordpress_publication_attempts' in public.get_user_backup_snapshot('core')::text) = 0 and position('5c200000-0000-4000-8000-000000000001' in public.get_user_backup_snapshot('core')::text) = 0, '32 backup and restore input exclude attempts');
+
+select is(
+  (
+    select confdeltype::text
+    from pg_constraint
+    where conrelid = 'public.wordpress_publication_attempts'::regclass
+      and conname = 'wordpress_publication_attempts_post_owner_fkey'
+  ),
+  'r',
+  '33 content deletion is restricted while WordPress publication attempts exist'
+);
 
 select * from finish();
 rollback;

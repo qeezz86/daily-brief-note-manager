@@ -26,12 +26,12 @@ describe('wordpress draft create service', () => {
     expect(JSON.stringify(calls)).not.toContain('"categories"')
   })
 
-  it('rejects non-HTTPS links and non-draft responses', async () => {
-    await expect(createWordPressDraft(client({ ...success, wordpress: { ...success.wordpress, link: 'javascript:alert(1)' } }), input)).rejects.toMatchObject({ code: 'INVALID_RESPONSE' })
-    await expect(createWordPressDraft(client({ ...success, wordpress: { ...success.wordpress, status: 'publish' } }), input)).rejects.toMatchObject({ code: 'INVALID_RESPONSE' })
+  it('treats unsafe success payloads as an uncertain client result', async () => {
+    await expect(createWordPressDraft(client({ ...success, wordpress: { ...success.wordpress, link: 'javascript:alert(1)' } }), input)).rejects.toMatchObject({ code: 'CLIENT_RESULT_UNCERTAIN' })
+    await expect(createWordPressDraft(client({ ...success, wordpress: { ...success.wordpress, status: 'publish' } }), input)).rejects.toMatchObject({ code: 'CLIENT_RESULT_UNCERTAIN' })
   })
 
-  it('never exposes a raw Function error', async () => {
-    await expect(createWordPressDraft(client(null, new Error('Authorization Basic secret')), input)).rejects.toEqual(expect.objectContaining<Partial<WordPressDraftServiceError>>({ code: 'UNKNOWN' }))
+  it('never exposes a raw Function error and fails closed as uncertain', async () => {
+    await expect(createWordPressDraft(client(null, new Error('Authorization Basic secret')), input)).rejects.toEqual(expect.objectContaining<Partial<WordPressDraftServiceError>>({ code: 'CLIENT_RESULT_UNCERTAIN' }))
   })
 })

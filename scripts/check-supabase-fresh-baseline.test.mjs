@@ -64,26 +64,26 @@ describe('Supabase fresh baseline deployment classification', () => {
     expect(classifyRemoteState(await inspection('fresh-empty-project.json'), manifest)).toBe(deploymentModes.fresh)
   })
 
-  it('accepts the exact 22-migration fresh plan and approved seed', async () => {
+  it('accepts the exact 23-migration fresh plan and approved seed', async () => {
     const manifest = await json('config/supabase-fresh-project-baseline.json')
     expect(validateDeploymentPlan(await inspection('fresh-empty-project.json'), manifest)).toEqual([])
   })
 
-  it('rejects a three-migration plan for an empty project', async () => {
+  it('rejects a one-migration hardening plan for an empty project', async () => {
     const manifest = await json('config/supabase-fresh-project-baseline.json')
     const value = await inspection('fresh-empty-project.json')
-    value.deploymentPlan.plannedMigrationSet = 'wordpress-incremental-3'
+    value.deploymentPlan.plannedMigrationSet = 'wordpress-hardening-1'
     expect(validateDeploymentPlan(value, manifest, deploymentModes.fresh)).not.toEqual([])
   })
 
-  it('classifies a consistent 19+3 project as incremental ready', async () => {
+  it('classifies a consistent 22+1 project as incremental ready', async () => {
     const manifest = await json('config/supabase-fresh-project-baseline.json')
     const value = await inspection('existing-incremental-project.json')
     expect(classifyRemoteState(value, manifest)).toBe(deploymentModes.incremental)
     expect(validateDeploymentPlan(value, manifest)).toEqual([])
   })
 
-  it('rejects all 22 migrations for an incremental project', async () => {
+  it('rejects all 23 migrations for an incremental project', async () => {
     const manifest = await json('config/supabase-fresh-project-baseline.json')
     const value = await inspection('existing-incremental-project.json')
     value.deploymentPlan.plannedMigrationSet = 'all'

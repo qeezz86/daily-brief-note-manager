@@ -105,15 +105,17 @@ function fingerprint(payload) { return `sha256:${createHash('sha256').update(JSO
 
 async function seedFixtures(user, siteOrigin) {
   const fixtures = []
+  const sourceUrl = 'https://source.example.test/economy'
   for (const day of [19, 20, 21, 22]) {
     const postId = randomUUID(); const date = `2026-07-${day}`; const title = `경제 대표 제목 ${day}`
-    const html = `<div class="daily-brief-note news-briefing economy"><h1>${title}</h1><a href="#sources">출처</a></div>`
+    const html = `<div class="daily-brief-note news-briefing economy"><h1>${title}</h1><a href="#sources">출처</a><section id="sources"><h2>출처</h2><a href="${sourceUrl}">Source</a></section></div>`
     const requestedUpdatedAt = '2026-07-19T00:00:00.000Z'; const slug = `economy-briefing-${date}`
     const post = await user.client.from('posts').insert({ id: postId, owner_id: user.id, category_id: 'economy', briefing_date: date, title, summary: '요약', html_body: html, slug, content_status: 'ready', source_import_type: 'manual_entry', updated_at: requestedUpdatedAt }).select('updated_at').single()
     if (post.error || !post.data) throw new SmokeError('DB_FIXTURE_FAILED', 'post fixture')
     const updatedAt = post.data.updated_at
     const meta = '가'.repeat(130)
     if ((await user.client.from('seo_data').insert({ post_id: postId, owner_id: user.id, representative_title: title, alternative_titles: ['대안1','대안2','대안3','대안4'], meta_description: meta, focus_keyword: '경제' })).error) throw new SmokeError('DB_FIXTURE_FAILED', 'SEO fixture')
+    if ((await user.client.from('sources').insert({ owner_id: user.id, post_id: postId, source_name: 'Example', source_title: 'Economy source', source_url: sourceUrl, checked_point: '테스트 출처 확인', sort_order: 0 })).error) throw new SmokeError('DB_FIXTURE_FAILED', 'source fixture')
     const createdTags = await user.client.from('tags').upsert(tags.map((name) => ({ owner_id: user.id, name, normalized_name: name.toLowerCase() })), { onConflict: 'owner_id,normalized_name' }).select('id,name,normalized_name')
     if (createdTags.error || !createdTags.data) throw new SmokeError('DB_FIXTURE_FAILED', 'tag fixture')
     if ((await user.client.from('post_tags').insert(createdTags.data.map((tag) => ({ owner_id: user.id, post_id: postId, tag_id: tag.id })))).error) throw new SmokeError('DB_FIXTURE_FAILED', 'post tag fixture')

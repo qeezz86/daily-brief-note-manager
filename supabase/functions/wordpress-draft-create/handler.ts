@@ -199,6 +199,9 @@ export function createWordPressDraftHandler(dependencies: Dependencies) {
         }
       })()
       if (!plan) return await block(database, attempt.id, 'PUBLICATION_PLAN_BLOCKED')
+      if (plan.source.updatedAt !== parsed.expectedSourceUpdatedAt) {
+        await block(database, attempt.id, 'SOURCE_CHANGED', plan.payloadFingerprint)
+      }
       if (plan.blockers.some((issue) => issue.code === 'WORDPRESS_DUPLICATE_SLUG' || issue.code === 'WORDPRESS_DUPLICATE_INCONSISTENT')) {
         await block(database, attempt.id, 'WORDPRESS_DUPLICATE_SLUG', plan.payloadFingerprint)
       }

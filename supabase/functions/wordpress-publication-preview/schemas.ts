@@ -51,6 +51,7 @@ export interface SourceContent {
   metaDescription: string
   htmlBody: string | null
   slug: string
+  sources?: Array<{ name: string; title: string; url: string; checkedPoint: string }>
   tags: Array<{ id: string; name: string; normalizedName: string }>
 }
 
