@@ -14,7 +14,7 @@ Phase 4C-1에서는 인증 공급자·route guard·공통 `AppLayout`을 초기 
 
 Phase 4C-2에서는 실제 production graph에 있던 React·Router·Query·Supabase·Zod만 제한된 vendor chunk로 분리하고, Backup 생성, Restore 검증·계획·실행, Import 분석 엔진을 해당 사용자 동작 시점에 불러옵니다. loader는 성공 promise를 재사용하고 실패 cache를 비워 다음 동작에서 재시도합니다. entry는 25.19 kB(gzip 7.74 kB), 가장 큰 chunk는 198.47 kB이며 500 kB와 circular chunk 경고가 없습니다. PWA의 `generateSW`·`autoUpdate`·navigation fallback 정책은 유지합니다. 자세한 graph, route/action별 전이 크기와 후속 bundle budget 계획은 [`docs/BUNDLE_SPLITTING.md`](docs/BUNDLE_SPLITTING.md)를 참고합니다.
 
-Phase 4C-3에서는 Vite production manifest로 entry, static closure, 대표 route, 동적 feature engine, largest chunk, 전체 JS와 PWA precache를 byte 단위로 측정합니다. 절대 상한과 승인 baseline 회귀 상한을 모두 통과해야 하며 Pull Request와 `main` push의 GitHub Actions에서 필수 gate로 실행됩니다. 정책, 현재 기준값, 실패 해석과 baseline 검수 절차는 [`docs/BUNDLE_BUDGET.md`](docs/BUNDLE_BUDGET.md)를 참고합니다.
+Phase 4C-3에서는 Vite production manifest로 entry, static closure, 대표 route, 동적 feature engine, largest chunk, 전체 JS와 PWA precache를 byte 단위로 측정합니다. 절대 상한과 승인 baseline 회귀 상한을 모두 통과해야 하며 Pull Request와 `main` push의 GitHub Actions 검증 workflow에서 실행됩니다. 정책, 현재 기준값, 실패 해석과 baseline 검수 절차는 [`docs/BUNDLE_BUDGET.md`](docs/BUNDLE_BUDGET.md)를 참고합니다.
 
 ## 요구 환경
 
@@ -74,6 +74,15 @@ npm run bundle:check
 `npm run check:supabase-fresh-baseline`은 canonical migration 23개와 category seed whitelist, fresh 23개·existing 22+1 적용 계획, 금지 SQL·literal, runbook deployment mode, sanitized fixture를 로컬 파일만으로 검증합니다. Protected env를 읽거나 network, linked Supabase CLI 또는 원격 명령을 실행하지 않습니다.
 
 Bundle budget CI는 Supabase module을 포함한 production graph를 일정하게 만들기 위해 로컬 주소와 비밀정보가 아닌 공개 placeholder key를 build-time 환경변수로 사용합니다. CI는 앱을 실행하거나 원격 Supabase에 연결하지 않으며 실제 credential이나 GitHub secret을 저장하지 않습니다. Raw 최대 chunk와 gzip 최대 chunk는 서로 다른 asset일 수 있으므로 각각 독립적으로 측정합니다.
+
+## Repository CI
+
+모든 Pull Request와 `main` push에서 다음 두 workflow를 secret 없이 실행합니다.
+
+- `bundle-budget`: production build와 bundle budget을 검증하고 report artifact를 보존합니다.
+- `offline-validation`: lint, 전체 Vitest suite, Supabase fresh baseline checker와 WordPress production readiness checker를 실행합니다.
+
+현재 repository CI 범위에는 DB lint, pgTAP, Deno, E2E와 WordPress smoke가 포함되지 않습니다. Vercel status는 repository validation과 별도이며, Vercel required 설정도 이 workflow에서 다루지 않습니다. Branch protection과 required checks는 아직 설정되지 않았으며 별도 Gate에서 적용해야 합니다.
 
 ## WordPress read-only 진단
 
