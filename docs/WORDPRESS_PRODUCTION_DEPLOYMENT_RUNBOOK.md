@@ -2,7 +2,7 @@
 
 ## 1. 목적과 범위
 
-이 문서는 Phase 5C 코드를 원격 Supabase, 실제 프런트엔드와 실제 WordPress에 적용하는 Phase 5C-R2 실행 절차다. Phase 5C-R2A read-only inspection에서 원격 DB가 fresh project이고 pending migration이 마지막 3개가 아니라 전체 22개임을 확인했다. 이 문서의 원격 명령과 WordPress 요청은 별도 실행 승인 전에는 실행하지 않는다.
+이 문서는 Phase 5C 코드를 원격 Supabase, 실제 프런트엔드와 실제 WordPress에 적용하는 Phase 5C-R2 실행 절차다. 현재 canonical DB 기준은 fresh project의 전체 23개와, 앞 22개가 정확히 적용된 existing project의 마지막 retention hardening 1개다. 이 문서의 원격 명령과 WordPress 요청은 별도 실행 승인 전에는 실행하지 않는다.
 
 목표는 다음 순서를 보장하는 것이다.
 
@@ -18,8 +18,8 @@ Phase 5C의 유일한 WordPress write는 `POST /wp-json/wp/v2/posts`이며 서�
 
 | 단위 | 파일·대상 | 분류 | 비고 |
 |---|---|---|---|
-| DB baseline | `config/supabase-fresh-project-baseline.json`의 22개 migration | fresh remote DB deployment | fresh project에서만 exact order 전체 적용 |
-| DB incremental | 마지막 WordPress migration 3개 | existing remote DB deployment | 앞 19개 history/schema가 일치할 때만 적용 |
+| DB baseline | `config/supabase-fresh-project-baseline.json`의 23개 migration | fresh remote DB deployment | fresh project에서만 exact order 전체 적용 |
+| DB forward migration | retention hardening migration 1개 | existing remote DB deployment | 앞 22개 history/schema가 정확히 일치할 때만 적용 |
 | DB types | `src/shared/supabase/database.types.ts` | repository-only | 컴파일용 생성물이며 원격 배포 단위가 아님 |
 | Function | `wordpress-diagnostics` | remote Function deployment | WordPress read-only 진단 |
 | Function | `wordpress-publication-preview` | remote Function deployment | GET-only taxonomy/duplicate/preview |
@@ -115,13 +115,14 @@ npx supabase functions list --project-ref <PROJECT_REF>
 
 Readiness checker는 원격 조회를 수행하지 않고 sanitized inspection JSON을 입력받아 다음 중 하나로 판정한다.
 
-- `FRESH_PROJECT_BASELINE_REQUIRED`: migration history 0, application table/function 0, local migration 22개 전부 pending, unexpected/remote-only object 0.
-- `EXISTING_PROJECT_INCREMENTAL_READY`: 앞 19개 migration과 core schema가 일치하고 마지막 3개만 pending.
+- `FRESH_PROJECT_BASELINE_REQUIRED`: migration history 0, application table/function 0, canonical migration 23개 전부 pending, unexpected/remote-only object 0.
+- `EXISTING_PROJECT_INCREMENTAL_READY`: 앞 22개 migration과 core schema가 정확히 일치하고 retention hardening migration 1개만 pending.
+- `MIGRATION_BASELINE_CURRENT`: canonical migration 23개가 모두 applied이고 pending migration이 없음.
 - `PARTIAL_BASELINE_BLOCKED`: migration이나 core object 일부만 존재하여 승인된 두 경로와 일치하지 않음.
 - `HISTORY_MISMATCH_BLOCKED`: schema/history 불일치, remote-only migration, checksum/apply 상태 불명확.
 - `UNEXPECTED_REMOTE_OBJECTS_BLOCKED`: fresh로 예상한 원격에 whitelist 밖 application object가 존재.
 
-현재 확인 상태는 첫 번째이며 실제 원격 write, Function deploy, secret 변경, WordPress 요청은 모두 0건이다. 이전 Gate 2의 “마지막 3개만 pending” 판단은 실제 `db push --dry-run` evidence와 달랐고 Gate 4는 해당 dry-run에서 안전하게 중단됐다. Migration repair가 아니라 fresh baseline이 필요하다.
+2026-07-21의 “당시 baseline 22개 전체 pending” 확인과 Phase 5B·5C의 19+3은 retention hardening 도입 전의 historical/legacy rollout evidence다. 현재 실행 모드를 판정할 때는 위 fresh 23개, existing 22+1 또는 current 23개만 사용한다. 실제 원격 write, Function deploy, secret 변경, WordPress 요청은 별도 승인 전까지 0건이어야 한다.
 
 ## 6B. Fresh Project Baseline Path
 
@@ -129,14 +130,14 @@ Readiness checker는 원격 조회를 수행하지 않고 sanitized inspection J
 
 1. remote public application table과 function 0을 read-only로 확인한다.
 2. migration history가 없거나 0행인지 확인한다.
-3. pending이 manifest의 22개와 순서까지 정확히 일치하는지 확인한다.
+3. pending이 manifest의 23개와 순서까지 정확히 일치하는지 확인한다.
 4. Supabase와 WordPress backup 상태·보존 기간·담당자를 확인한다.
 5. `npm run check:supabase-fresh-baseline`으로 migration whitelist와 안전성을 검증한다.
 6. `01_categories.sql`만 production seed whitelist인지 확인한다.
-7. 전체 baseline 22개와 category seed 적용에 대한 별도 명시적 승인을 받는다.
-8. 승인된 22개 migration 전체를 manifest 순서로 적용한다.
+7. 전체 baseline 23개와 category seed 적용에 대한 별도 명시적 승인을 받는다.
+8. 승인된 23개 migration 전체를 manifest 순서로 적용한다.
 9. 승인된 category seed를 한 번 적용한다.
-10. migration history가 정확히 22개인지 확인한다.
+10. migration history가 정확히 23개인지 확인한다.
 11. manifest의 core/WordPress table을 확인한다.
 12. 모든 user-owned table의 RLS와 policy inventory를 확인한다.
 13. RPC security type, 빈 `search_path`, execute privilege를 확인한다.
@@ -144,17 +145,15 @@ Readiness checker는 원격 조회를 수행하지 않고 sanitized inspection J
 15. 첫 운영 사용자 bootstrap 뒤 기존 앱 login과 owner-scoped empty read를 확인한다.
 16. 위 검증이 모두 끝난 뒤에만 WordPress secret과 Function 단계로 이동한다.
 
-Fresh에서 마지막 3개만 선택 적용하거나 seed를 생략하는 계획은 실패다. 상세 순서와 read-only SQL은 `docs/SUPABASE_FRESH_PROJECT_BASELINE.md`를 따른다.
+Fresh에서 일부 migration만 선택 적용하거나 seed를 생략하는 계획은 실패다. 상세 순서와 read-only SQL은 `docs/SUPABASE_FRESH_PROJECT_BASELINE.md`를 따른다.
 
 ## 6C. Existing Project Incremental Path
 
-기존 경로는 삭제하지 않는다. 앞 19개 migration history와 core schema가 정확히 일치하고 마지막 WordPress 3개만 pending일 때에만 다음 세 migration을 순서대로 적용한다.
+현재 existing 경로는 앞 22개 migration history와 core schema가 정확히 일치하고 마지막 retention hardening migration 1개만 pending일 때에만 적용한다.
 
-1. `20260718120000_wordpress_taxonomy_mappings.sql`
-2. `20260719120000_wordpress_draft_creation.sql`
-3. `20260719130000_harden_wordpress_draft_transition.sql`
+1. `20260724190000_harden_wordpress_publication_attempt_retention.sql`
 
-Incremental 경로에서는 category seed를 기본적으로 재실행하지 않는다. 전체 22개를 다시 적용하는 계획도 실패다. DB 적용에는 별도 명시적 승인이 필요하다.
+Phase 5B·5C에서 사용한 앞 19개 applied + WordPress migration 3개 pending 경로는 historical legacy rollout path다. 기록은 보존하지만 현재 실행 계획으로 분류하거나 적용하지 않는다. Existing 22+1 경로에서는 category seed를 재실행하지 않으며, 마지막 3개나 전체 23개를 계획하면 실패다. DB 적용에는 별도 명시적 승인이 필요하다.
 
 ## 6D. Partial or History-Mismatch Stop Path
 
@@ -166,11 +165,11 @@ Production seed는 정적 기준 데이터만 허용한다. 현재 whitelist는 
 
 ## 6F. Fresh Baseline Approval Gate
 
-승인 요청에는 exact commit, clean tree, backup, sanitized classification, 22개 manifest, seed whitelist, local reset/lint/pgTAP, Vitest/Deno/smoke/E2E/lint/build/bundle 결과와 예상 원격 객체를 포함한다. 이 승인은 DB baseline과 seed만 허용하며 Function, secret, frontend, WordPress draft를 허용하지 않는다.
+승인 요청에는 exact commit, clean tree, backup, sanitized classification, 23개 manifest, seed whitelist, local reset/lint/pgTAP, Vitest/Deno/smoke/E2E/lint/build/bundle 결과와 예상 원격 객체를 포함한다. 이 승인은 DB baseline과 seed만 허용하며 Function, secret, frontend, WordPress draft를 허용하지 않는다.
 
 ## 6G. Fresh Baseline Post-Deployment Verification
 
-Migration history 22개, expected public table, RLS/policy, RPC security/search path/execute, unique index와 partial execution guard, category 8개, user-owned content 0, WordPress mapping/attempt 0을 read-only SQL로 확인한다. 하나라도 다르면 WordPress 단계로 진행하지 않는다.
+Migration history 23개, expected public table, RLS/policy, RPC security/search path/execute, unique index와 partial execution guard, category 8개, user-owned content 0, WordPress mapping/attempt 0을 read-only SQL로 확인한다. 하나라도 다르면 WordPress 단계로 진행하지 않는다.
 
 ## 6H. Auth User Bootstrap Timing
 
@@ -190,9 +189,11 @@ npx supabase migration list --linked
 npx supabase db push --linked --dry-run
 ```
 
-Dry run의 pending 목록은 먼저 6A의 모드로 분류한다. Fresh이면 manifest의 22개 전체, existing이면 승인된 Phase 5B/5C 마지막 3개와 정확히 일치해야 한다. 그 밖의 오래된 일부 migration, 알 수 없는 remote-only version, unexpected object 또는 history mismatch가 보이면 push하지 않는다.
+Dry run의 pending 목록은 먼저 6A의 모드로 분류한다. Fresh이면 manifest의 23개 전체, existing이면 마지막 retention hardening migration 1개와 정확히 일치해야 하며, current이면 pending이 없어야 한다. 과거 19+3을 포함한 그 밖의 일부 migration, 알 수 없는 remote-only version, unexpected object 또는 history mismatch가 보이면 push하지 않는다.
 
-### 7.2 migration 안전 검수 결과
+### 7.2 historical Phase 5B·5C legacy 19+3 안전 검수 기록
+
+다음은 과거 WordPress migration 3개 도입 당시의 historical 검수 기록이며 현재 적용 순서가 아니다.
 
 - 세 파일은 timestamp 순 forward migration이다.
 - SQL에 `DROP TABLE`, `TRUNCATE`, content delete, 기존 `posts` 또는 mapping rewrite가 없다.
@@ -218,7 +219,7 @@ Backup이 없거나 상태가 불명확하면 중단한다. Runbook에 자동 de
 
 ## 9. Existing Project Incremental DB migration 적용 순서
 
-이 절은 `EXISTING_PROJECT_INCREMENTAL_READY`에만 적용한다. Fresh project는 6B와 baseline manifest를 따른다. 최종 DB 변경 승인을 받은 뒤에만 실행한다.
+이 절은 앞 22개가 정확히 적용된 `EXISTING_PROJECT_INCREMENTAL_READY`에만 적용한다. Fresh project는 6B와 baseline manifest를 따르고, `MIGRATION_BASELINE_CURRENT`는 DB migration을 실행하지 않는다. 최종 DB 변경 승인을 받은 뒤에만 실행한다.
 
 ```powershell
 npx supabase db push --linked --dry-run
@@ -226,11 +227,9 @@ npx supabase db push --linked
 npx supabase migration list --linked
 ```
 
-적용 순서는 반드시 다음과 같다.
+적용 대상은 반드시 다음 1개뿐이다.
 
-1. `20260718120000_wordpress_taxonomy_mappings.sql`
-2. `20260719120000_wordpress_draft_creation.sql`
-3. `20260719130000_harden_wordpress_draft_transition.sql`
+1. `20260724190000_harden_wordpress_publication_attempt_retention.sql`
 
 Dashboard SQL Editor에서 read-only catalog query로 다음을 확인한다. 실제 row 내용이나 secret을 출력하지 않는다.
 
@@ -415,7 +414,7 @@ Preview까지 실제 WordPress write는 0건이어야 한다.
 
 실행자가 직접 확인한다.
 
-- migration 세 개 적용 완료
+- 선택된 모드의 migration 적용 완료(fresh 23개 또는 existing retention hardening 1개)
 - Function 세 개 배포와 commit/version 확인
 - custom secret 다섯 개 설정, `WORDPRESS_LOCAL_MODE` 없음
 - diagnostics ready, owner UUID 일치
@@ -559,7 +558,7 @@ Supabase DB:
 다음이 모두 충족되어야 `READY_FOR_PHASE_5D`로 기록한다.
 
 - 승인 commit과 배포 version 일치
-- 선택된 모드의 remote migration 적용 완료(fresh 22개 또는 existing 마지막 3개), table/RLS/RPC/index/constraint 검증 완료
+- 선택된 모드의 remote migration 적용 완료(fresh 23개 또는 existing 22+1의 마지막 retention hardening 1개), table/RLS/RPC/index/constraint 검증 완료
 - Function 세 개 JWT 이중 인증과 exact CORS 검증 완료
 - frontend server-only secret 0건
 - read-only preflight 16단계 완료, WordPress write 0건

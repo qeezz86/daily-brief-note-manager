@@ -66,6 +66,7 @@ describe('Supabase fresh baseline deployment classification', () => {
 
   it('accepts the exact 23-migration fresh plan and approved seed', async () => {
     const manifest = await json('config/supabase-fresh-project-baseline.json')
+    expect(manifest.migrations).toHaveLength(23)
     expect(validateDeploymentPlan(await inspection('fresh-empty-project.json'), manifest)).toEqual([])
   })
 
@@ -80,7 +81,21 @@ describe('Supabase fresh baseline deployment classification', () => {
     const manifest = await json('config/supabase-fresh-project-baseline.json')
     const value = await inspection('existing-incremental-project.json')
     expect(classifyRemoteState(value, manifest)).toBe(deploymentModes.incremental)
+    expect(manifest.currentApplicationPlans.existing.pendingMigrations).toEqual([
+      '20260724190000_harden_wordpress_publication_attempt_retention.sql',
+    ])
     expect(validateDeploymentPlan(value, manifest)).toEqual([])
+  })
+
+  it('rejects the last-three regression for an exact first-22 applied project', async () => {
+    const manifest = await json('config/supabase-fresh-project-baseline.json')
+    const value = await inspection('existing-incremental-project.json')
+    value.deploymentPlan = {
+      plannedMigrations: manifest.migrations.slice(-3).map((migration) => migration.filename),
+      includeSeed: false,
+      seedFiles: [],
+    }
+    expect(validateDeploymentPlan(value, manifest, deploymentModes.incremental)).not.toEqual([])
   })
 
   it('rejects all 23 migrations for an incremental project', async () => {
@@ -88,6 +103,38 @@ describe('Supabase fresh baseline deployment classification', () => {
     const value = await inspection('existing-incremental-project.json')
     value.deploymentPlan.plannedMigrationSet = 'all'
     expect(validateDeploymentPlan(value, manifest, deploymentModes.incremental)).not.toEqual([])
+  })
+
+  it('classifies all 23 applied migrations as current with no deployment plan', async () => {
+    const manifest = await json('config/supabase-fresh-project-baseline.json')
+    const value = await inspection('current-project.json')
+    expect(classifyRemoteState(value, manifest)).toBe(deploymentModes.current)
+    expect(validateDeploymentPlan(value, manifest)).toEqual([])
+  })
+
+  it('does not misclassify the historical first-19 applied state as current 22+1', async () => {
+    const manifest = await json('config/supabase-fresh-project-baseline.json')
+    const value = await inspection('legacy-19-applied-project.json')
+    expect(classifyRemoteState(value, manifest)).toBe(deploymentModes.partial)
+    expect(validateDeploymentPlan(value, manifest)).not.toEqual([])
+  })
+
+  it('blocks a middle migration omission', async () => {
+    const manifest = await json('config/supabase-fresh-project-baseline.json')
+    expect(classifyRemoteState(await inspection('middle-missing-project.json'), manifest)).toBe(deploymentModes.partial)
+  })
+
+  it('blocks an applied migration order mismatch', async () => {
+    const manifest = await json('config/supabase-fresh-project-baseline.json')
+    const filenames = manifest.migrations.map((migration) => migration.filename)
+    const value = await inspection('existing-incremental-project.json')
+    value.remoteState.appliedMigrations = filenames.slice(0, 22)
+    ;[value.remoteState.appliedMigrations[10], value.remoteState.appliedMigrations[11]] = [
+      value.remoteState.appliedMigrations[11],
+      value.remoteState.appliedMigrations[10],
+    ]
+    delete value.remoteState.appliedMigrationSet
+    expect(classifyRemoteState(value, manifest)).toBe(deploymentModes.partial)
   })
 
   it('blocks a partial baseline', async () => {

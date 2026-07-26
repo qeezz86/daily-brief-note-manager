@@ -2,6 +2,26 @@
   "schemaVersion": 1,
   "deploymentMode": "fresh-project-baseline",
   "migrationCount": 23,
+  "currentApplicationPlans": {
+    "fresh": {
+      "requiredAppliedMigrationCount": 0,
+      "pendingMigrationCount": 23,
+      "seedRequired": true
+    },
+    "existing": {
+      "requiredAppliedMigrationCount": 22,
+      "pendingMigrations": ["20260724190000_harden_wordpress_publication_attempt_retention.sql"],
+      "seedRequired": false
+    }
+  },
+  "historicalRolloutPaths": [
+    {
+      "name": "Phase 5B/5C legacy 19+3 rollout path",
+      "status": "historical-only-not-current-execution-guidance",
+      "appliedMigrationCount": 19,
+      "thenPendingMigrationCount": 3
+    }
+  ],
   "migrations": [
     {
       "version": "20260710080000",
@@ -281,7 +301,7 @@
       "affectsRpc": true,
       "seedDependency": null,
       "freshProjectApplicable": true,
-      "existingProjectApplicable": "incremental-wordpress-migration-1-of-3"
+      "existingProjectApplicable": "historical-phase-5b-5c-legacy-rollout-1-of-3-not-current-plan"
     },
     {
       "version": "20260719120000",
@@ -295,7 +315,7 @@
       "affectsRpc": true,
       "seedDependency": null,
       "freshProjectApplicable": true,
-      "existingProjectApplicable": "incremental-wordpress-migration-2-of-3"
+      "existingProjectApplicable": "historical-phase-5b-5c-legacy-rollout-2-of-3-not-current-plan"
     },
     {
       "version": "20260719130000",
@@ -309,7 +329,7 @@
       "affectsRpc": true,
       "seedDependency": null,
       "freshProjectApplicable": true,
-      "existingProjectApplicable": "incremental-wordpress-migration-3-of-3"
+      "existingProjectApplicable": "historical-phase-5b-5c-legacy-rollout-3-of-3-not-current-plan"
     },
     {
       "version": "20260724190000",

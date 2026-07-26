@@ -5,6 +5,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 export const deploymentModes = Object.freeze({
   fresh: 'FRESH_PROJECT_BASELINE_REQUIRED',
   incremental: 'EXISTING_PROJECT_INCREMENTAL_READY',
+  current: 'MIGRATION_BASELINE_CURRENT',
   partial: 'PARTIAL_BASELINE_BLOCKED',
   historyMismatch: 'HISTORY_MISMATCH_BLOCKED',
   unexpectedObjects: 'UNEXPECTED_REMOTE_OBJECTS_BLOCKED',
@@ -91,14 +92,18 @@ function seedSafetyIssues(relativePath, source, allowedTables) {
 
 export function classifyRemoteState(inspection, manifest) {
   const filenames = manifest.migrations.map((migration) => migration.filename)
-  const baseline = filenames.slice(0, -1)
-  const incremental = filenames.slice(-1)
+  const existingPlan = manifest.currentApplicationPlans?.existing
+  const appliedPrefixCount = existingPlan?.requiredAppliedMigrationCount
+  const baseline = Number.isInteger(appliedPrefixCount) ? filenames.slice(0, appliedPrefixCount) : []
+  const incremental = existingPlan?.pendingMigrations ?? []
   const state = inspection.remoteState ?? inspection
   const migrationSet = (values, setName) => {
     if (Array.isArray(values)) return values
     if (setName === 'all') return filenames
     if (setName === 'baseline-22') return baseline
+    if (setName === 'baseline-23') return filenames
     if (setName === 'wordpress-hardening-1') return incremental
+    if (setName === 'none') return []
     return []
   }
   const applied = migrationSet(state.appliedMigrations, state.appliedMigrationSet)
@@ -119,25 +124,45 @@ export function classifyRemoteState(inspection, manifest) {
   if (historyRows === 0 && applied.length === 0 && tables.length === 0 && functions.length === 0 && same(pending, filenames)) {
     return deploymentModes.fresh
   }
-  if (same(applied, baseline) && same(pending, incremental) && state.coreSchemaPresent === true && state.historyMatchesSchema === true) {
+  if (historyRows === baseline.length && same(applied, baseline) && same(pending, incremental) && state.coreSchemaPresent === true && state.historyMatchesSchema === true) {
     return deploymentModes.incremental
+  }
+  if (historyRows === filenames.length && same(applied, filenames) && pending.length === 0 && state.coreSchemaPresent === true && state.historyMatchesSchema === true) {
+    return deploymentModes.current
   }
   return deploymentModes.partial
 }
 
 export function validateDeploymentPlan(inspection, manifest, mode = classifyRemoteState(inspection, manifest)) {
   const filenames = manifest.migrations.map((migration) => migration.filename)
-  const expectedMigrations = mode === deploymentModes.fresh ? filenames : filenames.slice(-3)
+  const incrementalMigrations = manifest.currentApplicationPlans?.existing?.pendingMigrations ?? []
+  const expectedMigrations = mode === deploymentModes.fresh
+    ? filenames
+    : mode === deploymentModes.incremental
+      ? incrementalMigrations
+      : []
   const plan = inspection.deploymentPlan ?? {}
+  const hasKnownPlan = Array.isArray(plan.plannedMigrations)
+    || ['all', 'wordpress-hardening-1', 'none'].includes(plan.plannedMigrationSet)
   const plannedMigrations = Array.isArray(plan.plannedMigrations)
     ? plan.plannedMigrations
     : plan.plannedMigrationSet === 'all'
       ? filenames
       : plan.plannedMigrationSet === 'wordpress-hardening-1'
-        ? filenames.slice(-3)
+        ? incrementalMigrations
+        : plan.plannedMigrationSet === 'none'
+          ? []
         : []
   const issues = []
 
+  if (!hasKnownPlan) issues.push('deployment plan must identify an explicit approved migration set')
+  if (mode === deploymentModes.current) {
+    if (plannedMigrations.length > 0) issues.push('current baseline must not plan additional migrations')
+    if (plan.includeSeed !== false || (plan.seedFiles ?? []).length > 0) {
+      issues.push('current baseline must not reapply seed data by default')
+    }
+    return issues
+  }
   if (mode !== deploymentModes.fresh && mode !== deploymentModes.incremental) {
     issues.push(`${mode}: deployment is blocked`)
     return issues
@@ -175,6 +200,14 @@ export async function checkSupabaseFreshBaseline(options = {}) {
   }
   if (expectedMigrationFiles[0] !== '20260710080000_initial_schema.sql') migrationIssues.push('first migration must be the initial schema')
   if (expectedMigrationFiles.at(-1) !== '20260724190000_harden_wordpress_publication_attempt_retention.sql') migrationIssues.push('last migration must be publication attempt retention hardening')
+  const existingPlan = manifest.currentApplicationPlans?.existing
+  const freshPlan = manifest.currentApplicationPlans?.fresh
+  if (freshPlan?.requiredAppliedMigrationCount !== 0 || freshPlan?.pendingMigrationCount !== 23 || freshPlan?.seedRequired !== true) {
+    migrationIssues.push('fresh project plan metadata must require all 23 migrations and the approved seed')
+  }
+  if (existingPlan?.requiredAppliedMigrationCount !== 22) migrationIssues.push('existing project plan must require exactly the first 22 migrations')
+  if (!same(existingPlan?.pendingMigrations, expectedMigrationFiles.slice(22))) migrationIssues.push('existing project plan must contain exactly the final retention hardening migration')
+  if (existingPlan?.seedRequired !== false) migrationIssues.push('existing project plan metadata must not require seed reapplication')
   checks.push(result('migration inventory', migrationIssues))
 
   const migrationSafety = []
