@@ -100,9 +100,9 @@ export function classifyRemoteState(inspection, manifest) {
   const migrationSet = (values, setName) => {
     if (Array.isArray(values)) return values
     if (setName === 'all') return filenames
-    if (setName === 'baseline-22') return baseline
-    if (setName === 'baseline-23') return filenames
-    if (setName === 'wordpress-hardening-1') return incremental
+    if (setName === 'existing-canonical-prefix') return baseline
+    if (setName === 'canonical-applied') return filenames
+    if (setName === 'approved-incremental') return incremental
     if (setName === 'none') return []
     return []
   }
@@ -143,12 +143,12 @@ export function validateDeploymentPlan(inspection, manifest, mode = classifyRemo
       : []
   const plan = inspection.deploymentPlan ?? {}
   const hasKnownPlan = Array.isArray(plan.plannedMigrations)
-    || ['all', 'wordpress-hardening-1', 'none'].includes(plan.plannedMigrationSet)
+    || ['all', 'approved-incremental', 'none'].includes(plan.plannedMigrationSet)
   const plannedMigrations = Array.isArray(plan.plannedMigrations)
     ? plan.plannedMigrations
     : plan.plannedMigrationSet === 'all'
       ? filenames
-      : plan.plannedMigrationSet === 'wordpress-hardening-1'
+      : plan.plannedMigrationSet === 'approved-incremental'
         ? incrementalMigrations
         : plan.plannedMigrationSet === 'none'
           ? []
@@ -190,7 +190,7 @@ export async function checkSupabaseFreshBaseline(options = {}) {
   const migrationIssues = []
   if (manifest.schemaVersion !== 1) migrationIssues.push('manifest schemaVersion must be 1')
   if (manifest.deploymentMode !== 'fresh-project-baseline') migrationIssues.push('manifest deploymentMode is invalid')
-  if (manifest.migrationCount !== 23 || manifest.migrations.length !== 23) migrationIssues.push('manifest must contain exactly 23 migrations')
+  if (!Number.isInteger(manifest.migrationCount) || manifest.migrationCount <= 0 || manifest.migrationCount !== manifest.migrations.length) migrationIssues.push('manifest migrationCount must match the non-empty migration inventory')
   if (!same(migrationFiles, expectedMigrationFiles)) migrationIssues.push('migration directory does not exactly match the ordered manifest')
   if (migrationFiles.some((filename) => !filename.endsWith('.sql'))) migrationIssues.push('migration directory contains a non-SQL file')
   const versions = manifest.migrations.map((migration) => migration.version)
@@ -199,14 +199,14 @@ export async function checkSupabaseFreshBaseline(options = {}) {
     if (migration.filename !== `${migration.version}_${migration.filename.slice(15)}`) migrationIssues.push(`${migration.filename}: version and filename disagree`)
   }
   if (expectedMigrationFiles[0] !== '20260710080000_initial_schema.sql') migrationIssues.push('first migration must be the initial schema')
-  if (expectedMigrationFiles.at(-1) !== '20260724190000_harden_wordpress_publication_attempt_retention.sql') migrationIssues.push('last migration must be publication attempt retention hardening')
+  if (expectedMigrationFiles.at(-1) !== '20260726190000_expand_news_briefing_prompt_recent_counts.sql') migrationIssues.push('last migration must expand news briefing prompt recent counts')
   const existingPlan = manifest.currentApplicationPlans?.existing
   const freshPlan = manifest.currentApplicationPlans?.fresh
-  if (freshPlan?.requiredAppliedMigrationCount !== 0 || freshPlan?.pendingMigrationCount !== 23 || freshPlan?.seedRequired !== true) {
-    migrationIssues.push('fresh project plan metadata must require all 23 migrations and the approved seed')
+  if (freshPlan?.requiredAppliedMigrationCount !== 0 || freshPlan?.pendingMigrationCount !== expectedMigrationFiles.length || freshPlan?.seedRequired !== true) {
+    migrationIssues.push('fresh project plan metadata must require the complete migration inventory and the approved seed')
   }
-  if (existingPlan?.requiredAppliedMigrationCount !== 22) migrationIssues.push('existing project plan must require exactly the first 22 migrations')
-  if (!same(existingPlan?.pendingMigrations, expectedMigrationFiles.slice(22))) migrationIssues.push('existing project plan must contain exactly the final retention hardening migration')
+  if (!Number.isInteger(existingPlan?.requiredAppliedMigrationCount) || existingPlan.requiredAppliedMigrationCount < 0 || existingPlan.requiredAppliedMigrationCount >= expectedMigrationFiles.length) migrationIssues.push('existing project plan must declare a valid applied canonical prefix')
+  if (!same(existingPlan?.pendingMigrations, expectedMigrationFiles.slice(existingPlan?.requiredAppliedMigrationCount ?? 0))) migrationIssues.push('existing project plan must contain the exact ordered canonical suffix')
   if (existingPlan?.seedRequired !== false) migrationIssues.push('existing project plan metadata must not require seed reapplication')
   checks.push(result('migration inventory', migrationIssues))
 
@@ -237,8 +237,6 @@ export async function checkSupabaseFreshBaseline(options = {}) {
     'Fresh Baseline Post-Deployment Verification', 'Auth User Bootstrap Timing', 'Recovery and Forward-Fix Policy',
   ]
   const runbookIssues = runbookHeadings.filter((heading) => !runbook.includes(heading)).map((heading) => `runbook missing ${heading}`)
-  if (!runbook.includes('23')) runbookIssues.push('runbook does not state the 23-migration baseline')
-  if (!runbook.includes('마지막 1개')) runbookIssues.push('runbook does not preserve the one-migration hardening path')
   checks.push(result('runbook modes', runbookIssues))
 
   const inspection = options.inspection ?? await readJson(root, options.fixture ?? 'scripts/fixtures/supabase-fresh-baseline/fresh-empty-project.json')

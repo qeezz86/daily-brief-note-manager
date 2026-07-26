@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(38);
+select plan(50);
 
 insert into auth.users (id, email) values
   ('00000000-0000-0000-0000-000000003c01', 'prompt-run-owner@example.test'),
@@ -72,6 +72,30 @@ select is((select owner_id from public.generated_prompts where prompt_text = E'E
 select is((select is_pinned from public.generated_prompts where prompt_text = E'Exact prompt\n'), false, 'saved prompt starts unpinned');
 select is((select prompt_text from public.generated_prompts where prompt_text = E'Exact prompt\n'), E'Exact prompt\n', 'prompt text is stored exactly');
 select is((select context_snapshot from public.generated_prompts where prompt_text = E'Exact prompt\n'), public.test_news_prompt_snapshot('economy', '2026-07-13', 1), 'context snapshot is stored exactly');
+select is((select requested_post_count from public.generated_prompts where prompt_text = E'Exact prompt\n'), 5, 'seven-parameter save defaults requested count to five');
+select is((select actual_post_count from public.generated_prompts where prompt_text = E'Exact prompt\n'), 1, 'seven-parameter save persists actual count separately');
+select is((
+  public.save_news_briefing_prompt_run(
+    'economy', '2026-07-13', 'standard', 90, 1,
+    public.test_news_prompt_snapshot('economy', '2026-07-13', 1),
+    'Requested ten', 10
+  )
+).requested_post_count, 10, 'save persists requested count ten');
+select is((
+  public.save_news_briefing_prompt_run(
+    'economy', '2026-07-13', 'standard', 90, 1,
+    public.test_news_prompt_snapshot('economy', '2026-07-13', 1),
+    'Requested fifteen', 15
+  )
+).requested_post_count, 15, 'save persists requested count fifteen');
+select throws_ok($$ select public.save_news_briefing_prompt_run('economy','2026-07-13','standard',90,1,public.test_news_prompt_snapshot('economy','2026-07-13'),'invalid zero',0) $$, '22023', null::text, 'save rejects requested count zero');
+select throws_ok($$ select public.save_news_briefing_prompt_run('economy','2026-07-13','standard',90,1,public.test_news_prompt_snapshot('economy','2026-07-13'),'invalid one',1) $$, '22023', null::text, 'save rejects requested count one');
+select throws_ok($$ select public.save_news_briefing_prompt_run('economy','2026-07-13','standard',90,1,public.test_news_prompt_snapshot('economy','2026-07-13'),'invalid six',6) $$, '22023', null::text, 'save rejects requested count six');
+select throws_ok($$ select public.save_news_briefing_prompt_run('economy','2026-07-13','standard',90,1,public.test_news_prompt_snapshot('economy','2026-07-13'),'invalid twenty',20) $$, '22023', null::text, 'save rejects requested count twenty');
+select throws_ok($$ select public.save_news_briefing_prompt_run('economy','2026-07-13','standard',90,1,public.test_news_prompt_snapshot('economy','2026-07-13'),'invalid null',null) $$, '22023', null::text, 'save rejects null requested count');
+select throws_ok($$ select public.save_news_briefing_prompt_run('economy','2026-07-13','standard',90,1,public.test_news_prompt_snapshot('economy','2026-07-13',6),'actual exceeds requested',5) $$, '22023', null::text, 'save rejects actual count above requested');
+select ok(has_function_privilege('authenticated', 'public.save_news_briefing_prompt_run(text,date,text,integer,integer,jsonb,text,integer)', 'EXECUTE'), 'authenticated retains save execute privilege');
+select is((select proconfig from pg_proc where oid = 'public.save_news_briefing_prompt_run(text,date,text,integer,integer,jsonb,text,integer)'::regprocedure), array['search_path=""'], 'save RPC keeps an empty search_path');
 
 select throws_ok($$ select public.save_news_briefing_prompt_run('ai-column','2026-07-13','standard',90,1,public.test_news_prompt_snapshot('ai-column','2026-07-13'),'x') $$, '22023', null::text, 'non-news category is rejected');
 select throws_ok($$ select public.save_news_briefing_prompt_run('disabled-news','2026-07-13','standard',90,1,public.test_news_prompt_snapshot('disabled-news','2026-07-13'),'x') $$, '22023', null::text, 'disabled category is rejected');

@@ -6,9 +6,21 @@ import { buildNewsBriefingPrompt } from './buildBriefingPrompt'
 import { validateBriefingPrompt } from './validateBriefingPrompt'
 import { summarizeBriefingPromptValidation } from './briefingPromptValidation.types'
 
-const settings = { categoryId: 'economy', referenceDate: '2026-07-13', mode: 'standard' as const, closedLookbackDays: 90 }
+const settings = { categoryId: 'economy', referenceDate: '2026-07-13', mode: 'standard' as const, recentPostCount: 5 as const, closedLookbackDays: 90 }
 describe('briefing prompt repository', () => {
   it('sends bounded RPC parameters', async () => { const rpc = vi.fn().mockResolvedValue({ data: context, error: null }); await getNewsBriefingPromptContext({ rpc } as unknown as DatabaseClient, settings); expect(rpc).toHaveBeenCalledWith('get_news_briefing_prompt_context', { p_category_id: 'economy', p_reference_date: '2026-07-13', p_recent_post_limit: 5, p_closed_lookback_days: 90, p_closed_limit: 20 }) })
+  it('sends the selected count and defaults omitted legacy settings to 5', async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: context, error: null })
+    await getNewsBriefingPromptContext({ rpc } as unknown as DatabaseClient, { ...settings, recentPostCount: 10 })
+    expect(rpc).toHaveBeenLastCalledWith('get_news_briefing_prompt_context', expect.objectContaining({ p_recent_post_limit: 10 }))
+    await getNewsBriefingPromptContext({ rpc } as unknown as DatabaseClient, { ...settings, recentPostCount: undefined })
+    expect(rpc).toHaveBeenLastCalledWith('get_news_briefing_prompt_context', expect.objectContaining({ p_recent_post_limit: 5 }))
+  })
+  it('rejects an invalid recent count before calling the RPC', async () => {
+    const rpc = vi.fn()
+    await expect(getNewsBriefingPromptContext({ rpc } as unknown as DatabaseClient, { ...settings, recentPostCount: 6 as never })).rejects.toThrow()
+    expect(rpc).not.toHaveBeenCalled()
+  })
   it('returns a safe RPC error message', async () => { const client = { rpc: vi.fn().mockResolvedValue({ data: null, error: { message: 'private SQL' } }) } as unknown as DatabaseClient; await expect(getNewsBriefingPromptContext(client, settings)).rejects.toThrow('브리핑 프롬프트 데이터를 불러오지 못했습니다.'); await expect(getNewsBriefingPromptContext(client, settings)).rejects.not.toThrow('private SQL') })
   it('rejects invalid RPC JSON', async () => { const client = { rpc: vi.fn().mockResolvedValue({ data: { schemaVersion: 2 }, error: null }) } as unknown as DatabaseClient; await expect(getNewsBriefingPromptContext(client, settings)).rejects.toThrow('데이터 형식이 올바르지 않습니다') })
 })
@@ -36,6 +48,16 @@ describe('briefing prompt history repository', () => {
     const snapshot = { ...context, promptValidationVersion: 1 as const, promptValidationSummary: summarizeBriefingPromptValidation(validation) ?? undefined }
     await expect(savePromptRun({ rpc } as unknown as DatabaseClient, { settings, context: snapshot, promptText })).resolves.toEqual(run)
     expect(rpc).toHaveBeenCalledWith('save_news_briefing_prompt_run', expect.objectContaining({ p_context_snapshot: snapshot, p_prompt_text: promptText, p_category_id: 'economy', p_reference_date: '2026-07-13', p_prompt_mode: 'standard', p_closed_lookback_days: 90 }))
+    expect(rpc).toHaveBeenCalledWith('save_news_briefing_prompt_run', expect.objectContaining({ p_requested_post_count: 5 }))
+  })
+  it('passes requested count 15 to the save RPC', async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: briefingPromptRunRow({ ...run, requestedPostCount: 15 }), error: null })
+    const promptText = buildNewsBriefingPrompt(context, 'standard')
+    const countSettings = { ...settings, recentPostCount: 15 as const }
+    const validation = validateBriefingPrompt({ promptText, context, mode: 'standard', settings: countSettings, promptTemplateVersion: 1 })
+    const snapshot = { ...context, promptValidationVersion: 1 as const, promptValidationSummary: summarizeBriefingPromptValidation(validation) ?? undefined }
+    await savePromptRun({ rpc } as unknown as DatabaseClient, { settings: countSettings, context: snapshot, promptText })
+    expect(rpc).toHaveBeenCalledWith('save_news_briefing_prompt_run', expect.objectContaining({ p_requested_post_count: 15 }))
   })
   it('does not expose RPC error details', async () => {
     const client = { rpc: vi.fn().mockResolvedValue({ data: null, error: { message: 'private SQL' } }) } as unknown as DatabaseClient

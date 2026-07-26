@@ -15,7 +15,10 @@ const ids = {
   attempt: 'b0000000-0000-4000-8000-000000000001',
 }
 
-export function backupSnapshotFixture(profile: BackupProfile = 'core'): BackupSnapshot {
+export function backupSnapshotFixture(
+  profile: BackupProfile = 'core',
+  requestedPostCount: 5 | 10 | 15 = 5,
+): BackupSnapshot {
   const data: BackupSnapshot['data'] = {
     posts: [{
       id: ids.post, categoryId: 'economy', seriesNo: null, briefingDate: '2026-07-15',
@@ -38,7 +41,7 @@ export function backupSnapshotFixture(profile: BackupProfile = 'core'): BackupSn
     newsStatusHistory: [{ id: ids.history, topicId: ids.topic, fromStatus: null, toStatus: 'active', reason: null, changedAt: '2026-07-15T00:00:00Z' }],
     newsUpdates: [{ id: ids.update, postId: ids.post, topicId: ids.topic, previousUpdateId: null, itemOrder: 1, updateType: 'new', headline: '새 소식', factSummary: '사실 요약', importanceSummary: '중요성', impactSummary: '영향', changeSummary: null, createdAt: '2026-07-15T00:00:00Z', updatedAt: '2026-07-15T00:00:00Z' }],
     newsFollowups: [{ id: ids.followup, topicId: ids.topic, checkText: '후속 확인', status: 'pending', dueDate: null, priority: 'normal', resolutionNote: null, resolvedAt: null, createdAt: '2026-07-15T00:00:00Z', updatedAt: '2026-07-15T00:00:00Z' }],
-    generatedPrompts: [{ id: ids.prompt, categoryId: 'economy', requestedPostCount: 5, actualPostCount: 1, promptMode: 'standard', referenceDate: '2026-07-15', closedLookbackDays: 90, contextSchemaVersion: 1, contextSnapshot: { schemaVersion: 1 }, promptText: '안전한 프롬프트', isPinned: false, generatedAt: '2026-07-15T00:00:00Z' }],
+    generatedPrompts: [{ id: ids.prompt, categoryId: 'economy', requestedPostCount, actualPostCount: 1, promptMode: 'standard', referenceDate: '2026-07-15', closedLookbackDays: 90, contextSchemaVersion: 1, contextSnapshot: { schemaVersion: 1 }, promptText: '안전한 프롬프트', isPinned: false, generatedAt: '2026-07-15T00:00:00Z' }],
   }
   if (profile === 'full') {
     data.importJobs = [{ id: ids.job, format: 'daily-brief-note-content-import', schemaVersion: 1, sourceName: 'import.json', sourceFingerprint: 'a'.repeat(64), status: 'completed', expectedItemCount: 1, totalCount: 1, readyCount: 1, warningCount: 0, invalidCount: 0, duplicateCount: 0, acknowledgedWarningCount: 0, dryRunSummary: {}, startedAt: '2026-07-15T00:00:00Z', completedAt: '2026-07-15T00:01:00Z', cancelledAt: null, createdAt: '2026-07-15T00:00:00Z', updatedAt: '2026-07-15T00:01:00Z', restoredFromBackup: false, executionLocked: false, restoreOriginChecksum: null }]

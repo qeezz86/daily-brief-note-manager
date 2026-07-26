@@ -37,6 +37,8 @@ describe('BriefingPromptRunDetailPage', () => {
     expect(screen.getByText('Context schema').nextElementSibling).toHaveTextContent('v1')
     expect(screen.getByText('Template version').nextElementSibling).toHaveTextContent('v1')
     expect(screen.getByText('저장 당시 검증').nextElementSibling).toHaveTextContent('유효 · v1')
+    expect(screen.getByText('요청한 최근 글 수').nextElementSibling).toHaveTextContent('5개')
+    expect(screen.getByText('실제 사용한 최근 글 수').nextElementSibling).toHaveTextContent('1개')
     expect(screen.getByText(/게시물 1 · 뉴스 항목 1/)).toBeInTheDocument()
     expect(client.rpc).not.toHaveBeenCalledWith('get_news_briefing_prompt_context', expect.anything())
   })

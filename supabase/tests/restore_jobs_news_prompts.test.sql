@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(27);
+select plan(33);
 
 insert into auth.users(id,email) values ('00000000-0000-0000-0000-000000005001','restore-news@example.test');
 create function public.test_restore_news_job(p_hash text,p_count integer) returns uuid language sql set search_path='' as $$
@@ -81,6 +81,24 @@ insert into news_jobs values('cycle-link',public.test_restore_news_job(repeat('7
 select public.append_restore_job_records((select id from news_jobs where name='cycle-link'),jsonb_build_array(public.test_restore_news_record('newsUpdates','update-one','50400000-0000-0000-0000-000000000001',1,0,'{}','[]','reuse_existing'),public.test_restore_news_record('newsUpdates','update-two','50400000-0000-0000-0000-000000000002',1,1,'{}','[]','reuse_existing'),public.test_restore_news_record('newsUpdatePreviousLinks','cycle-link',null,2,0,'{"updateId":"update-one","previousUpdateId":"update-two"}','["newsUpdates:update-one","newsUpdates:update-two"]','create'))); select public.finalize_restore_job((select id from news_jobs where name='cycle-link'));
 set local role postgres; update public.restore_job_records set status='reused' where job_id=(select id from news_jobs where name='cycle-link') and section='newsUpdates'; update public.restore_jobs set status='running' where id=(select id from news_jobs where name='cycle-link'); set local role authenticated; set local "request.jwt.claims"='{"sub":"00000000-0000-0000-0000-000000005001","role":"authenticated"}';
 select is((public.run_restore_job_record((select id from public.restore_job_records where job_id=(select id from news_jobs where name='cycle-link') and section='newsUpdatePreviousLinks'))->>'errorCode'),'RESTORE_PREVIOUS_LINK_INVALID','27 previous cycle link blocked');
+
+insert into news_jobs values('prompt-ten',public.test_restore_news_job(repeat('8',64),1));
+select public.append_restore_job_records((select id from news_jobs where name='prompt-ten'),jsonb_build_array(public.test_restore_news_record('generatedPrompts','prompt-ten','50700000-0000-0000-0000-000000000020',1,0,'{"categoryId":"economy","requestedPostCount":10,"actualPostCount":2,"promptMode":"standard","promptText":"restore ten","isPinned":false,"generatedAt":"2026-07-15T03:04:05Z","referenceDate":"2026-07-15","closedLookbackDays":90,"contextSchemaVersion":1,"contextSnapshot":{"schemaVersion":1,"category":{"id":"economy"},"referenceDate":"2026-07-15","recentPosts":[]}}','["category:economy"]'))); select public.finalize_restore_job((select id from news_jobs where name='prompt-ten'));
+select is((public.run_restore_job_record((select id from public.restore_job_records where job_id=(select id from news_jobs where name='prompt-ten')))->>'status'),'applied','28 requested count ten restore succeeds');
+select is((select requested_post_count from public.generated_prompts where id='50700000-0000-0000-0000-000000000020'),10,'29 requested count ten is preserved');
+
+insert into news_jobs values('prompt-fifteen',public.test_restore_news_job(repeat('9',64),1));
+select public.append_restore_job_records((select id from news_jobs where name='prompt-fifteen'),jsonb_build_array(public.test_restore_news_record('generatedPrompts','prompt-fifteen','50700000-0000-0000-0000-000000000021',1,0,'{"categoryId":"economy","requestedPostCount":15,"actualPostCount":8,"promptMode":"detailed","promptText":"restore fifteen","isPinned":false,"generatedAt":"2026-07-15T03:04:05Z","referenceDate":"2026-07-15","closedLookbackDays":90,"contextSchemaVersion":1,"contextSnapshot":{"schemaVersion":1,"category":{"id":"economy"},"referenceDate":"2026-07-15","recentPosts":[]}}','["category:economy"]'))); select public.finalize_restore_job((select id from news_jobs where name='prompt-fifteen'));
+select is((public.run_restore_job_record((select id from public.restore_job_records where job_id=(select id from news_jobs where name='prompt-fifteen')))->>'status'),'applied','30 requested count fifteen restore succeeds');
+select is((select actual_post_count from public.generated_prompts where id='50700000-0000-0000-0000-000000000021'),8,'31 actual count eight is preserved separately');
+
+insert into news_jobs values('prompt-invalid-count',public.test_restore_news_job(repeat('1',64),1));
+select public.append_restore_job_records((select id from news_jobs where name='prompt-invalid-count'),jsonb_build_array(public.test_restore_news_record('generatedPrompts','prompt-invalid-count','50700000-0000-0000-0000-000000000022',1,0,'{"categoryId":"economy","requestedPostCount":6,"actualPostCount":2,"promptMode":"standard","promptText":"invalid requested","isPinned":false,"generatedAt":"2026-07-15T03:04:05Z","referenceDate":"2026-07-15","closedLookbackDays":90,"contextSchemaVersion":1,"contextSnapshot":{"schemaVersion":1,"category":{"id":"economy"},"referenceDate":"2026-07-15","recentPosts":[]}}','["category:economy"]'))); select public.finalize_restore_job((select id from news_jobs where name='prompt-invalid-count'));
+select is((public.run_restore_job_record((select id from public.restore_job_records where job_id=(select id from news_jobs where name='prompt-invalid-count')))->>'errorCode'),'RESTORE_INVALID_PAYLOAD','32 invalid requested count restore is rejected');
+
+insert into news_jobs values('prompt-invalid-actual',public.test_restore_news_job(repeat('2',64),1));
+select public.append_restore_job_records((select id from news_jobs where name='prompt-invalid-actual'),jsonb_build_array(public.test_restore_news_record('generatedPrompts','prompt-invalid-actual','50700000-0000-0000-0000-000000000023',1,0,'{"categoryId":"economy","requestedPostCount":5,"actualPostCount":6,"promptMode":"standard","promptText":"invalid actual","isPinned":false,"generatedAt":"2026-07-15T03:04:05Z","referenceDate":"2026-07-15","closedLookbackDays":90,"contextSchemaVersion":1,"contextSnapshot":{"schemaVersion":1,"category":{"id":"economy"},"referenceDate":"2026-07-15","recentPosts":[]}}','["category:economy"]'))); select public.finalize_restore_job((select id from news_jobs where name='prompt-invalid-actual'));
+select is((public.run_restore_job_record((select id from public.restore_job_records where job_id=(select id from news_jobs where name='prompt-invalid-actual')))->>'errorCode'),'RESTORE_INVALID_PAYLOAD','33 actual count above requested restore is rejected');
 
 select * from finish();
 rollback;

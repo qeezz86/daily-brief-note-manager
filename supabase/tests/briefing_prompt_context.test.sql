@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(27);
+select plan(47);
 
 insert into auth.users (id, email) values
   ('00000000-0000-0000-0000-000000003b01', 'prompt-owner@example.test'),
@@ -85,6 +85,40 @@ select throws_ok($$ select public.get_news_briefing_prompt_context('economy','20
 set local "request.jwt.claims" = '{"sub":"00000000-0000-0000-0000-000000003b01","role":"authenticated"}';
 select is(public.get_news_briefing_prompt_context('economy','2026-07-13',5,90,20)->>'schemaVersion', '1', 'schema version is one');
 select ok((select (value->>'recentPosts')::integer = jsonb_array_length(context->'recentPosts') and (value->>'recentUpdates')::integer = 2 and (value->>'openTopics')::integer = jsonb_array_length(context->'openTopics') and (value->>'pendingFollowups')::integer = jsonb_array_length(context->'pendingFollowups') and (value->>'recentClosedTopics')::integer = jsonb_array_length(context->'recentClosedTopics') from (select public.get_news_briefing_prompt_context('economy','2026-07-13',5,90,20) context) source cross join lateral (select source.context->'counts' value) counts), 'counts match returned arrays');
+select lives_ok($$ select public.get_news_briefing_prompt_context('economy','2026-07-13',10,90,20) $$, 'recent count ten succeeds');
+select lives_ok($$ select public.get_news_briefing_prompt_context('economy','2026-07-13',15,90,20) $$, 'recent count fifteen succeeds');
+select is(jsonb_array_length(public.get_news_briefing_prompt_context('economy','2026-07-13')->'recentPosts'), 5, 'omitted recent count defaults to five');
+select throws_ok($$ select public.get_news_briefing_prompt_context('economy','2026-07-13',0,90,20) $$, '22023', 'BRIEFING_PROMPT_RECENT_LIMIT_INVALID', 'zero recent count rejected');
+select throws_ok($$ select public.get_news_briefing_prompt_context('economy','2026-07-13',-1,90,20) $$, '22023', 'BRIEFING_PROMPT_RECENT_LIMIT_INVALID', 'negative recent count rejected');
+select throws_ok($$ select public.get_news_briefing_prompt_context('economy','2026-07-13',1,90,20) $$, '22023', 'BRIEFING_PROMPT_RECENT_LIMIT_INVALID', 'one recent count rejected');
+select throws_ok($$ select public.get_news_briefing_prompt_context('economy','2026-07-13',6,90,20) $$, '22023', 'BRIEFING_PROMPT_RECENT_LIMIT_INVALID', 'six recent count rejected');
+select throws_ok($$ select public.get_news_briefing_prompt_context('economy','2026-07-13',20,90,20) $$, '22023', 'BRIEFING_PROMPT_RECENT_LIMIT_INVALID', 'twenty recent count rejected');
+select throws_ok($$ select public.get_news_briefing_prompt_context('economy','2026-07-13',null,90,20) $$, '22023', 'BRIEFING_PROMPT_RECENT_LIMIT_INVALID', 'null recent count rejected');
+select throws_ok($$ select public.get_news_briefing_prompt_context('economy','2026-07-13','5'::text,90,20) $$, '42883', null::text, 'text recent count has no SQL signature');
+select throws_ok($$ select public.get_news_briefing_prompt_context('economy','2026-07-13',array[5],90,20) $$, '42883', null::text, 'array recent count has no SQL signature');
+select throws_ok($$ select public.get_news_briefing_prompt_context('economy','2026-07-13',5.5::numeric,90,20) $$, '42883', null::text, 'decimal recent count has no SQL signature');
+select is(jsonb_array_length(public.get_news_briefing_prompt_context('economy','2026-07-13',10,90,20)->'recentPosts'), 6, 'count ten uses all six available posts');
+select is(jsonb_array_length(public.get_news_briefing_prompt_context('economy','2026-07-13',15,90,20)->'recentPosts'), 6, 'count fifteen uses all six available posts');
+select is(jsonb_array_length(public.get_news_briefing_prompt_context('global','2026-07-13',5,90,20)->'recentPosts'), 0, 'category isolation excludes economy posts');
+
+set local role postgres;
+insert into public.posts (
+  id, owner_id, category_id, briefing_date, published_on, title, summary,
+  html_body, slug, content_status, source_import_type, updated_at
+) values
+  ('3b100000-0000-0000-0000-000000000010','00000000-0000-0000-0000-000000003b01','economy','2026-07-05','2026-07-13','같은 날짜 이전 수정','요약','<div><h1>제목</h1></div>','same-day-older','published','manual_entry','2026-07-13 09:00+09'),
+  ('3b100000-0000-0000-0000-000000000011','00000000-0000-0000-0000-000000003b01','economy','2026-07-06','2026-07-13','같은 날짜 최신 수정','요약','<div><h1>제목</h1></div>','same-day-newer','published','manual_entry','2026-07-13 10:00+09');
+set local role authenticated;
+set local "request.jwt.claims" = '{"sub":"00000000-0000-0000-0000-000000003b01","role":"authenticated"}';
+select results_eq(
+  $$ select value->>'title' from jsonb_array_elements(public.get_news_briefing_prompt_context('economy','2026-07-13',5,90,20)->'recentPosts') with ordinality limit 2 $$,
+  $$ values ('같은 날짜 최신 수정'),('같은 날짜 이전 수정') $$,
+  'same-day posts sort by updatedAt descending'
+);
+select ok(public.get_news_briefing_prompt_context('economy','2026-07-13',5,90,20)->'recentPosts'->0 ? 'updatedAt', 'context includes additive updatedAt');
+select ok(has_function_privilege('authenticated', 'public.get_news_briefing_prompt_context(text,date,integer,integer,integer)', 'EXECUTE'), 'authenticated retains context execute privilege');
+select ok(not has_function_privilege('anon', 'public.get_news_briefing_prompt_context(text,date,integer,integer,integer)', 'EXECUTE'), 'anon has no context execute privilege');
+select is((select proconfig from pg_proc where oid = 'public.get_news_briefing_prompt_context(text,date,integer,integer,integer)'::regprocedure), array['search_path=""'], 'context RPC keeps an empty search_path');
 
 select * from finish();
 rollback;

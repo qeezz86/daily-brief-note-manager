@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(59);
+select plan(61);
 
 insert into auth.users (id, email) values
   ('00000000-0000-0000-0000-000000004b01', 'backup-owner@example.test'),
@@ -41,7 +41,7 @@ insert into public.sources (id, owner_id, post_id, news_update_id, source_name, 
 insert into public.news_followups (id, owner_id, topic_id, check_text, status, priority, created_at, updated_at) values
   ('4b700000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000004b01','4b300000-0000-0000-0000-000000000001','후속 확인','pending','high','2026-07-15 01:00+00','2026-07-15 01:00+00');
 insert into public.generated_prompts (id, owner_id, category_id, requested_post_count, actual_post_count, prompt_mode, prompt_text, is_pinned, generated_at, reference_date, closed_lookback_days, context_schema_version, context_snapshot) values
-  ('4b800000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000004b01','economy',5,1,'standard','저장 프롬프트',true,'2026-07-15 01:00+00','2026-07-15',90,1,'{"schemaVersion":1,"promptTemplateVersion":1}'),
+  ('4b800000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000004b01','economy',15,1,'standard','저장 프롬프트',true,'2026-07-15 01:00+00','2026-07-15',90,1,'{"schemaVersion":1,"promptTemplateVersion":1}'),
   ('4b800000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000004b02','economy',5,0,'standard','타인 프롬프트',false,'2026-07-15 01:00+00','2026-07-15',90,1,'{"schemaVersion":1}');
 
 insert into public.import_jobs (id, owner_id, format, schema_version, source_name, source_fingerprint, status, expected_item_count, total_count, ready_count, created_at, updated_at) values
@@ -122,6 +122,8 @@ select is((public.get_user_backup_estimate('core')->'sectionCounts'->>'posts')::
 select is(public.get_user_backup_estimate('full')->>'includesNormalizedPayload','true','57 full estimate flags normalized payload');
 select table_privs_are('public','import_jobs','authenticated',array['SELECT'],'58 existing direct write restriction unchanged');
 select is((select count(*)::int from public.posts where owner_id='00000000-0000-0000-0000-000000004b01'),2,'59 backup RPC performs no writes');
+select is((select (value->'data'->'generatedPrompts'->0->>'requestedPostCount')::int from core_snapshot),15,'60 requested prompt count is preserved');
+select is((select (value->'data'->'generatedPrompts'->0->>'actualPostCount')::int from core_snapshot),1,'61 actual prompt count is preserved separately');
 
 select * from finish();
 rollback;

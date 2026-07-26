@@ -214,13 +214,13 @@ MVP 기본값은 `표준`이다. 모든 모드는 요청 정보와 프로젝트 
 
 ### 6.1 Phase 3B-1 모드 적용
 
-Phase 3B-1의 집계 RPC는 모드와 무관하게 동일한 원시 context를 반환하고, 프런트엔드 빌더가 포함 상세도만 결정한다.
+집계 RPC의 대상 범위는 모드와 무관하며 카테고리, 기준일, 최근 글 수로 결정한다. 프런트엔드 빌더는 포함 상세도만 결정한다.
 
 - 간단: 최근 브리핑 제목·핵심 뉴스 요약, high 또는 overdue 후속 항목, 최근 종료 주제 핵심
-- 표준: 최근 게시물 최대 5개와 뉴스 항목, 모든 추적 주제, 모든 pending 후속 항목, 최근 종료 주제
+- 표준: 선택한 최근 게시물 `5`, `10`, `15`개까지의 뉴스 항목, 모든 추적 주제, 모든 pending 후속 항목, 최근 종료 주제
 - 상세: 표준 구성에 중요성·영향·변화 요약, 주제 최신 업데이트와 종료 메모 세부 내용 추가
 
-Phase 3B-1은 최근 게시물을 최대 5개로 고정해 `schemaVersion = 1` context와 프롬프트를 미리보기만 했다. Phase 3B-2는 미리보기에 사용한 정확한 프롬프트와 전체 context snapshot, category·reference date·mode·종료 조회 기간을 이력으로 저장한다. 외부 AI API는 호출하지 않으며 제품 전체의 5·10·15개 선택은 후속 단계에서 확장한다.
+Phase 3B-1은 최근 게시물을 최대 5개로 고정해 `schemaVersion = 1` context와 프롬프트를 미리보기만 했다. Phase 3B-2는 미리보기에 사용한 정확한 프롬프트와 전체 context snapshot, category·reference date·mode·종료 조회 기간을 이력으로 저장한다. Phase 5C-R2부터 `5`, `10`, `15` 선택을 지원하며 기본값은 `5`다. 사용 가능한 글이 요청 수보다 적으면 모두 사용한다. 최근 글은 `publishedOn DESC`, `updatedAt DESC`, `id ASC` 순으로 정렬한다. 외부 AI API는 호출하지 않는다.
 
 ### 6.2 Phase 3B-3 모드 적용
 
@@ -410,9 +410,10 @@ Phase 3B-4의 새 snapshot은 선택 필드 `promptValidationVersion = 1`과 저
 - 기록 저장과 오래된 미고정 기록 정리는 PostgreSQL DB 함수가 하나의 트랜잭션에서 처리한다.
 - 오래된 고정 기록을 해제하면 같은 사용자·카테고리의 retention을 다시 적용한다.
 - 저장된 prompt text와 context snapshot은 수정하거나 현재 데이터로 다시 생성하지 않는다.
+- 이력 상세는 저장된 요청 수와 실제 사용 수를 그대로 표시하며 현재 데이터에서 다시 계산하지 않는다.
 - 설정 변경으로 stale이 된 미리보기는 재생성 전 저장하지 않는다.
-- `requested_post_count`에는 사용자가 요청한 최근 글 수를 기록한다.
-- `actual_post_count`에는 실제 프롬프트에 사용한 발행 글 수를 기록한다.
+- `requested_post_count`에는 `5`, `10`, `15` 중 사용자가 요청한 최근 글 수를 기록한다.
+- `actual_post_count`에는 실제 프롬프트에 사용한 발행 글 수를 기록하며 `0` 이상 요청 수 이하여야 한다.
 - `prompt_text`에는 WordPress HTML 전문, 뉴스 기사 원문, CCTV 원문·전체 자막·전체 번역을 포함하지 않는다.
 
 ## 11. 추가 지시사항 우선순위

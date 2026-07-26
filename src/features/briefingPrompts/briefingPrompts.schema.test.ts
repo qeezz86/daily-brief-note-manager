@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseBriefingPromptRun, parseNewsBriefingPromptContext, validateSaveBriefingPromptRunInput } from './briefingPrompts.schema'
+import { briefingPromptRecentCountSchema, parseBriefingPromptRun, parseNewsBriefingPromptContext, validateSaveBriefingPromptRunInput } from './briefingPrompts.schema'
 import { briefingPromptContextFixture as context, briefingPromptRunFixture as run, briefingPromptRunRow } from './briefingPrompts.fixtures'
 import { buildNewsBriefingPrompt } from './buildBriefingPrompt'
 import { validateBriefingPrompt } from './validateBriefingPrompt'
@@ -12,6 +12,15 @@ describe('briefing prompt context schema', () => {
   it('defaults unexpected null arrays without hiding original counts', () => { const parsed = parseNewsBriefingPromptContext({ ...context, recentPosts: null, openTopics: null, pendingFollowups: null, recentClosedTopics: null }); expect(parsed.recentPosts).toEqual([]); expect(parsed.counts).toEqual(context.counts) })
   it('preserves duplicate rows and invalid counts for deterministic validation', () => { const parsed = parseNewsBriefingPromptContext({ ...context, recentPosts: [context.recentPosts[0], context.recentPosts[0]], counts: { recentPosts: 99, recentUpdates: 99, openTopics: 99, pendingFollowups: 99, overdueFollowups: 99, recentClosedTopics: 99 } }); expect(parsed.recentPosts).toHaveLength(2); expect(parsed.counts.recentPosts).toBe(99) })
   it('sorts post updates by item order', () => { const second = { ...context.recentPosts[0].updates[0], id: '66666666-6666-4666-8666-666666666666', itemOrder: 2 }; const parsed = parseNewsBriefingPromptContext({ ...context, recentPosts: [{ ...context.recentPosts[0], updates: [second, context.recentPosts[0].updates[0]] }] }); expect(parsed.recentPosts[0].updates.map((item) => item.itemOrder)).toEqual([1, 2]) })
+  it('sorts same-day posts by updatedAt descending with legacy rows last', () => {
+    const base = context.recentPosts[0]
+    const older = { ...base, id: '00000000-0000-4000-8000-000000000002', updatedAt: '2026-07-12T10:00:00+09:00' }
+    const newer = { ...base, id: '00000000-0000-4000-8000-000000000003', updatedAt: '2026-07-12T11:00:00+09:00' }
+    const legacy = { ...base, id: '00000000-0000-4000-8000-000000000001', updatedAt: undefined }
+    expect(parseNewsBriefingPromptContext({ ...context, recentPosts: [legacy, older, newer] }).recentPosts.map((post) => post.id)).toEqual([newer.id, older.id, legacy.id])
+  })
+  it.each([5, 10, 15])('accepts recent count %s', (value) => expect(briefingPromptRecentCountSchema.parse(value)).toBe(value))
+  it.each([0, -1, 1, 6, 20, 1.5, '5', null, [], 999999])('rejects invalid recent count %j', (value) => expect(briefingPromptRecentCountSchema.safeParse(value).success).toBe(false))
 })
 
 describe('saved briefing prompt schema', () => {
@@ -24,8 +33,12 @@ describe('saved briefing prompt schema', () => {
     expect(parsed.contextSnapshot).not.toHaveProperty('promptTemplateVersion')
   })
   it('rejects a row and snapshot category mismatch', () => expect(() => parseBriefingPromptRun({ ...briefingPromptRunRow(), category_id: 'global' })).toThrow('snapshot 설정'))
+  it('rejects invalid stored requested and actual counts', () => {
+    expect(() => parseBriefingPromptRun({ ...briefingPromptRunRow(), requested_post_count: 6 })).toThrow()
+    expect(() => parseBriefingPromptRun({ ...briefingPromptRunRow(), requested_post_count: 5, actual_post_count: 6 })).toThrow()
+  })
   it('keeps prompt bytes while validating save input', () => {
-    const settings = { categoryId: 'economy', referenceDate: '2026-07-13', mode: 'standard' as const, closedLookbackDays: 90 }
+    const settings = { categoryId: 'economy', referenceDate: '2026-07-13', mode: 'standard' as const, recentPostCount: 5 as const, closedLookbackDays: 90 }
     const promptText = buildNewsBriefingPrompt(context, 'standard')
     const result = validateBriefingPrompt({ promptText, context, mode: 'standard', settings, promptTemplateVersion: 1 })
     const validContext = { ...context, promptValidationVersion: 1 as const, promptValidationSummary: summarizeBriefingPromptValidation(result) ?? undefined }
