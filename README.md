@@ -82,7 +82,7 @@ Bundle budget CI는 Supabase module을 포함한 production graph를 일정하�
 - `bundle-budget`: production build와 bundle budget을 검증하고 report artifact를 보존합니다.
 - `offline-validation`: lint, 전체 Vitest suite, Supabase fresh baseline checker와 WordPress production readiness checker를 실행합니다.
 
-현재 repository CI 범위에는 DB lint, pgTAP, Deno, E2E와 WordPress smoke가 포함되지 않습니다. Vercel status는 repository validation과 별도이며, Vercel required 설정도 이 workflow에서 다루지 않습니다. Branch protection과 required checks는 아직 설정되지 않았으며 별도 Gate에서 적용해야 합니다.
+현재 repository CI 범위에는 DB lint, pgTAP, Deno, E2E와 WordPress smoke가 포함되지 않습니다. Vercel status는 repository validation과 별도이며, Vercel required 설정도 이 workflow에서 다루지 않습니다. 현재 repository ruleset #19760818에서 `bundle-budget`과 `offline-validation`을 required checks로 적용하고 있습니다.
 
 ## WordPress read-only 진단
 
