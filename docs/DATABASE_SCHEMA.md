@@ -109,7 +109,7 @@ categories
 
 `get_news_briefing_prompt_context(category_id, reference_date, recent_post_limit, closed_lookback_days, closed_limit)`는 인증 사용자의 뉴스 프롬프트용 데이터를 JSONB 하나로 반환하는 읽기 전용 `SECURITY INVOKER` 함수다. `owner_id`는 입력받지 않고 `auth.uid()`와 기존 RLS를 사용한다. 함수 실행 권한은 `authenticated`에만 부여한다.
 
-반환 JSON의 `schemaVersion`은 1이다. 최근 `published` 게시물은 최대 5개, 종료 조회 기간은 1~180일, 종료 주제는 최대 20개로 제한한다. 종료 시각은 `news_status_history`의 기준일 이전 최신 `to_status = closed` 이력이며 현재 상태가 `closed`인 주제만 반환한다. WordPress HTML, 이미지 프롬프트, 사용자 이메일, 소유자 ID와 원문 기사 전문은 반환하지 않는다. 이 RPC는 `generated_prompts`를 포함한 어떤 테이블에도 쓰지 않는다.
+반환 JSON의 `schemaVersion`은 1이다. 최근 글 요청 수는 `5`, `10`, `15` 중 하나이며 기본값은 `5`다. 최근 `published` 게시물은 요청 수까지 반환하고 사용 가능한 글이 더 적으면 모두 반환한다. 정렬은 `published_on DESC`, `updated_at DESC`, `id ASC` 순이며 context의 최근 글에는 `updatedAt`을 포함한다. 종료 조회 기간은 1~180일, 종료 주제는 최대 20개로 제한한다. 종료 시각은 `news_status_history`의 기준일 이전 최신 `to_status = closed` 이력이며 현재 상태가 `closed`인 주제만 반환한다. WordPress HTML, 이미지 프롬프트, 사용자 이메일, 소유자 ID와 원문 기사 전문은 반환하지 않는다. 이 RPC는 `generated_prompts`를 포함한 어떤 테이블에도 쓰지 않는다.
 
 ## 4. 카테고리
 
@@ -495,11 +495,12 @@ foreign key (news_update_id, owner_id)
 - 고정 해제도 같은 사용자·카테고리의 retention을 같은 트랜잭션에서 다시 적용한다.
 - authenticated 사용자는 자기 행 SELECT만 가능하며 직접 INSERT·UPDATE·DELETE할 수 없다.
 - `save_news_briefing_prompt_run`은 `owner_id`를 입력받지 않고 `auth.uid()`로 결정하며 뉴스·활성 카테고리, 설정 범위, snapshot의 schema/category/reference date와 금지된 최상위 개인정보 필드를 검증한다.
+- 저장 RPC의 마지막 `p_requested_post_count` 인자는 선택 사항이며 기본값은 `5`다. 기존 7인자 호출은 계속 동작한다.
 - `set_news_briefing_prompt_run_pinned`은 소유권을 직접 확인하고 `is_pinned`만 변경한다.
 - `category_id`, `reference_date`, `prompt_mode`, `closed_lookback_days`, `context_schema_version`, `context_snapshot`, `prompt_text`, `generated_at`, `owner_id`는 저장 후 변경하지 않는다.
 - 이력 상세는 현재 데이터를 재조회해 prompt나 snapshot을 재구성하지 않는다.
-- `requested_post_count`에는 사용자가 요청한 최근 글 수를 저장한다.
-- `actual_post_count`에는 실제 프롬프트 컨텍스트에 사용한 발행 글 수를 저장한다.
+- `requested_post_count`에는 `5`, `10`, `15` 중 사용자가 요청한 최근 글 수를 저장한다.
+- `actual_post_count`에는 실제 프롬프트 컨텍스트에 사용한 발행 글 수를 저장하며 `0` 이상 요청 수 이하여야 한다.
 - `prompt_text`에는 WordPress HTML 전문, 뉴스 기사 원문, CCTV 원문·전체 자막·전체 번역을 포함하지 않는다.
 - Phase 3B-3부터 새 `context_snapshot`은 기존 `schemaVersion = 1`과 호환되는 선택 필드 `promptTemplateVersion = 1`을 포함한다. 과거 snapshot에는 이 필드가 없을 수 있으며 별도 DB column이나 migration은 사용하지 않는다.
 
@@ -559,6 +560,8 @@ AI·정보DB·중국어 학습 컨텍스트의 exact title, slug, focus keyword 
 - snapshot은 section count, 전체 count, profile flag와 update 관계 검사를 함께 반환한다.
 - 브라우저는 공식 format·manifest를 조립하고 관계와 민감정보를 검증한 뒤 canonical payload의 SHA-256 checksum을 추가한다.
 - 공식 외부 형식은 `docs/BACKUP_FORMAT.md`를 따른다.
+- 공식 backup schema version 1은 `generatedPrompts`의 요청 수 `5`, `10`, `15`를 그대로 보존한다.
+- 복원은 요청 수의 허용값과 실제 사용 수가 요청 수를 초과하지 않는지 적용 전에 검증한다.
 
 복구는 Phase 4B-1 범위가 아니다. 후속 구현은 실제 반영 전 dry-run과 중복 검사를 수행하고 항목별 `preserve`, `remap`, `reuse`, `skip`, `block` 계획과 예정 작업·오류를 표시해야 한다.
 

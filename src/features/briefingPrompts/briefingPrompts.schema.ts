@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import type {
+  BriefingPromptRecentCount,
   BriefingPromptRun,
   NewsBriefingPromptContext,
   SaveBriefingPromptRunInput,
@@ -13,6 +14,11 @@ import {
 
 const dateOnly = z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
 const timestamp = z.string().datetime({ offset: true })
+export const briefingPromptRecentCountSchema = z.union([
+  z.literal(5),
+  z.literal(10),
+  z.literal(15),
+])
 const nullableText = z.string().nullable().catch(null)
 const safeArray = <T extends z.ZodTypeAny>(item: T) => z.preprocess(
   (value) => Array.isArray(value) ? value : [],
@@ -50,7 +56,7 @@ const contextSchema = z.object({
     displayIdPattern: nullableText, slugPattern: z.string(),
   }),
   recentPosts: safeArray(z.object({
-    id: z.string().uuid(), publishedOn: dateOnly, displayId: nullableText,
+    id: z.string().uuid(), publishedOn: dateOnly, updatedAt: timestamp.optional(), displayId: nullableText,
     title: z.string(), summary: z.string(), updates: safeArray(updateSchema),
   })),
   openTopics: safeArray(z.object({
@@ -87,15 +93,36 @@ const promptRunRowSchema = z.object({
   prompt_text: z.string().refine((value) => value.trim().length > 0),
   is_pinned: z.boolean(),
   generated_at: timestamp,
-  requested_post_count: z.number().int().positive(),
+  requested_post_count: briefingPromptRecentCountSchema,
   actual_post_count: z.number().int().nonnegative(),
+}).superRefine((row, context) => {
+  if (row.actual_post_count > row.requested_post_count) {
+    context.addIssue({
+      code: 'custom',
+      message: '실제 사용한 최근 글 수가 요청 수를 초과했습니다.',
+      path: ['actual_post_count'],
+    })
+  }
 })
+
+function compareOptionalTimestampDescending(
+  left: string | undefined,
+  right: string | undefined,
+): number {
+  if (left && right) return right.localeCompare(left)
+  if (left) return -1
+  if (right) return 1
+  return 0
+}
 
 export function parseNewsBriefingPromptContext(value: unknown): NewsBriefingPromptContext {
   const parsed = contextSchema.parse(value)
   const recentPosts = parsed.recentPosts
     .map((post) => ({ ...post, updates: [...post.updates].sort((a, b) => a.itemOrder - b.itemOrder || a.id.localeCompare(b.id)) }))
-    .sort((a, b) => b.publishedOn.localeCompare(a.publishedOn) || a.id.localeCompare(b.id))
+    .sort((a, b) =>
+      b.publishedOn.localeCompare(a.publishedOn)
+      || compareOptionalTimestampDescending(a.updatedAt, b.updatedAt)
+      || a.id.localeCompare(b.id))
   const openOrder = { reopened: 0, active: 1, monitoring: 2 }
   const openTopics = [...parsed.openTopics].sort((a, b) =>
     openOrder[a.status] - openOrder[b.status] || b.lastSeenAt.localeCompare(a.lastSeenAt) || a.topicKey.localeCompare(b.topicKey))
@@ -141,6 +168,9 @@ export function validateSaveBriefingPromptRunInput(
 ): SaveBriefingPromptRunInput {
   const context = parseNewsBriefingPromptContext(input.context)
   const promptText = z.string().refine((value) => value.trim().length > 0).parse(input.promptText)
+  const recentPostCount = briefingPromptRecentCountSchema.parse(
+    input.settings.recentPostCount ?? 5,
+  ) as BriefingPromptRecentCount
   if (
     context.category.id !== input.settings.categoryId
     || context.referenceDate !== input.settings.referenceDate
@@ -149,6 +179,7 @@ export function validateSaveBriefingPromptRunInput(
     || !Number.isInteger(input.settings.closedLookbackDays)
     || input.settings.closedLookbackDays < 1
     || input.settings.closedLookbackDays > 180
+    || context.recentPosts.length > recentPostCount
   ) {
     throw new Error('현재 설정과 프롬프트 snapshot이 일치하지 않습니다.')
   }

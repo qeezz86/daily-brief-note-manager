@@ -10,10 +10,10 @@ Fresh project는 다음을 모두 만족한다.
 
 - `supabase_migrations.schema_migrations`가 없거나 0행이다.
 - 예상 public application table과 application function이 없다.
-- 로컬 canonical migration 23개가 순서대로 전부 pending이다.
+- 로컬 canonical migration 24개가 순서대로 전부 pending이다.
 - whitelist 밖 remote application object와 remote-only migration이 없다.
 
-2026-07-21 read-only inspection은 retention hardening 도입 전의 역사적 evidence로, 당시 application table/function과 migration history가 0건이고 당시 baseline 22개가 pending임을 확인했다. 이 기록은 현재 실행 지침이 아니다. 현재 source of truth는 retention hardening을 포함한 아래 23개이며, fresh 상태에서는 23개 전체가 pending이어야 `FRESH_PROJECT_BASELINE_REQUIRED`로 판정한다. 과거 Gate 2의 “마지막 3개만 pending” 판단과 Phase 5B·5C의 19+3 rollout은 legacy rollout path일 뿐 현재 적용 계획으로 사용하지 않는다.
+2026-07-21 read-only inspection은 retention hardening 도입 전의 역사적 evidence로, 당시 application table/function과 migration history가 0건이고 당시 baseline 22개가 pending임을 확인했다. 이 기록은 현재 실행 지침이 아니다. 현재 source of truth는 prompt recent-count 확장을 포함한 아래 24개이며, fresh 상태에서는 24개 전체가 pending이어야 `FRESH_PROJECT_BASELINE_REQUIRED`로 판정한다. 과거 Gate 2의 “마지막 3개만 pending” 판단과 Phase 5B·5C의 19+3 rollout은 legacy rollout path일 뿐 현재 적용 계획으로 사용하지 않는다.
 
 ## 3. migration 순서와 dependency
 
@@ -42,6 +42,7 @@ Fresh project는 다음을 모두 만족한다.
 | 21 | `20260719120000_wordpress_draft_creation.sql` | publication attempt audit/idempotency | 20 | 신규 table/RLS/RPC |
 | 22 | `20260719130000_harden_wordpress_draft_transition.sql` | service-only transition | 21 | 의도된 `REVOKE`/`DROP FUNCTION` 후 replacement |
 | 23 | `20260724190000_harden_wordpress_publication_attempt_retention.sql` | publication attempt retention hardening | 22 | content/owner FK의 `CASCADE`를 `RESTRICT`로 교체 |
+| 24 | `20260726190000_expand_news_briefing_prompt_recent_counts.sql` | 뉴스 프롬프트 최근 글 5·10·15 확장 | 23, 20 | context/save/restore RPC replacement, 데이터 rewrite 없음 |
 
 정적 검수 결과 `DROP TABLE`, `TRUNCATE`, 무조건 `DELETE`, 기존 `posts` 대량 rewrite, credential literal, 실제 UUID/email, production URL literal은 없다. `DROP FUNCTION`, `DROP INDEX`, constraint/function rename은 replacement를 위한 forward hardening이며 table/data 파괴와 구분한다. 상세 object와 flag는 manifest에 기록한다.
 
@@ -51,7 +52,7 @@ Fresh project는 다음을 모두 만족한다.
 
 | 파일 | 대상 | 방식 | fresh 적용 | existing 재실행 |
 |---|---|---|---|---|
-| `supabase/seed/01_categories.sql` | `public.categories` | `INSERT ... ON CONFLICT (id) DO UPDATE` | migration 23개 뒤 | 기술적으로 idempotent지만 existing 22+1 배포에서는 기본 금지 |
+| `supabase/seed/01_categories.sql` | `public.categories` | `INSERT ... ON CONFLICT (id) DO UPDATE` | migration 24개 뒤 | 기술적으로 idempotent지만 existing 22+2 배포에서는 기본 금지 |
 
 허용 데이터는 제품 동작에 필요한 정적 category definition뿐이다. 사용자, 이메일, UUID, post/HTML/news, taxonomy mapping ID, publication attempt, URL, credential/token은 금지한다. Seed는 특정 Auth user나 FK user를 요구하지 않는다.
 
@@ -61,9 +62,9 @@ Expected category ID는 다음 8개다: `economy`, `global`, `technology`, `soci
 
 ## 5. deployment mode 분류
 
-- `FRESH_PROJECT_BASELINE_REQUIRED`: history 0, application object 0, pending이 canonical 23개 전체와 순서까지 정확히 일치하고 remote-only/unknown object가 없음.
-- `EXISTING_PROJECT_INCREMENTAL_READY`: 앞 22개 history/schema가 정확히 일치하고 마지막 retention hardening migration 1개만 pending. Seed 재적용 없음.
-- `MIGRATION_BASELINE_CURRENT`: canonical 23개가 순서대로 모두 applied이고 pending이 없음. 추가 migration이나 seed 적용 계획 없음.
+- `FRESH_PROJECT_BASELINE_REQUIRED`: history 0, application object 0, pending이 canonical 24개 전체와 순서까지 정확히 일치하고 remote-only/unknown object가 없음.
+- `EXISTING_PROJECT_INCREMENTAL_READY`: 앞 22개 history/schema가 정확히 일치하고 retention hardening과 prompt recent-count migration 2개가 순서대로 pending. Seed 재적용 없음.
+- `MIGRATION_BASELINE_CURRENT`: canonical 24개가 순서대로 모두 applied이고 pending이 없음. 추가 migration이나 seed 적용 계획 없음.
 - `PARTIAL_BASELINE_BLOCKED`: 일부 migration/object만 존재하거나 pending set이 어느 승인 경로와도 일치하지 않음.
 - `HISTORY_MISMATCH_BLOCKED`: schema가 있으나 history가 없거나, remote-only version, history/schema 불일치, checksum 상태 불명확.
 - `UNEXPECTED_REMOTE_OBJECTS_BLOCKED`: fresh로 예상한 프로젝트에 whitelist 밖 application table/function/object가 존재.
@@ -79,7 +80,7 @@ Checker는 `scripts/fixtures/supabase-fresh-baseline/`의 sanitized JSON 또는 
 3. sanitized remote classification
 4. manifest와 checker PASS
 5. local reset/lint/pgTAP, Vitest, Deno, smoke, E2E, lint, build, bundle PASS
-6. canonical migration 23개와 seed 1개의 exact whitelist
+6. canonical migration 24개와 seed 1개의 exact whitelist
 7. 예상 변경: public table 23개, manifest의 expected RPC, RLS/policies/index, category 8개
 8. 원격 baseline migration과 seed를 실행한다는 별도 명시적 사용자 승인
 
@@ -99,7 +100,7 @@ Checker는 `scripts/fixtures/supabase-fresh-baseline/`의 sanitized JSON 또는 
 다음 SQL은 mutation이 없으며 실제 배포 승인 뒤 SQL Editor에서 실행한다. 이번 planning phase에는 원격에서 실행하지 않는다.
 
 ```sql
--- migration history: exact version inventory and count 23
+-- migration history: exact version inventory and count 24
 select version, name
 from supabase_migrations.schema_migrations
 order by version;
@@ -172,4 +173,4 @@ Migration 하나라도 실패하거나 history, RLS, policy, RPC privilege, inde
 
 DDL rollback을 자동화하지 않는다. 적용된 migration과 실제 catalog를 read-only로 보존·조사하고 새 versioned migration으로 forward-fix한다. Supabase Free plan에서는 PITR을 전제하지 않으므로 배포 직전 플랫폼 backup 가능 범위와 별도 export를 확인하고 복구 담당자·보존 기간을 기록한다.
 
-WordPress 단계는 migration history 23, table/RLS/policy/RPC/index, category 8, initial user data 0, 첫 운영 사용자 login/owner-scope 검증이 모두 끝난 뒤에만 시작한다.
+WordPress 단계는 migration history 24, table/RLS/policy/RPC/index, category 8, initial user data 0, 첫 운영 사용자 login/owner-scope 검증이 모두 끝난 뒤에만 시작한다.

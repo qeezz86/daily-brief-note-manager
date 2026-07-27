@@ -71,7 +71,15 @@ export const backupRestoreSectionSchemas = {
     actualPostCount: nonnegative, promptMode: z.enum(['simple', 'standard', 'detailed']), referenceDate: date,
     closedLookbackDays: positive, contextSchemaVersion: positive, contextSnapshot: z.unknown(),
     promptText: z.string(), isPinned: z.boolean(), generatedAt: datetime,
-  }).strict()),
+  }).strict().superRefine((row, context) => {
+    if (row.actualPostCount > row.requestedPostCount) {
+      context.addIssue({
+        code: 'custom',
+        message: '실제 사용한 최근 글 수가 요청 수를 초과했습니다.',
+        path: ['actualPostCount'],
+      })
+    }
+  })),
   wordpressTaxonomyMappings: z.array(z.object({
     id, siteOrigin: z.string().url(), mappingKind: z.enum(['category', 'tag']), localKey: z.string().min(1),
     wordpressTaxonomy: z.enum(['category', 'post_tag']), wordpressTermId: positive,

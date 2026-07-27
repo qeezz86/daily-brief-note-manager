@@ -13,7 +13,8 @@ export const briefingPromptQueryKeys = {
   all: ['briefing-prompts'] as const,
   context: (userId: string, settings: BriefingPromptSettings) => [
     ...briefingPromptQueryKeys.all, 'context', userId, settings.categoryId,
-    settings.referenceDate, settings.mode, settings.closedLookbackDays,
+    settings.referenceDate, settings.mode, settings.recentPostCount ?? 5,
+    settings.closedLookbackDays,
   ] as const,
   history: (userId: string) => [...briefingPromptQueryKeys.all, 'history', userId] as const,
   detail: (userId: string, runId: string) => [

@@ -2,7 +2,7 @@
 
 Daily Brief Note의 콘텐츠, SEO 정보, 출처, 뉴스 추적 이력과 생성 프롬프트를 관리하기 위한 비공개 웹앱입니다.
 
-현재 저장소는 Phase 5C-R2 WordPress draft hardening 단계입니다. 로컬 migration inventory는 23개이며, 앞 22개가 적용된 운영 환경에는 마지막 publication-attempt retention migration 1개만 별도 승인 아래 적용합니다. Machine-readable whitelist와 offline checker는 [`config/supabase-fresh-project-baseline.json`](config/supabase-fresh-project-baseline.json), 전체 승인·검증 정책은 [`docs/SUPABASE_FRESH_PROJECT_BASELINE.md`](docs/SUPABASE_FRESH_PROJECT_BASELINE.md)를 따릅니다. 이 로컬 hardening Gate는 원격 DB, Function, secret, frontend와 WordPress를 변경하지 않습니다.
+현재 저장소의 canonical migration inventory는 24개입니다. 앞 22개가 적용된 기존 환경에는 publication-attempt retention migration과 news prompt recent-count migration을 순서대로 적용하는 incremental plan을 사용합니다. Machine-readable whitelist와 offline checker는 [`config/supabase-fresh-project-baseline.json`](config/supabase-fresh-project-baseline.json), 전체 승인·검증 정책은 [`docs/SUPABASE_FRESH_PROJECT_BASELINE.md`](docs/SUPABASE_FRESH_PROJECT_BASELINE.md)를 따릅니다. Phase 5C-R2 news prompt recent-count 변경의 local reset, DB lint, pgTAP, database type generation, lint, Vitest, build와 Playwright 검증은 별도 Local Validation Gate에서 모두 통과했습니다.
 
 인증된 단일 허용 사용자는 콘텐츠별 publication payload를 Dry Run으로 검토한 뒤 명시적 확인을 거쳐 WordPress `draft` 1건을 생성할 수 있습니다. 서버는 쓰기 직전에 RLS 범위의 DB 원본, taxonomy, duplicate slug, source `updated_at`과 canonical fingerprint를 다시 검증합니다. WordPress credential은 브라우저나 DB에 저장하지 않으며 publish·update·delete·media·taxonomy write와 자동 재시도는 수행하지 않습니다. 실제 원격 배포와 단일 draft smoke는 별도 승인 아래 [`docs/WORDPRESS_PRODUCTION_DEPLOYMENT_RUNBOOK.md`](docs/WORDPRESS_PRODUCTION_DEPLOYMENT_RUNBOOK.md)를 따릅니다.
 
@@ -71,7 +71,7 @@ npm run bundle:check
 
 `npm run build:budget`은 production build와 budget 검사를 연속 실행합니다. 의도된 bundle 변화의 원인을 검토한 뒤에만 `npm run bundle:baseline`으로 기존 `dist`의 승인 baseline을 갱신하고, 생성된 `config/bundle-baseline.json` diff를 코드 리뷰에 포함합니다.
 
-`npm run check:supabase-fresh-baseline`은 canonical migration 23개와 category seed whitelist, fresh 23개·existing 22+1 적용 계획, 금지 SQL·literal, runbook deployment mode, sanitized fixture를 로컬 파일만으로 검증합니다. Protected env를 읽거나 network, linked Supabase CLI 또는 원격 명령을 실행하지 않습니다.
+`npm run check:supabase-fresh-baseline`은 canonical migration inventory에서 계산한 24개와 category seed whitelist, fresh 24개·existing 22+2 적용 계획, 금지 SQL·literal, runbook deployment mode, sanitized fixture를 로컬 파일만으로 검증합니다. Protected env를 읽거나 network, linked Supabase CLI 또는 원격 명령을 실행하지 않습니다.
 
 Bundle budget CI는 Supabase module을 포함한 production graph를 일정하게 만들기 위해 로컬 주소와 비밀정보가 아닌 공개 placeholder key를 build-time 환경변수로 사용합니다. CI는 앱을 실행하거나 원격 Supabase에 연결하지 않으며 실제 credential이나 GitHub secret을 저장하지 않습니다. Raw 최대 chunk와 gzip 최대 chunk는 서로 다른 asset일 수 있으므로 각각 독립적으로 측정합니다.
 
@@ -82,7 +82,7 @@ Bundle budget CI는 Supabase module을 포함한 production graph를 일정하�
 - `bundle-budget`: production build와 bundle budget을 검증하고 report artifact를 보존합니다.
 - `offline-validation`: lint, 전체 Vitest suite, Supabase fresh baseline checker와 WordPress production readiness checker를 실행합니다.
 
-현재 repository CI 범위에는 DB lint, pgTAP, Deno, E2E와 WordPress smoke가 포함되지 않습니다. Vercel status는 repository validation과 별도이며, Vercel required 설정도 이 workflow에서 다루지 않습니다. Branch protection과 required checks는 아직 설정되지 않았으며 별도 Gate에서 적용해야 합니다.
+현재 repository CI 범위에는 DB lint, pgTAP, Deno, E2E와 WordPress smoke가 포함되지 않습니다. Vercel status는 repository validation과 별도이며, Vercel required 설정도 이 workflow에서 다루지 않습니다. 현재 repository ruleset #19760818에서 `bundle-budget`과 `offline-validation`을 required checks로 적용하고 있습니다.
 
 ## WordPress read-only 진단
 
@@ -154,9 +154,9 @@ npx supabase gen types typescript --local > src/shared/supabase/database.types.t
 
 `/news-followups`에서는 상태·우선순위·카테고리·마감일·검색 조건으로 후속 확인 항목을 조회합니다. 신규 항목은 `pending`으로 생성되며 `done` 또는 `cancelled` 처리에는 해결 메모가 필요하고 `resolved_at`은 DB가 자동 기록합니다. 마감 초과는 `Asia/Seoul`의 오늘보다 이른 `pending` 마감일에만 적용됩니다. 종료된 주제에는 새 항목을 추가하거나 일반 내용을 수정할 수 없지만 기존 pending 항목의 완료·취소는 가능하며, 주제 종료 시 자동 처리되지 않습니다. 쓰기는 전용 RPC만 사용하고 물리 삭제와 처리 항목 재개는 지원하지 않습니다. 이 데이터는 브리핑 프롬프트 context와 저장 이력에 반영됩니다.
 
-`/briefing-prompts`에서는 활성 뉴스 카테고리만 선택할 수 있습니다. 읽기 전용 `get_news_briefing_prompt_context` RPC가 현재 사용자 데이터에서 기준일 이전의 발행 게시물 최대 5개, 해당 뉴스 업데이트, `active`·`monitoring`·`reopened` 주제, pending 후속 항목과 최근 종료 주제 최대 20개를 결정적 순서로 집계합니다. 종료 조회 기간은 기본 90일, 최대 180일입니다. context schema version은 1이며 WordPress HTML 전문, 이미지 프롬프트, 사용자 이메일과 원문 기사 전문은 포함하지 않습니다. 미리보기 설정이 바뀌면 stale로 표시되어 재생성 전에는 저장할 수 없습니다.
+`/briefing-prompts`에서는 활성 뉴스 카테고리와 최근 글 수 `5`·`10`·`15`(기본 `5`)를 선택할 수 있습니다. 읽기 전용 `get_news_briefing_prompt_context` RPC가 현재 사용자 데이터에서 기준일 이전의 발행 게시물을 요청 수까지, 해당 뉴스 업데이트, `active`·`monitoring`·`reopened` 주제, pending 후속 항목과 최근 종료 주제 최대 20개를 결정적 순서로 집계합니다. 글이 요청 수보다 적으면 모두 사용하고 요청 수와 실제 사용 수를 구분해 표시합니다. 최근 글 수는 생성 모드와 독립적으로 유지됩니다. 종료 조회 기간은 기본 90일, 최대 180일입니다. context schema version은 1이며 WordPress HTML 전문, 이미지 프롬프트, 사용자 이메일과 원문 기사 전문은 포함하지 않습니다. 미리보기 설정이 바뀌면 stale로 표시되어 재생성 전에는 저장할 수 없습니다.
 
-`/briefing-prompts/history`와 상세 경로에서는 저장 당시 설정, 정확한 프롬프트와 context snapshot을 조회·복사하고 고정 상태를 변경합니다. 새 snapshot에는 `promptTemplateVersion`을 선택 필드로 기록하고 상세 화면에서 적용 버전을 표시합니다. 버전이 없던 과거 이력도 안전하게 표시하며, 현재 category rules로 과거 prompt text를 다시 생성하지 않습니다. 프롬프트와 snapshot은 저장 후 수정할 수 없고 현재 뉴스 데이터가 바뀌어도 과거 이력은 변하지 않습니다. 사용자·카테고리별 미고정 최근 30개를 보존하며 고정 이력은 한도와 자동 정리에서 제외됩니다. 오래된 이력을 고정 해제하면 같은 카테고리의 retention이 다시 적용됩니다. 쓰기는 전용 RPC만 사용하며 외부 AI API는 호출하지 않습니다.
+`/briefing-prompts/history`와 상세 경로에서는 저장 당시 설정, 요청 최근 글 수, 실제 사용 수, 정확한 프롬프트와 context snapshot을 조회·복사하고 고정 상태를 변경합니다. 새 snapshot에는 `promptTemplateVersion`을 선택 필드로 기록하고 상세 화면에서 적용 버전을 표시합니다. 버전이 없던 과거 이력도 안전하게 표시하며, 현재 category rules나 뉴스 데이터로 과거 prompt text와 count를 다시 생성·추론하지 않습니다. 프롬프트와 snapshot은 저장 후 수정할 수 없고 현재 뉴스 데이터가 바뀌어도 과거 이력은 변하지 않습니다. 사용자·카테고리별 미고정 최근 30개를 보존하며 고정 이력은 한도와 자동 정리에서 제외됩니다. 오래된 이력을 고정 해제하면 같은 카테고리의 retention이 다시 적용됩니다. 쓰기는 전용 RPC만 사용하며 외부 AI API는 호출하지 않습니다.
 
 카테고리별 결정적 작성 규칙은 `src/features/briefingPrompts/categoryPromptRules.ts`에 category ID를 key로 두고 관리합니다. 경제·국제·과학기술·사회·환경·에너지의 조사 범위, 출처 우선순위와 검증 지침만 구조화하며 wrapper class, briefing ID pattern과 slug pattern은 DB category 설정을 사용합니다. 프롬프트 화면의 적용 규칙 영역에서 선택 템플릿, wrapper, ID·slug 예시와 template version을 확인할 수 있습니다.
 

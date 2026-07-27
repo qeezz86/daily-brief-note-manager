@@ -93,6 +93,26 @@ describe('validateBackupForRestore manifest and section schema', () => {
     const bundle = await backupRestoreBundleFixture(); (bundle.data.posts[0] as unknown as Record<string, unknown>).unknownField = true; const signed = await resignBackup(bundle)
     expect((await validateBackupForRestore(signed, { currentCategories: currentCategoriesFromBundle(bundle) })).result.issues.some((item) => item.code === 'BACKUP_SECTION_SCHEMA_INVALID')).toBe(true)
   })
+  it.each([10, 15] as const)('generated prompt requested count %s를 schema v1에서 복원 가능으로 검증한다', async (requestedPostCount) => {
+    const bundle = await changed('core', (value) => { value.data.generatedPrompts[0].requestedPostCount = requestedPostCount })
+    const output = await validate(bundle)
+    expect(output.result.status).toBe('restorable')
+    expect(output.bundle?.schemaVersion).toBe(1)
+    expect(output.bundle?.data.generatedPrompts[0].requestedPostCount).toBe(requestedPostCount)
+  })
+  it('generated prompt의 invalid requested count를 차단한다', async () => {
+    const bundle = await changed('core', (value) => {
+      (value.data.generatedPrompts[0] as unknown as { requestedPostCount: number }).requestedPostCount = 6
+    })
+    expect((await validate(bundle)).result.issues.some((item) => item.code === 'BACKUP_SECTION_SCHEMA_INVALID')).toBe(true)
+  })
+  it('generated prompt actual count가 requested count를 초과하면 차단한다', async () => {
+    const bundle = await changed('core', (value) => {
+      value.data.generatedPrompts[0].requestedPostCount = 5
+      value.data.generatedPrompts[0].actualPostCount = 6
+    })
+    expect((await validate(bundle)).result.status).toBe('not_restorable')
+  })
   it('owner_id key를 민감정보로 차단한다', async () => {
     const bundle = await backupRestoreBundleFixture(); (bundle.data.posts[0] as unknown as Record<string, unknown>).owner_id = crypto.randomUUID(); const signed = await resignBackup(bundle)
     expect((await validateBackupForRestore(signed, { currentCategories: currentCategoriesFromBundle(bundle) })).result.issues.some((item) => item.code === 'BACKUP_SENSITIVE_DATA_FOUND')).toBe(true)

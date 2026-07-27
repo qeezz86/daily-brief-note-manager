@@ -16,7 +16,10 @@ import {
   type BriefingPromptValidationSeverity,
   type ValidateBriefingPromptInput,
 } from './briefingPromptValidation.types'
-import { briefingPromptModeLabels } from './briefingPrompts.types'
+import {
+  briefingPromptModeLabels,
+  briefingPromptRecentCounts,
+} from './briefingPrompts.types'
 
 const priorityLabels = { high: '높음', normal: '보통', low: '낮음' } as const
 const updateLabels = { new: '신규', follow_up: '후속', correction: '정정', closure_note: '종료 메모' } as const
@@ -247,6 +250,12 @@ function validateContextIntegrity(input: ValidateBriefingPromptInput, collector:
   if (context.category.id !== settings.categoryId) collector.add('error', 'CONTEXT_CATEGORY_MISMATCH', 'Context 카테고리와 생성 설정이 일치하지 않습니다.', 'context')
   if (context.referenceDate !== settings.referenceDate) collector.add('error', 'CONTEXT_REFERENCE_DATE_MISMATCH', 'Context 기준일과 생성 설정이 일치하지 않습니다.', 'context')
   if (settings.mode !== input.mode) collector.add('error', 'PROMPT_MODE_MISMATCH', '검증 mode와 생성 설정이 일치하지 않습니다.', 'context')
+  const requestedPostCount = settings.recentPostCount ?? 5
+  if (!briefingPromptRecentCounts.includes(requestedPostCount)) {
+    collector.add('error', 'INVALID_REQUESTED_POST_COUNT', '요청한 최근 글 수는 5·10·15 중 하나여야 합니다.', 'context')
+  } else if (context.recentPosts.length > requestedPostCount) {
+    collector.add('error', 'ACTUAL_POST_COUNT_EXCEEDED', '실제 사용한 최근 글 수가 요청 수를 초과했습니다.', 'context')
+  }
   if (context.promptTemplateVersion !== promptTemplateVersion || promptTemplateVersion !== PROMPT_TEMPLATE_VERSION) {
     collector.add('error', 'PROMPT_TEMPLATE_VERSION_MISMATCH', 'Context, builder와 생성 설정의 template version이 일치하지 않습니다.', 'context')
   }
@@ -285,14 +294,22 @@ function validateContextIntegrity(input: ValidateBriefingPromptInput, collector:
   for (const headline of duplicateValues(context.recentPosts.flatMap((post) => post.updates.map((update) => update.headline)))) {
     collector.add('warning', 'DUPLICATE_NORMALIZED_HEADLINE', '공백·영문 대소문자를 정규화한 동일 headline이 있습니다.', 'duplicates', headline)
   }
-  if (context.recentPosts.length > 5) collector.add('error', 'RECENT_POST_LIMIT_EXCEEDED', '현재 context schema가 허용하는 최근 게시물 5개를 초과했습니다.', 'context')
   for (const post of context.recentPosts) {
     for (const itemOrder of duplicateValues(post.updates.map((update) => String(update.itemOrder)))) {
       collector.add('error', 'DUPLICATE_UPDATE_ITEM_ORDER', '같은 게시물에 동일한 update item_order가 중복되었습니다.', 'duplicates', `${post.id}:${itemOrder}`)
     }
   }
 
-  const postOrder = isDeterministicallySorted(context.recentPosts, (a, b) => b.publishedOn.localeCompare(a.publishedOn) || a.id.localeCompare(b.id))
+  const postOrder = isDeterministicallySorted(context.recentPosts, (a, b) =>
+    b.publishedOn.localeCompare(a.publishedOn)
+    || (a.updatedAt && b.updatedAt
+      ? b.updatedAt.localeCompare(a.updatedAt)
+      : a.updatedAt
+        ? -1
+        : b.updatedAt
+          ? 1
+          : 0)
+    || a.id.localeCompare(b.id))
   const updatesOrder = context.recentPosts.every((post) => isDeterministicallySorted(post.updates, (a, b) => a.itemOrder - b.itemOrder || a.id.localeCompare(b.id)))
   const openOrder = { reopened: 0, active: 1, monitoring: 2 }
   const topicsOrder = isDeterministicallySorted(context.openTopics, (a, b) => openOrder[a.status] - openOrder[b.status] || b.lastSeenAt.localeCompare(a.lastSeenAt) || a.topicKey.localeCompare(b.topicKey))

@@ -1,6 +1,7 @@
 import type { DatabaseClient } from '../../shared/supabase/client'
 import type { Json } from '../../shared/supabase/database.types'
 import {
+  briefingPromptRecentCountSchema,
   parseBriefingPromptRun,
   parseNewsBriefingPromptContext,
   validateSaveBriefingPromptRunInput,
@@ -31,10 +32,13 @@ export async function getNewsBriefingPromptContext(
   client: DatabaseClient,
   settings: BriefingPromptSettings,
 ): Promise<NewsBriefingPromptContext> {
+  const recentPostCount = briefingPromptRecentCountSchema.parse(
+    settings.recentPostCount ?? 5,
+  )
   const { data, error } = await client.rpc('get_news_briefing_prompt_context', {
     p_category_id: settings.categoryId,
     p_reference_date: settings.referenceDate,
-    p_recent_post_limit: 5,
+    p_recent_post_limit: recentPostCount,
     p_closed_lookback_days: settings.closedLookbackDays,
     p_closed_limit: 20,
   })
@@ -88,7 +92,7 @@ export async function savePromptRun(
   } catch {
     throw new Error('현재 설정과 프롬프트 결과를 다시 확인해 주세요.')
   }
-  const { data, error } = await client.rpc('save_news_briefing_prompt_run', {
+  const saveArgs = {
     p_category_id: valid.settings.categoryId,
     p_reference_date: valid.settings.referenceDate,
     p_prompt_mode: valid.settings.mode,
@@ -96,7 +100,11 @@ export async function savePromptRun(
     p_context_schema_version: valid.context.schemaVersion,
     p_context_snapshot: valid.context as unknown as Json,
     p_prompt_text: valid.promptText,
-  })
+    p_requested_post_count: valid.settings.recentPostCount ?? 5,
+  }
+  const { data, error } = await client.rpc('save_news_briefing_prompt_run', {
+    ...saveArgs,
+  } as typeof saveArgs)
   if (error || !data) throw new Error('프롬프트 이력을 저장하지 못했습니다.')
   try {
     return parseBriefingPromptRun(data)

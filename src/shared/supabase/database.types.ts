@@ -1849,6 +1849,7 @@ export type Database = {
           p_prompt_mode: string
           p_prompt_text: string
           p_reference_date: string
+          p_requested_post_count?: number
         }
         Returns: {
           actual_post_count: number

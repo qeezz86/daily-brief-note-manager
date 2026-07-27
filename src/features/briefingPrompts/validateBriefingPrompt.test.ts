@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { buildNewsBriefingPrompt } from './buildBriefingPrompt'
 import { briefingPromptContextFixture } from './briefingPrompts.fixtures'
-import type { BriefingPromptMode, NewsBriefingPromptContext } from './briefingPrompts.types'
+import type { BriefingPromptMode, BriefingPromptRecentCount, NewsBriefingPromptContext } from './briefingPrompts.types'
 import { PROMPT_TEMPLATE_VERSION } from './categoryPromptRules'
 import { validateBriefingPrompt } from './validateBriefingPrompt'
 
@@ -16,6 +16,7 @@ function runValidation(options: {
   categoryId?: string
   referenceDate?: string
   promptTemplateVersion?: number
+  recentPostCount?: number
 } = {}) {
   const context = options.context ?? cloneContext()
   const mode = options.mode ?? 'standard'
@@ -28,6 +29,7 @@ function runValidation(options: {
       categoryId: options.categoryId ?? context.category.id,
       referenceDate: options.referenceDate ?? context.referenceDate,
       mode,
+      recentPostCount: (options.recentPostCount ?? 5) as BriefingPromptRecentCount,
       closedLookbackDays: 90,
     },
     promptTemplateVersion: options.promptTemplateVersion ?? PROMPT_TEMPLATE_VERSION,
@@ -102,6 +104,36 @@ describe('validateBriefingPrompt context integrity and duplicates', () => {
     const prompt = buildNewsBriefingPrompt(context, 'standard')
     const result = validateBriefingPrompt({ promptText: prompt, context, mode: 'standard', settings: { categoryId: 'economy', referenceDate: '2026-07-13', mode: 'detailed', closedLookbackDays: 90 }, promptTemplateVersion: 1 })
     expect(codes(result)).toContain('PROMPT_MODE_MISMATCH')
+  })
+  it('accepts requested 15 with actual 8 and rejects actual above requested', () => {
+    const context = cloneContext()
+    const base = context.recentPosts[0]
+    context.recentPosts = Array.from({ length: 8 }, (_, index) => ({
+      ...base,
+      id: `00000000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`,
+      displayId: `#2026-07-12-ECO-${index + 1}`,
+      title: `최근 경제 브리핑 ${index + 1}`,
+      updates: [],
+    }))
+    context.counts = { ...context.counts, recentPosts: 8, recentUpdates: 0 }
+    expect(codes(runValidation({ context, recentPostCount: 15 }))).not.toContain('ACTUAL_POST_COUNT_EXCEEDED')
+    expect(codes(runValidation({ context: { ...context, recentPosts: context.recentPosts.slice(0, 6), counts: { ...context.counts, recentPosts: 6 } }, recentPostCount: 5 }))).toContain('ACTUAL_POST_COUNT_EXCEEDED')
+  })
+  it('accepts requested 10 with actual 10', () => {
+    const context = cloneContext()
+    const base = context.recentPosts[0]
+    context.recentPosts = Array.from({ length: 10 }, (_, index) => ({
+      ...base,
+      id: `00000000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`,
+      displayId: `#2026-07-12-ECO-${index + 1}`,
+      title: `최근 경제 브리핑 ${index + 1}`,
+      updates: [],
+    }))
+    context.counts = { ...context.counts, recentPosts: 10, recentUpdates: 0 }
+    expect(codes(runValidation({ context, recentPostCount: 10 }))).not.toContain('ACTUAL_POST_COUNT_EXCEEDED')
+  })
+  it('rejects a requested count outside 5, 10 and 15', () => {
+    expect(codes(runValidation({ recentPostCount: 6 }))).toContain('INVALID_REQUESTED_POST_COUNT')
   })
   it('does not silently hide invalid counts', () => {
     const context = cloneContext()

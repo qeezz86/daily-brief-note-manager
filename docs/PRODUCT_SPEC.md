@@ -1095,6 +1095,16 @@ Phase 3B-3은 경제, 국제, 과학기술, 사회, 환경·에너지의 결정�
 - 경고: 최근 데이터 부재, 간단 mode의 정상적인 상세 생략, 정규화 exact headline 중복, 과도한 길이. 저장과 복사를 허용한다.
 - stale preview: 검증 결과도 stale로 간주하고 재생성 전 저장·prompt 복사를 차단한다. context JSON 복사는 디버깅 목적으로 허용한다.
 
+### 10.4.5 Phase 5C-R2 최근 글 수 선택
+
+- 최근 글 수는 `5`, `10`, `15` 중 하나를 선택하며 기본값은 `5`다.
+- 최근 글 수는 카테고리, 기준일, 생성 모드와 독립된 설정이며 다른 설정을 바꾸거나 다시 생성해도 선택값을 유지한다.
+- 선택값을 바꾸면 기존 미리보기는 stale 상태가 되며 새 설정으로 다시 생성하기 전에는 저장할 수 없다.
+- 요청 수보다 사용 가능한 글이 적으면 모든 사용 가능한 글을 사용하고 실제 사용 수를 함께 표시한다.
+- 최근 글 정렬은 `publishedOn DESC`, `updatedAt DESC`, `id ASC` 순서다.
+- 저장된 실행에는 요청 수와 실제 사용 수를 별도로 보존한다.
+- 히스토리 상세는 저장된 요청 수와 실제 사용 수를 표시하며 현재 데이터로 prompt를 재생성하거나 수를 추론하지 않는다.
+
 검증은 section marker와 builder가 출력한 사용자 의미 문자열을 사용하며 자연어 의미 유사도, 외부 기사 비교, 실제 뉴스 팩트체크와 외부 AI API 호출을 수행하지 않는다. Context의 잘못된 counts, post/update/followup/topic 중복과 open/closed topic 충돌을 parser에서 조용히 숨기지 않는다.
 
 새 snapshot은 기존 `schemaVersion = 1`과 호환되는 선택 필드로 `promptValidationVersion = 1`과 오류가 없는 저장 당시 summary(`status`, `errorCount = 0`, `warningCount`, `checkCount`)를 보존한다. 상세 issue 전체는 저장하지 않는다. 과거 run에 summary가 없으면 “검증 기록 없음 (이전 이력)”으로 표시하고 현재 validator로 저장 당시 결과처럼 재검증하지 않는다. 기존 JSONB 저장 RPC가 선택 필드를 그대로 보존하므로 별도 DB migration을 사용하지 않는다.

@@ -7,6 +7,14 @@ describe('buildBackupBundle', () => {
     const result = await buildBackupBundle(backupSnapshotFixture(), { now: new Date('2026-07-15T06:30:00Z'), appVersion: '1.2.3' })
     expect(result.bundle).toMatchObject({ format: 'daily-brief-note-backup', schemaVersion: 1, profile: 'core', exportedAt: '2026-07-15T06:30:00.000Z', appVersion: '1.2.3' })
   })
+  it.each([5, 10, 15] as const)('requested count %s를 schema v1에서 round trip한다', async (requestedPostCount) => {
+    const result = await buildBackupBundle(backupSnapshotFixture('core', requestedPostCount))
+    expect(result.bundle.schemaVersion).toBe(1)
+    expect(result.bundle.data.generatedPrompts[0]).toMatchObject({
+      requestedPostCount,
+      actualPostCount: 1,
+    })
+  })
   it('appVersion null을 허용한다', async () => {
     expect((await buildBackupBundle(backupSnapshotFixture(), { appVersion: null })).bundle.appVersion).toBeNull()
   })

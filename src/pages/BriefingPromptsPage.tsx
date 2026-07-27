@@ -24,12 +24,13 @@ import { useAuth } from '../features/auth/useAuth'
 import { useActiveCategoriesQuery } from '../features/categories/categories.queries'
 import { supabase, type DatabaseClient } from '../shared/supabase/client'
 
-const initialSettings: BriefingPromptSettings = { categoryId: '', referenceDate: getSeoulDate(), mode: 'standard', closedLookbackDays: 90 }
+const initialSettings: BriefingPromptSettings = { categoryId: '', referenceDate: getSeoulDate(), mode: 'standard', recentPostCount: 5, closedLookbackDays: 90 }
 
 function settingsMatch(left: BriefingPromptSettings, right: BriefingPromptSettings): boolean {
   return left.categoryId === right.categoryId
     && left.referenceDate === right.referenceDate
     && left.mode === right.mode
+    && (left.recentPostCount ?? 5) === (right.recentPostCount ?? 5)
     && left.closedLookbackDays === right.closedLookbackDays
 }
 
@@ -91,7 +92,7 @@ export function BriefingPromptsPageContent({ client = supabase, userId }: { clie
     {contextQuery.isFetching ? <div className="content-state" role="status">프롬프트 데이터를 집계하고 있습니다.</div> : null}
     {contextQuery.isError ? <div className="content-state content-state--error" role="alert"><h2>프롬프트 데이터를 불러오지 못했습니다</h2><p>{contextQuery.error.message}</p></div> : null}
     {promptResult.error ? <div className="content-state content-state--error" role="alert"><h2>카테고리 규칙을 적용하지 못했습니다</h2><p>{promptResult.error}</p></div> : null}
-    {versionedContext && prompt && validation ? <><div className="prompt-results"><BriefingPromptValidationPanel result={validation} stale={isStale} /></div><BriefingPromptPreview context={versionedContext} prompt={prompt} promptCopyDisabled={isStale || validation.status === 'invalid'} />
+    {versionedContext && prompt && validation && submitted ? <><div className="prompt-results"><BriefingPromptValidationPanel result={validation} stale={isStale} /></div><BriefingPromptPreview context={versionedContext} prompt={prompt} requestedPostCount={submitted.recentPostCount ?? 5} promptCopyDisabled={isStale || validation.status === 'invalid'} />
       {isStale ? <p className="form-alert" role="status">설정이 변경되어 현재 미리보기가 오래되었습니다. 다시 프롬프트를 생성해 주세요.</p> : null}
       {saveMutation.isSuccess ? <p className="form-success" role="status">프롬프트 이력을 저장했습니다. <Link to={`/briefing-prompts/history/${saveMutation.data.id}`}>저장한 이력 보기</Link></p> : null}
       {saveMutation.isError ? <p className="form-alert" role="alert">{saveMutation.error.message}</p> : null}

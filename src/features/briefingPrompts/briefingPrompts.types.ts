@@ -1,6 +1,9 @@
 export const briefingPromptModes = ['simple', 'standard', 'detailed'] as const
 export type BriefingPromptMode = (typeof briefingPromptModes)[number]
 
+export const briefingPromptRecentCounts = [5, 10, 15] as const
+export type BriefingPromptRecentCount = (typeof briefingPromptRecentCounts)[number]
+
 export const briefingPromptModeLabels: Record<BriefingPromptMode, string> = {
   simple: '간단',
   standard: '표준',
@@ -34,6 +37,7 @@ export interface BriefingPromptUpdate {
 export interface BriefingPromptPost {
   id: string
   publishedOn: string
+  updatedAt?: string
   displayId: string | null
   title: string
   summary: string
@@ -122,6 +126,7 @@ export interface BriefingPromptSettings {
   categoryId: string
   referenceDate: string
   mode: BriefingPromptMode
+  recentPostCount?: BriefingPromptRecentCount
   closedLookbackDays: number
 }
 
@@ -145,7 +150,7 @@ export interface BriefingPromptRun {
   promptText: string
   isPinned: boolean
   generatedAt: string
-  requestedPostCount: number
+  requestedPostCount: BriefingPromptRecentCount
   actualPostCount: number
 }
 

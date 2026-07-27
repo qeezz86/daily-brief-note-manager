@@ -64,48 +64,49 @@ describe('Supabase fresh baseline deployment classification', () => {
     expect(classifyRemoteState(await inspection('fresh-empty-project.json'), manifest)).toBe(deploymentModes.fresh)
   })
 
-  it('accepts the exact 23-migration fresh plan and approved seed', async () => {
+  it('accepts the exact 24-migration fresh plan and approved seed', async () => {
     const manifest = await json('config/supabase-fresh-project-baseline.json')
-    expect(manifest.migrations).toHaveLength(23)
+    expect(manifest.migrations).toHaveLength(24)
     expect(validateDeploymentPlan(await inspection('fresh-empty-project.json'), manifest)).toEqual([])
   })
 
   it('rejects a one-migration hardening plan for an empty project', async () => {
     const manifest = await json('config/supabase-fresh-project-baseline.json')
     const value = await inspection('fresh-empty-project.json')
-    value.deploymentPlan.plannedMigrationSet = 'wordpress-hardening-1'
+    value.deploymentPlan.plannedMigrationSet = 'approved-incremental'
     expect(validateDeploymentPlan(value, manifest, deploymentModes.fresh)).not.toEqual([])
   })
 
-  it('classifies a consistent 22+1 project as incremental ready', async () => {
+  it('classifies a consistent 22+2 project as incremental ready', async () => {
     const manifest = await json('config/supabase-fresh-project-baseline.json')
     const value = await inspection('existing-incremental-project.json')
     expect(classifyRemoteState(value, manifest)).toBe(deploymentModes.incremental)
     expect(manifest.currentApplicationPlans.existing.pendingMigrations).toEqual([
       '20260724190000_harden_wordpress_publication_attempt_retention.sql',
+      '20260726190000_expand_news_briefing_prompt_recent_counts.sql',
     ])
     expect(validateDeploymentPlan(value, manifest)).toEqual([])
   })
 
-  it('rejects the last-three regression for an exact first-22 applied project', async () => {
+  it('rejects an incomplete suffix plan for an exact canonical-prefix project', async () => {
     const manifest = await json('config/supabase-fresh-project-baseline.json')
     const value = await inspection('existing-incremental-project.json')
     value.deploymentPlan = {
-      plannedMigrations: manifest.migrations.slice(-3).map((migration) => migration.filename),
+      plannedMigrations: ['20260726190000_expand_news_briefing_prompt_recent_counts.sql'],
       includeSeed: false,
       seedFiles: [],
     }
     expect(validateDeploymentPlan(value, manifest, deploymentModes.incremental)).not.toEqual([])
   })
 
-  it('rejects all 23 migrations for an incremental project', async () => {
+  it('rejects all 24 migrations for an incremental project', async () => {
     const manifest = await json('config/supabase-fresh-project-baseline.json')
     const value = await inspection('existing-incremental-project.json')
     value.deploymentPlan.plannedMigrationSet = 'all'
     expect(validateDeploymentPlan(value, manifest, deploymentModes.incremental)).not.toEqual([])
   })
 
-  it('classifies all 23 applied migrations as current with no deployment plan', async () => {
+  it('classifies all 24 applied migrations as current with no deployment plan', async () => {
     const manifest = await json('config/supabase-fresh-project-baseline.json')
     const value = await inspection('current-project.json')
     expect(classifyRemoteState(value, manifest)).toBe(deploymentModes.current)
@@ -128,7 +129,7 @@ describe('Supabase fresh baseline deployment classification', () => {
     const manifest = await json('config/supabase-fresh-project-baseline.json')
     const filenames = manifest.migrations.map((migration) => migration.filename)
     const value = await inspection('existing-incremental-project.json')
-    value.remoteState.appliedMigrations = filenames.slice(0, 22)
+    value.remoteState.appliedMigrations = filenames.slice(0, manifest.currentApplicationPlans.existing.requiredAppliedMigrationCount)
     ;[value.remoteState.appliedMigrations[10], value.remoteState.appliedMigrations[11]] = [
       value.remoteState.appliedMigrations[11],
       value.remoteState.appliedMigrations[10],

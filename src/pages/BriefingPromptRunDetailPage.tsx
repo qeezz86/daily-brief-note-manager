@@ -64,6 +64,8 @@ export function BriefingPromptRunDetailPageContent({
       <div><dt>카테고리</dt><dd>{run.contextSnapshot.category.name}</dd></div>
       <div><dt>기준일</dt><dd>{run.referenceDate}</dd></div>
       <div><dt>모드</dt><dd>{briefingPromptModeLabels[run.promptMode]}</dd></div>
+      <div><dt>요청한 최근 글 수</dt><dd>{run.requestedPostCount}개</dd></div>
+      <div><dt>실제 사용한 최근 글 수</dt><dd>{run.actualPostCount}개</dd></div>
       <div><dt>종료 뉴스 조회 기간</dt><dd>{run.closedLookbackDays}일</dd></div>
       <div><dt>생성 시각</dt><dd>{formatPromptRunDateTime(run.generatedAt)}</dd></div>
       <div><dt>고정 상태</dt><dd>{run.isPinned ? '고정' : '미고정'}</dd></div>
