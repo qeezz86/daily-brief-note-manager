@@ -8,6 +8,7 @@ import {
   getPostById,
   getSeoDataByPostId,
   updatePost,
+  updatePostImageMetadata,
 } from './posts.repository'
 import type { PostDetail } from './posts.types'
 
@@ -248,6 +249,70 @@ describe('posts repository mutations', () => {
       p_tags: ['AI', '에이전트', '자동화', '업무 혁신', '생성형 AI'],
       p_sources: [expect.objectContaining({ source_name: 'OpenAI', sort_order: 0 })],
     }))
+  })
+
+  it('calls only the dedicated image metadata RPC and maps its result', async () => {
+    const imageResult = {
+      id: 'post-1',
+      image_prompt: '저장된 프롬프트',
+      image_alt: '저장된 ALT',
+      image_prompt_version: 2,
+      image_prompt_updated_at: '2026-07-28T01:00:00Z',
+      updated_at: '2026-07-28T01:00:00Z',
+    }
+    const rpc = vi.fn().mockResolvedValue({ data: imageResult, error: null })
+    const client = { rpc } as unknown as DatabaseClient
+
+    await expect(updatePostImageMetadata(client, 'post-1', {
+      imagePrompt: '저장된 프롬프트',
+      imageAlt: '저장된 ALT',
+    })).resolves.toEqual(imageResult)
+
+    expect(rpc).toHaveBeenCalledWith('update_post_image_metadata', {
+      p_post_id: 'post-1',
+      p_image_prompt: '저장된 프롬프트',
+      p_image_alt: '저장된 ALT',
+    })
+    expect(rpc.mock.calls[0][1]).toEqual({
+      p_post_id: 'post-1',
+      p_image_prompt: '저장된 프롬프트',
+      p_image_alt: '저장된 ALT',
+    })
+  })
+
+  it('propagates image metadata authorization and atomic save failures safely', async () => {
+    const unauthorizedClient = {
+      rpc: vi.fn().mockResolvedValue({
+        data: null,
+        error: { code: '42501', message: 'private database detail' },
+      }),
+    } as unknown as DatabaseClient
+    await expect(updatePostImageMetadata(unauthorizedClient, 'post-1', {
+      imagePrompt: null,
+      imageAlt: null,
+    })).rejects.toThrow('찾을 수 없거나 접근 권한이 없습니다.')
+
+    const failedClient = {
+      rpc: vi.fn().mockResolvedValue({
+        data: null,
+        error: { code: '23514', message: 'private database detail' },
+      }),
+    } as unknown as DatabaseClient
+    await expect(updatePostImageMetadata(failedClient, 'post-1', {
+      imagePrompt: '실패 프롬프트',
+      imageAlt: '실패 ALT',
+    })).rejects.toThrow('기존 데이터는 변경되지 않았습니다.')
+  })
+
+  it('treats an empty image metadata result as inaccessible or missing', async () => {
+    const client = {
+      rpc: vi.fn().mockResolvedValue({ data: null, error: null }),
+    } as unknown as DatabaseClient
+
+    await expect(updatePostImageMetadata(client, 'missing', {
+      imagePrompt: null,
+      imageAlt: null,
+    })).rejects.toThrow('찾을 수 없거나 접근 권한이 없습니다.')
   })
 
   it('maps Chinese metadata to the Chinese atomic publication RPC', async () => {

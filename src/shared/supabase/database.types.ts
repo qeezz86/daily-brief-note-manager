@@ -2218,6 +2218,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      update_post_image_metadata: {
+        Args: { p_image_alt: string; p_image_prompt: string; p_post_id: string }
+        Returns: Json
+      }
     }
     Enums: {
       [_ in never]: never

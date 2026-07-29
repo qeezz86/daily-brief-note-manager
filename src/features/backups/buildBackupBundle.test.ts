@@ -15,6 +15,15 @@ describe('buildBackupBundle', () => {
       actualPostCount: 1,
     })
   })
+  it('schema v1에서 기존 image prompt와 ALT 구조를 그대로 보존한다', async () => {
+    const result = await buildBackupBundle(backupSnapshotFixture())
+    expect(result.bundle.schemaVersion).toBe(1)
+    expect(result.bundle.data.posts[0]).toMatchObject({
+      imagePrompt: '전문 경제 뉴스 이미지',
+      imageAlt: '경제 브리핑',
+    })
+    expect(result.bundle.data.posts[0]).not.toHaveProperty('imageMetadata')
+  })
   it('appVersion null을 허용한다', async () => {
     expect((await buildBackupBundle(backupSnapshotFixture(), { appVersion: null })).bundle.appVersion).toBeNull()
   })

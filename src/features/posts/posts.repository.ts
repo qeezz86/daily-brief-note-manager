@@ -31,6 +31,20 @@ interface RepositoryError {
   details?: string
 }
 
+export interface PostImageMetadata {
+  id: string
+  image_prompt: string | null
+  image_alt: string | null
+  image_prompt_version: number
+  image_prompt_updated_at: string | null
+  updated_at: string
+}
+
+export interface UpdatePostImageMetadataInput {
+  imagePrompt: string | null
+  imageAlt: string | null
+}
+
 function throwPostError(error: RepositoryError): never {
   const detail = `${error.message ?? ''} ${error.details ?? ''}`
 
@@ -84,6 +98,40 @@ function throwPostEditorError(error: RepositoryError): never {
   throw new Error(
     '콘텐츠 편집 정보를 저장하지 못했습니다. 기존 데이터는 변경되지 않았습니다.',
   )
+}
+
+function isNullableString(value: unknown): value is string | null {
+  return value === null || typeof value === 'string'
+}
+
+function mapPostImageMetadata(value: unknown): PostImageMetadata {
+  if (
+    typeof value !== 'object' ||
+    value === null ||
+    !('id' in value) ||
+    !('image_prompt' in value) ||
+    !('image_alt' in value) ||
+    !('image_prompt_version' in value) ||
+    !('image_prompt_updated_at' in value) ||
+    !('updated_at' in value) ||
+    typeof value.id !== 'string' ||
+    !isNullableString(value.image_prompt) ||
+    !isNullableString(value.image_alt) ||
+    typeof value.image_prompt_version !== 'number' ||
+    !isNullableString(value.image_prompt_updated_at) ||
+    typeof value.updated_at !== 'string'
+  ) {
+    throw new Error('이미지 프롬프트와 ALT 저장 결과를 확인하지 못했습니다.')
+  }
+
+  return {
+    id: value.id,
+    image_prompt: value.image_prompt,
+    image_alt: value.image_alt,
+    image_prompt_version: value.image_prompt_version,
+    image_prompt_updated_at: value.image_prompt_updated_at,
+    updated_at: value.updated_at,
+  }
 }
 
 export async function getPostTags(client: DatabaseClient, postId: string): Promise<PostTag[]> {
@@ -326,6 +374,33 @@ export async function updatePost(
   if (!data) throw new Error('수정할 콘텐츠를 찾을 수 없습니다.')
 
   return data
+}
+
+export async function updatePostImageMetadata(
+  client: DatabaseClient,
+  postId: string,
+  input: UpdatePostImageMetadataInput,
+): Promise<PostImageMetadata> {
+  const { data, error } = await client.rpc('update_post_image_metadata', {
+    p_post_id: postId,
+    // Generated Supabase function arguments do not preserve SQL parameter nullability.
+    p_image_prompt: input.imagePrompt!,
+    p_image_alt: input.imageAlt!,
+  })
+
+  if (error) {
+    if (error.code === '42501') {
+      throw new Error('수정할 콘텐츠를 찾을 수 없거나 접근 권한이 없습니다.')
+    }
+    throw new Error(
+      '이미지 프롬프트와 ALT를 저장하지 못했습니다. 기존 데이터는 변경되지 않았습니다.',
+    )
+  }
+  if (data === null) {
+    throw new Error('수정할 콘텐츠를 찾을 수 없거나 접근 권한이 없습니다.')
+  }
+
+  return mapPostImageMetadata(data)
 }
 
 export async function archivePost(

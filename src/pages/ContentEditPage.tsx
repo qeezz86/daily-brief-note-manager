@@ -15,6 +15,7 @@ import {
   usePostTagsQuery,
   useSeoDataQuery,
   useUpdatePostMutation,
+  useUpdatePostImageMetadataMutation,
 } from '../features/posts/posts.queries'
 import { supabase, type DatabaseClient } from '../shared/supabase/client'
 
@@ -31,6 +32,8 @@ export function ContentEditPageContent({
 }: ContentEditPageContentProps) {
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [submitSuccess, setSubmitSuccess] = useState<string | null>(null)
+  const [imageSaveError, setImageSaveError] = useState<string | null>(null)
+  const [imageSaveSuccess, setImageSaveSuccess] = useState<string | null>(null)
   const postQuery = usePostQuery(client, userId, postId)
   const seoQuery = useSeoDataQuery(client, userId, postId)
   const categoriesQuery = useActiveCategoriesQuery(client)
@@ -40,6 +43,7 @@ export function ContentEditPageContent({
   const aiMetadataQuery = useAiMetadataQuery(client, userId, postId)
   const infoDbMetadataQuery = useInfoDbMetadataQuery(client, userId, postId)
   const updateMutation = useUpdatePostMutation(client, userId, postId)
+  const imageMetadataMutation = useUpdatePostImageMetadataMutation(client, userId, postId)
 
   async function handleSubmit(values: PostFormValues) {
     setSubmitError(null)
@@ -91,6 +95,30 @@ export function ContentEditPageContent({
           ? error.message
           : '콘텐츠를 수정하지 못했습니다.',
       )
+    }
+  }
+
+  async function handleImageMetadataSubmit(values: {
+    imagePrompt: string
+    imageAlt: string
+  }) {
+    setImageSaveError(null)
+    setImageSaveSuccess(null)
+
+    try {
+      const saved = await imageMetadataMutation.mutateAsync({
+        imagePrompt: values.imagePrompt.trim() || null,
+        imageAlt: values.imageAlt.trim() || null,
+      })
+      setImageSaveSuccess('이미지 프롬프트와 ALT를 저장했습니다.')
+      return saved
+    } catch (error) {
+      setImageSaveError(
+        error instanceof Error
+          ? error.message
+          : '이미지 프롬프트와 ALT를 저장하지 못했습니다.',
+      )
+      return null
     }
   }
 
@@ -147,6 +175,10 @@ export function ContentEditPageContent({
         submitError={submitError}
         submitSuccess={submitSuccess}
         onSubmit={handleSubmit}
+        isImageSaving={imageMetadataMutation.isPending}
+        imageSaveError={imageSaveError}
+        imageSaveSuccess={imageSaveSuccess}
+        onImageMetadataSubmit={handleImageMetadataSubmit}
       />
     </section>
   )

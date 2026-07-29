@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -227,6 +227,182 @@ describe('PostForm', () => {
     expect(screen.getByLabelText('포커스 키워드')).toBeInTheDocument()
     expect(screen.getByLabelText('이미지 프롬프트')).toBeInTheDocument()
     expect(screen.getByLabelText('이미지 ALT 문구')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '이미지 프롬프트·ALT만 저장' })).toBeDisabled()
+  })
+
+  it('enables image-only save only for changed image fields', async () => {
+    const browserUser = userEvent.setup()
+    render(
+      <PostForm
+        mode="edit"
+        categories={categories}
+        post={post}
+        isSaving={false}
+        submitError={null}
+        onSubmit={vi.fn().mockResolvedValue(undefined)}
+        onImageMetadataSubmit={vi.fn().mockResolvedValue(null)}
+      />,
+    )
+
+    const imageButton = screen.getByRole('button', { name: '이미지 프롬프트·ALT만 저장' })
+    await browserUser.type(screen.getByLabelText('제목'), ' 다른 변경')
+    expect(imageButton).toBeDisabled()
+    await browserUser.type(screen.getByLabelText('이미지 프롬프트'), '새 프롬프트')
+    expect(imageButton).toBeEnabled()
+  })
+
+  it('does not let unrelated validation errors block image-only save', async () => {
+    const browserUser = userEvent.setup()
+    const onImageMetadataSubmit = vi.fn().mockResolvedValue({
+      id: post.id,
+      image_prompt: '유효한 프롬프트',
+      image_alt: null,
+      image_prompt_version: 2,
+      image_prompt_updated_at: '2026-07-28T01:00:00Z',
+      updated_at: '2026-07-28T01:00:00Z',
+    })
+    render(
+      <PostForm
+        mode="edit"
+        categories={categories}
+        post={post}
+        isSaving={false}
+        submitError={null}
+        onSubmit={vi.fn().mockResolvedValue(undefined)}
+        onImageMetadataSubmit={onImageMetadataSubmit}
+      />,
+    )
+
+    await browserUser.clear(screen.getByLabelText('제목'))
+    await browserUser.type(screen.getByLabelText('이미지 프롬프트'), '유효한 프롬프트')
+    await browserUser.click(screen.getByRole('button', { name: '이미지 프롬프트·ALT만 저장' }))
+
+    expect(onImageMetadataSubmit).toHaveBeenCalledTimes(1)
+    expect(screen.getByLabelText('제목')).toHaveValue('')
+  })
+
+  it('saves only image values and preserves unrelated input and dirty state', async () => {
+    const browserUser = userEvent.setup()
+    const onImageMetadataSubmit = vi.fn().mockResolvedValue({
+      id: post.id,
+      image_prompt: '저장된 프롬프트',
+      image_alt: '저장된 ALT',
+      image_prompt_version: 2,
+      image_prompt_updated_at: '2026-07-28T01:00:00Z',
+      updated_at: '2026-07-28T01:00:00Z',
+    })
+    render(
+      <PostForm
+        mode="edit"
+        categories={categories}
+        post={post}
+        isSaving={false}
+        submitError={null}
+        imageSaveSuccess="이미지 프롬프트와 ALT를 저장했습니다."
+        onSubmit={vi.fn().mockResolvedValue(undefined)}
+        onImageMetadataSubmit={onImageMetadataSubmit}
+      />,
+    )
+
+    const title = screen.getByLabelText('제목')
+    await browserUser.clear(title)
+    await browserUser.type(title, '저장하지 않은 제목')
+    await browserUser.type(screen.getByLabelText('이미지 프롬프트'), '저장된 프롬프트')
+    await browserUser.type(screen.getByLabelText('이미지 ALT 문구'), '저장된 ALT')
+    await browserUser.click(screen.getByRole('button', { name: '이미지 프롬프트·ALT만 저장' }))
+
+    expect(onImageMetadataSubmit).toHaveBeenCalledWith({
+      imagePrompt: '저장된 프롬프트',
+      imageAlt: '저장된 ALT',
+    })
+    expect(title).toHaveValue('저장하지 않은 제목')
+    expect(screen.getByText('다른 변경 사항은 저장되지 않은 상태로 유지됩니다.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '이미지 프롬프트·ALT만 저장' })).toBeDisabled()
+  })
+
+  it('keeps image input dirty after a failed image-only save', async () => {
+    const browserUser = userEvent.setup()
+    const onImageMetadataSubmit = vi.fn().mockResolvedValue(null)
+    render(
+      <PostForm
+        mode="edit"
+        categories={categories}
+        post={post}
+        isSaving={false}
+        submitError={null}
+        imageSaveError="이미지 프롬프트와 ALT를 저장하지 못했습니다."
+        onSubmit={vi.fn().mockResolvedValue(undefined)}
+        onImageMetadataSubmit={onImageMetadataSubmit}
+      />,
+    )
+
+    const prompt = screen.getByLabelText('이미지 프롬프트')
+    await browserUser.type(prompt, '실패 후 유지할 프롬프트')
+    await browserUser.click(screen.getByRole('button', { name: '이미지 프롬프트·ALT만 저장' }))
+
+    expect(prompt).toHaveValue('실패 후 유지할 프롬프트')
+    expect(screen.getByRole('button', { name: '이미지 프롬프트·ALT만 저장' })).toBeEnabled()
+    expect(screen.getByRole('alert')).toHaveTextContent('저장하지 못했습니다.')
+  })
+
+  it('exposes an accessible pending image save state and blocks both save actions', () => {
+    render(
+      <PostForm
+        mode="edit"
+        categories={categories}
+        post={post}
+        isSaving={false}
+        isImageSaving
+        submitError={null}
+        onSubmit={vi.fn().mockResolvedValue(undefined)}
+        onImageMetadataSubmit={vi.fn().mockResolvedValue(null)}
+      />,
+    )
+
+    expect(screen.getByRole('button', { name: '이미지 프롬프트·ALT만 저장 중' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '변경 사항 저장' })).toBeDisabled()
+  })
+
+  it('blocks duplicate image-only submissions before the pending render completes', async () => {
+    const browserUser = userEvent.setup()
+    let resolveSave!: (value: {
+      id: string
+      image_prompt: string
+      image_alt: null
+      image_prompt_version: number
+      image_prompt_updated_at: string
+      updated_at: string
+    }) => void
+    const onImageMetadataSubmit = vi.fn().mockReturnValue(new Promise((resolve) => {
+      resolveSave = resolve
+    }))
+    render(
+      <PostForm
+        mode="edit"
+        categories={categories}
+        post={post}
+        isSaving={false}
+        submitError={null}
+        onSubmit={vi.fn().mockResolvedValue(undefined)}
+        onImageMetadataSubmit={onImageMetadataSubmit}
+      />,
+    )
+
+    await browserUser.type(screen.getByLabelText('이미지 프롬프트'), '한 번만 저장')
+    const button = screen.getByRole('button', { name: '이미지 프롬프트·ALT만 저장' })
+    fireEvent.click(button)
+    fireEvent.click(button)
+
+    await waitFor(() => expect(onImageMetadataSubmit).toHaveBeenCalledTimes(1))
+    resolveSave({
+      id: post.id,
+      image_prompt: '한 번만 저장',
+      image_alt: null,
+      image_prompt_version: 2,
+      image_prompt_updated_at: '2026-07-28T01:00:00Z',
+      updated_at: '2026-07-28T01:00:00Z',
+    })
+    await waitFor(() => expect(button).toBeDisabled())
   })
 
   it('allows a draft to save with empty HTML, SEO, and image fields', async () => {

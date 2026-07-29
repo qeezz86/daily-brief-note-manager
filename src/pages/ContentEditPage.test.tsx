@@ -5,9 +5,26 @@ import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
 
 import type { Category } from '../features/categories/categories.types'
+import type { PostImageMetadata } from '../features/posts/posts.repository'
 import type { PostDetail } from '../features/posts/posts.types'
 import type { DatabaseClient } from '../shared/supabase/client'
 import { ContentEditPageContent } from './ContentEditPage'
+
+type TestRpcSuccessData = PostDetail | PostImageMetadata
+
+type TestRpcError = {
+  code: string
+  message: string
+}
+
+type TestRpcResult =
+  | { data: TestRpcSuccessData; error: null }
+  | { data: null; error: TestRpcError }
+
+type TestRpcImplementation = (
+  functionName: string,
+  payload?: Record<string, unknown>,
+) => Promise<TestRpcResult>
 
 const category: Category = {
   id: 'economy',
@@ -79,9 +96,33 @@ function createClient() {
   sourceBuilder.eq.mockReturnValue(sourceBuilder)
   sourceBuilder.order.mockResolvedValue({ data: [], error: null })
 
-  const rpc = vi.fn().mockResolvedValue({
-    data: { ...post, title: '수정된 경제 브리핑' },
-    error: null,
+  const rpc = vi.fn<TestRpcImplementation>(async (functionName, payload) => {
+    if (functionName === 'update_post_image_metadata') {
+      return {
+        data: {
+          id: post.id,
+          image_prompt: typeof payload?.p_image_prompt === 'string'
+            ? payload.p_image_prompt
+            : null,
+          image_alt: typeof payload?.p_image_alt === 'string'
+            ? payload.p_image_alt
+            : null,
+          image_prompt_version: 2,
+          image_prompt_updated_at: '2026-07-28T01:00:00Z',
+          updated_at: '2026-07-28T01:00:00Z',
+        },
+        error: null,
+      }
+    }
+    return {
+      data: {
+        ...post,
+        title: typeof payload?.p_title === 'string'
+          ? payload.p_title
+          : '수정된 경제 브리핑',
+      },
+      error: null,
+    }
   })
 
   return {
@@ -133,5 +174,69 @@ describe('ContentEditPage', () => {
     expect(screen.getByLabelText('카테고리')).toBeDisabled()
     expect(screen.getByLabelText('브리핑 날짜')).toBeDisabled()
     await waitFor(() => expect(seoBuilder.maybeSingle).toHaveBeenCalledTimes(2))
+  })
+
+  it('saves image metadata separately, keeps unrelated edits, and preserves full save', async () => {
+    const browserUser = userEvent.setup()
+    const { client, rpc } = createClient()
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    })
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <ContentEditPageContent client={client} userId="owner-a" postId="post-1" />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    const title = await screen.findByLabelText('제목')
+    await browserUser.clear(title)
+    await browserUser.type(title, '아직 저장하지 않은 제목')
+    await browserUser.type(screen.getByLabelText('이미지 프롬프트'), ' 전용 프롬프트 ')
+    await browserUser.type(screen.getByLabelText('이미지 ALT 문구'), ' 전용 ALT ')
+    await browserUser.click(screen.getByRole('button', { name: '이미지 프롬프트·ALT만 저장' }))
+
+    expect(await screen.findByText('이미지 프롬프트와 ALT를 저장했습니다.')).toBeInTheDocument()
+    expect(rpc).toHaveBeenCalledWith('update_post_image_metadata', {
+      p_post_id: 'post-1',
+      p_image_prompt: '전용 프롬프트',
+      p_image_alt: '전용 ALT',
+    })
+    expect(title).toHaveValue('아직 저장하지 않은 제목')
+    expect(screen.getByText('다른 변경 사항은 저장되지 않은 상태로 유지됩니다.')).toBeInTheDocument()
+
+    await browserUser.click(screen.getByRole('button', { name: '변경 사항 저장' }))
+    expect(await screen.findByText('변경 사항을 저장했습니다.')).toBeInTheDocument()
+    expect(rpc).toHaveBeenCalledWith(
+      'save_post_publication_bundle',
+      expect.objectContaining({ p_title: '아직 저장하지 않은 제목' }),
+    )
+  })
+
+  it('keeps image values and dirty state when the dedicated RPC fails', async () => {
+    const browserUser = userEvent.setup()
+    const { client, rpc } = createClient()
+    rpc.mockImplementation(async (functionName: string) => functionName === 'update_post_image_metadata'
+      ? { data: null, error: { code: '23514', message: 'forced failure' } }
+      : { data: post, error: null })
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    })
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <ContentEditPageContent client={client} userId="owner-a" postId="post-1" />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    const prompt = await screen.findByLabelText('이미지 프롬프트')
+    await browserUser.type(prompt, '실패해도 유지')
+    await browserUser.click(screen.getByRole('button', { name: '이미지 프롬프트·ALT만 저장' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('기존 데이터는 변경되지 않았습니다.')
+    expect(prompt).toHaveValue('실패해도 유지')
+    expect(screen.getByRole('button', { name: '이미지 프롬프트·ALT만 저장' })).toBeEnabled()
   })
 })
