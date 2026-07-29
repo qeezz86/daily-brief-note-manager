@@ -13,8 +13,10 @@ import {
   getPosts,
   getSeoDataByPostId,
   updatePost,
+  updatePostImageMetadata,
 } from './posts.repository'
-import type { CreatePostInput, UpdatePostInput } from './posts.types'
+import type { UpdatePostImageMetadataInput } from './posts.repository'
+import type { CreatePostInput, PostDetail, UpdatePostInput } from './posts.types'
 
 export const postQueryKeys = {
   all: ['posts'] as const,
@@ -178,6 +180,28 @@ export function useUpdatePostMutation(
       void queryClient.invalidateQueries({ queryKey: postQueryKeys.chineseMetadata(userId, postId) })
       void queryClient.invalidateQueries({ queryKey: postQueryKeys.aiMetadata(userId, postId) })
       void queryClient.invalidateQueries({ queryKey: postQueryKeys.infoDbMetadata(userId, postId) })
+    },
+  })
+}
+
+export function useUpdatePostImageMetadataMutation(
+  client: DatabaseClient | null,
+  userId: string,
+  postId: string,
+) {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (input: UpdatePostImageMetadataInput) =>
+      updatePostImageMetadata(requireClient(client), postId, input),
+    onSuccess: (imageMetadata) => {
+      queryClient.setQueryData<PostDetail | null>(
+        postQueryKeys.detail(userId, postId),
+        (post) => post ? { ...post, ...imageMetadata } : post,
+      )
+      void queryClient.invalidateQueries({
+        queryKey: postQueryKeys.list(userId),
+      })
     },
   })
 }

@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useFieldArray, useForm, useWatch } from 'react-hook-form'
 
 import type { Category } from '../categories/categories.types'
@@ -29,6 +29,7 @@ import {
   type PostTag,
   type SeoData,
 } from './posts.types'
+import type { PostImageMetadata } from './posts.repository'
 
 function toMetadataDifficulty(value: string | null | undefined): '' | 'beginner' | 'intermediate' | 'advanced' {
   return value === 'beginner' || value === 'intermediate' || value === 'advanced' ? value : ''
@@ -48,6 +49,13 @@ interface PostFormProps {
   submitError: string | null
   submitSuccess?: string | null
   onSubmit: (values: PostFormValues) => Promise<void>
+  isImageSaving?: boolean
+  imageSaveError?: string | null
+  imageSaveSuccess?: string | null
+  onImageMetadataSubmit?: (values: {
+    imagePrompt: string
+    imageAlt: string
+  }) => Promise<PostImageMetadata | null>
 }
 
 export function PostForm({
@@ -64,10 +72,15 @@ export function PostForm({
   submitError,
   submitSuccess = null,
   onSubmit,
+  isImageSaving = false,
+  imageSaveError = null,
+  imageSaveSuccess = null,
+  onImageMetadataSubmit,
 }: PostFormProps) {
   const [htmlValidationErrors, setHtmlValidationErrors] = useState<string[]>([])
   const [tagInput, setTagInput] = useState('')
   const [tagInputError, setTagInputError] = useState<string | null>(null)
+  const imageSubmitInFlight = useRef(false)
   const initialCategory = categories.find(
     (category) => category.id === post?.category_id,
   )
@@ -75,8 +88,11 @@ export function PostForm({
     register,
     handleSubmit,
     control,
+    getValues,
+    resetField,
     setValue,
     setError,
+    trigger,
     formState: { errors, dirtyFields, isSubmitting },
   } = useForm<PostFormInput, unknown, PostFormValues>({
     resolver: zodResolver(postFormSchema),
@@ -142,6 +158,10 @@ export function PostForm({
     (category) => category.id === categoryId,
   )
   const disabled = isSaving || isSubmitting
+  const imageMetadataDirty = Boolean(dirtyFields.imagePrompt || dirtyFields.imageAlt)
+  const hasUnrelatedDirtyFields = Object.keys(dirtyFields).some(
+    (fieldName) => fieldName !== 'imagePrompt' && fieldName !== 'imageAlt',
+  )
   const statusOptions = mode === 'create'
     ? ['draft']
     : post?.content_status === 'archived'
@@ -194,6 +214,38 @@ export function PostForm({
     }
 
     await onSubmit(values)
+  }
+
+  async function handleImageMetadataSubmit() {
+    if (
+      mode !== 'edit' ||
+      !post?.id ||
+      !onImageMetadataSubmit ||
+      disabled ||
+      isImageSaving ||
+      imageSubmitInFlight.current ||
+      !imageMetadataDirty
+    ) {
+      return
+    }
+
+    imageSubmitInFlight.current = true
+    try {
+      const imageFieldsValid = await trigger(['imagePrompt', 'imageAlt'])
+      if (!imageFieldsValid) return
+
+      const values = getValues()
+      const saved = await onImageMetadataSubmit({
+        imagePrompt: values.imagePrompt,
+        imageAlt: values.imageAlt,
+      })
+      if (!saved) return
+
+      resetField('imagePrompt', { defaultValue: saved.image_prompt ?? '' })
+      resetField('imageAlt', { defaultValue: saved.image_alt ?? '' })
+    } finally {
+      imageSubmitInFlight.current = false
+    }
   }
 
   function addTag() {
@@ -539,7 +591,7 @@ export function PostForm({
             </div>
           </fieldset>
 
-          <fieldset className="post-form__section" disabled={disabled}>
+          <fieldset className="post-form__section" disabled={disabled || isImageSaving}>
             <legend>대표 이미지 정보</legend>
             <div className="post-form__field post-form__field--wide">
               <label htmlFor="post-image-prompt">이미지 프롬프트</label>
@@ -566,6 +618,29 @@ export function PostForm({
               ) : (
                 <p className="field-help">이미지 파일이나 URL은 저장하지 않습니다.</p>
               )}
+            </div>
+            {imageSaveError ? (
+              <p className="form-alert post-form__field--wide" role="alert">{imageSaveError}</p>
+            ) : null}
+            {imageSaveSuccess ? (
+              <div className="post-form__field--wide">
+                <p className="form-success" role="status">{imageSaveSuccess}</p>
+                {hasUnrelatedDirtyFields ? (
+                  <p className="field-help">다른 변경 사항은 저장되지 않은 상태로 유지됩니다.</p>
+                ) : null}
+              </div>
+            ) : null}
+            <div className="post-form__actions post-form__field--wide">
+              <button
+                className="secondary-button"
+                type="button"
+                disabled={disabled || isImageSaving || !imageMetadataDirty || !post?.id}
+                onClick={() => { void handleImageMetadataSubmit() }}
+              >
+                {isImageSaving
+                  ? '이미지 프롬프트·ALT만 저장 중'
+                  : '이미지 프롬프트·ALT만 저장'}
+              </button>
             </div>
           </fieldset>
 
@@ -719,7 +794,7 @@ export function PostForm({
       ) : null}
 
       <div className="post-form__actions">
-        <button className="primary-button" type="submit" disabled={disabled}>
+        <button className="primary-button" type="submit" disabled={disabled || isImageSaving}>
           {disabled ? '저장 중' : mode === 'create' ? '콘텐츠 저장' : '변경 사항 저장'}
         </button>
       </div>

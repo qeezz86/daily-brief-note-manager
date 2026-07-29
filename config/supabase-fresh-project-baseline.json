@@ -1,16 +1,16 @@
 {
   "schemaVersion": 1,
   "deploymentMode": "fresh-project-baseline",
-  "migrationCount": 24,
+  "migrationCount": 25,
   "currentApplicationPlans": {
     "fresh": {
       "requiredAppliedMigrationCount": 0,
-      "pendingMigrationCount": 24,
+      "pendingMigrationCount": 25,
       "seedRequired": true
     },
     "existing": {
       "requiredAppliedMigrationCount": 22,
-      "pendingMigrations": ["20260724190000_harden_wordpress_publication_attempt_retention.sql", "20260726190000_expand_news_briefing_prompt_recent_counts.sql"],
+      "pendingMigrations": ["20260724190000_harden_wordpress_publication_attempt_retention.sql", "20260726190000_expand_news_briefing_prompt_recent_counts.sql", "20260727150000_add_post_image_prompt_alt_update_rpc.sql"],
       "seedRequired": false
     }
   },
@@ -343,7 +343,7 @@
       "affectsRpc": false,
       "seedDependency": null,
       "freshProjectApplicable": true,
-      "existingProjectApplicable": "incremental-wordpress-hardening-1-of-2"
+      "existingProjectApplicable": "incremental-wordpress-hardening-1-of-3"
     },
     {
       "version": "20260726190000",
@@ -357,7 +357,21 @@
       "affectsRpc": true,
       "seedDependency": null,
       "freshProjectApplicable": true,
-      "existingProjectApplicable": "incremental-news-prompt-count-2-of-2"
+      "existingProjectApplicable": "incremental-news-prompt-count-2-of-3"
+    },
+    {
+      "version": "20260727150000",
+      "filename": "20260727150000_add_post_image_prompt_alt_update_rpc.sql",
+      "purpose": "Add an owner-scoped atomic RPC that updates only a post's image prompt and ALT text.",
+      "majorObjects": ["update_post_image_metadata"],
+      "dependsOn": ["20260726190000"],
+      "destructiveStatements": [],
+      "dataRewrite": "none",
+      "affectsRls": false,
+      "affectsRpc": true,
+      "seedDependency": null,
+      "freshProjectApplicable": true,
+      "existingProjectApplicable": "incremental-post-image-metadata-3-of-3"
     }
   ],
   "seedFiles": ["01_categories.sql"],
@@ -365,7 +379,7 @@
   "expectedCategoryIds": ["economy", "global", "technology", "society", "climate-energy", "ai-column", "info-db", "chinese-study"],
   "expectedCoreTables": ["ai_metadata", "categories", "chinese_metadata", "generated_prompts", "import_job_item_attempts", "import_job_items", "import_jobs", "info_db_metadata", "news_followups", "news_status_history", "news_topics", "news_updates", "post_tags", "posts", "restore_job_record_attempts", "restore_job_records", "restore_jobs", "seo_data", "series_counters", "sources", "tags"],
   "expectedWordPressTables": ["wordpress_taxonomy_mappings", "wordpress_publication_attempts"],
-  "expectedFunctions": ["append_import_job_items", "append_restore_job_records", "cancel_import_job", "cancel_restore_job", "create_import_job", "create_news_followup", "create_news_update", "create_restore_job", "finalize_import_job", "finalize_restore_job", "get_import_job", "get_import_job_items", "get_import_jobs", "get_news_briefing_prompt_context", "get_restore_job", "get_restore_job_records", "get_restore_jobs", "get_user_backup_estimate", "get_user_backup_snapshot", "import_content_post", "import_news_tracking_for_post", "issue_series_no", "reorder_news_updates", "resolve_news_followup", "resume_cancelled_import_job", "resume_cancelled_restore_job", "run_import_job_item_content", "run_import_job_item_tracking", "run_restore_job_record", "save_ai_publication_bundle", "save_chinese_publication_bundle", "save_info_db_publication_bundle", "save_news_briefing_prompt_run", "save_post_editor", "save_post_publication_bundle", "set_news_briefing_prompt_run_pinned", "transition_news_topic_status", "transition_wordpress_publication_attempt_service", "update_news_followup", "update_news_update"],
+  "expectedFunctions": ["append_import_job_items", "append_restore_job_records", "cancel_import_job", "cancel_restore_job", "create_import_job", "create_news_followup", "create_news_update", "create_restore_job", "finalize_import_job", "finalize_restore_job", "get_import_job", "get_import_job_items", "get_import_jobs", "get_news_briefing_prompt_context", "get_restore_job", "get_restore_job_records", "get_restore_jobs", "get_user_backup_estimate", "get_user_backup_snapshot", "import_content_post", "import_news_tracking_for_post", "issue_series_no", "reorder_news_updates", "resolve_news_followup", "resume_cancelled_import_job", "resume_cancelled_restore_job", "run_import_job_item_content", "run_import_job_item_tracking", "run_restore_job_record", "save_ai_publication_bundle", "save_chinese_publication_bundle", "save_info_db_publication_bundle", "save_news_briefing_prompt_run", "save_post_editor", "save_post_publication_bundle", "set_news_briefing_prompt_run_pinned", "transition_news_topic_status", "transition_wordpress_publication_attempt_service", "update_news_followup", "update_news_update", "update_post_image_metadata"],
   "forbiddenRemoteCommandsDuringPlanning": ["supabase link", "supabase migration list --linked", "supabase db push --linked", "supabase db pull", "supabase migration repair", "supabase db reset --linked", "supabase secrets set", "supabase secrets unset", "supabase functions deploy"],
-  "requiredPostDeploymentChecks": ["migration-history-24", "expected-public-tables", "rls-enabled", "policy-inventory", "expected-rpcs", "rpc-security-type", "rpc-search-path", "rpc-execute-privileges", "unique-indexes", "partial-unique-execution-guard", "category-count-8", "category-ids", "initial-user-content-zero", "wordpress-taxonomy-mappings-zero", "wordpress-publication-attempts-zero"]
+  "requiredPostDeploymentChecks": ["migration-history-25", "expected-public-tables", "rls-enabled", "policy-inventory", "expected-rpcs", "rpc-security-type", "rpc-search-path", "rpc-execute-privileges", "unique-indexes", "partial-unique-execution-guard", "category-count-8", "category-ids", "initial-user-content-zero", "wordpress-taxonomy-mappings-zero", "wordpress-publication-attempts-zero"]
 }
