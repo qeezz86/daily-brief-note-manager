@@ -11,6 +11,16 @@ import { describe, expect, it, vi } from 'vitest'
 import { routes } from '../../app/router'
 import { AuthProvider } from './AuthProvider'
 
+vi.mock('../../pages/DashboardPage', () => ({
+  DashboardPage: function MockDashboardDestination() {
+    return (
+      <section aria-label="대시보드">
+        <h1>콘텐츠 관리</h1>
+      </section>
+    )
+  },
+}))
+
 const user: User = {
   id: '00000000-0000-0000-0000-0000000000a1',
   aud: 'authenticated',

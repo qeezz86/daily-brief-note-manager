@@ -199,7 +199,7 @@ export async function checkSupabaseFreshBaseline(options = {}) {
     if (migration.filename !== `${migration.version}_${migration.filename.slice(15)}`) migrationIssues.push(`${migration.filename}: version and filename disagree`)
   }
   if (expectedMigrationFiles[0] !== '20260710080000_initial_schema.sql') migrationIssues.push('first migration must be the initial schema')
-  if (expectedMigrationFiles.at(-1) !== '20260727150000_add_post_image_prompt_alt_update_rpc.sql') migrationIssues.push('last migration must add the post image metadata update RPC')
+  if (expectedMigrationFiles.at(-1) !== '20260729150000_get_dashboard_overview.sql') migrationIssues.push('last migration must add the operational dashboard overview RPC')
   const existingPlan = manifest.currentApplicationPlans?.existing
   const freshPlan = manifest.currentApplicationPlans?.fresh
   if (freshPlan?.requiredAppliedMigrationCount !== 0 || freshPlan?.pendingMigrationCount !== expectedMigrationFiles.length || freshPlan?.seedRequired !== true) {

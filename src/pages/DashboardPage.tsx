@@ -1,24 +1,42 @@
-import { Link } from 'react-router-dom'
+import { useAuth } from '../features/auth/useAuth'
+import { DashboardOverview } from '../features/dashboard/DashboardOverview'
+import { useDashboardOverviewQuery } from '../features/dashboard/dashboard.queries'
+import type { DashboardRpcClient } from '../features/dashboard/dashboard.repository'
+import { supabase } from '../shared/supabase/client'
 
-export function DashboardPage() {
+interface DashboardPageContentProps {
+  client?: DashboardRpcClient | null
+  userId: string
+}
+
+export function DashboardPageContent({
+  client = supabase,
+  userId,
+}: DashboardPageContentProps) {
+  const query = useDashboardOverviewQuery(client, userId, 5)
+
   return (
     <section className="dashboard" aria-labelledby="dashboard-title">
       <div className="dashboard__heading">
         <p className="dashboard__eyebrow">대시보드</p>
-        <h1 id="dashboard-title">콘텐츠 관리</h1>
+        <h1 id="dashboard-title">운영 현황</h1>
+        <p>콘텐츠, 뉴스 추적, 후속 확인, 저장 프롬프트를 한눈에 확인합니다.</p>
       </div>
 
-      <div className="empty-state" role="status">
-        <span className="empty-state__indicator" aria-hidden="true" />
-        <div>
-          <h2>인증 연결이 준비되었습니다</h2>
-          <p>콘텐츠 관리 기능은 다음 단계에서 추가됩니다.</p>
-        </div>
-      </div>
-
-      <Link className="primary-link" to="/content">
-        콘텐츠 목록 보기
-      </Link>
+      <DashboardOverview
+        data={query.data}
+        isPending={query.isPending}
+        isError={query.isError}
+        onRetry={() => {
+          void query.refetch()
+        }}
+      />
     </section>
   )
+}
+
+export function DashboardPage() {
+  const { user } = useAuth()
+
+  return <DashboardPageContent userId={user?.id ?? ''} />
 }

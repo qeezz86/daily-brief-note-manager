@@ -1455,6 +1455,10 @@ export type Database = {
         Returns: Json
       }
       finalize_restore_job: { Args: { p_job_id: string }; Returns: Json }
+      get_dashboard_overview: {
+        Args: { p_recent_limit?: number }
+        Returns: Json
+      }
       get_import_job: { Args: { p_job_id: string }; Returns: Json }
       get_import_job_items: { Args: { p_job_id: string }; Returns: Json }
       get_import_job_v1: { Args: { p_job_id: string }; Returns: Json }
