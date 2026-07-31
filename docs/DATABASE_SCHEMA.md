@@ -111,6 +111,14 @@ categories
 
 반환 JSON의 `schemaVersion`은 1이다. 최근 글 요청 수는 `5`, `10`, `15` 중 하나이며 기본값은 `5`다. 최근 `published` 게시물은 요청 수까지 반환하고 사용 가능한 글이 더 적으면 모두 반환한다. 정렬은 `published_on DESC`, `updated_at DESC`, `id ASC` 순이며 context의 최근 글에는 `updatedAt`을 포함한다. 종료 조회 기간은 1~180일, 종료 주제는 최대 20개로 제한한다. 종료 시각은 `news_status_history`의 기준일 이전 최신 `to_status = closed` 이력이며 현재 상태가 `closed`인 주제만 반환한다. WordPress HTML, 이미지 프롬프트, 사용자 이메일, 소유자 ID와 원문 기사 전문은 반환하지 않는다. 이 RPC는 `generated_prompts`를 포함한 어떤 테이블에도 쓰지 않는다.
 
+### 3.2 운영 대시보드 overview RPC
+
+`get_dashboard_overview(p_recent_limit integer default 5)`는 인증 사용자의 운영 현황을 snake_case JSONB로 반환하는 읽기 전용 `SECURITY INVOKER` 함수다. 허용 범위는 1~10이고 UI는 5를 사용한다. `owner_id` 입력은 없으며 `auth.uid()` 명시 조건과 `posts`, `news_topics`, `news_followups`, `generated_prompts`의 기존 authenticated SELECT/RLS를 함께 적용한다. `PUBLIC`과 `anon` 실행은 취소하고 `authenticated`에만 실행 권한을 부여한다.
+
+응답 `schema_version`은 1이다. `counts`는 로그인 사용자의 `total_posts`, canonical `ready` 상태의 `ready_posts`, canonical `active` 상태의 `active_news_topics`, canonical `pending` 상태의 `pending_news_followups`를 포함한다. `category_counts`는 활성 category를 `sort_order`, `id` 순으로 반환하고 0건 category도 포함한다. `recent_posts`는 `updated_at DESC, id DESC`, `recent_prompt_runs`는 `generated_at DESC, id DESC`로 제한한다. Prompt projection은 실제 schema의 `reference_date`, `requested_post_count`, `actual_post_count`, `generated_at`을 사용한다.
+
+응답에는 `owner_id`, HTML/summary/image metadata, prompt/context 전문, source 원문, credential/token, import/backup payload를 포함하지 않는다. 함수는 table·column·index·constraint·RLS를 변경하지 않고 데이터를 쓰거나 WordPress를 호출하지 않는다. 이 derived aggregate는 backup schema version 1이나 import/restore graph에 추가하지 않는다.
+
 ## 4. 카테고리
 
 ### 4.1 `categories`

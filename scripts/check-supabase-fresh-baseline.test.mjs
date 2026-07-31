@@ -64,12 +64,12 @@ describe('Supabase fresh baseline deployment classification', () => {
     expect(classifyRemoteState(await inspection('fresh-empty-project.json'), manifest)).toBe(deploymentModes.fresh)
   })
 
-  it('accepts the exact 25-migration fresh plan and approved seed', async () => {
+  it('accepts the exact 26-migration fresh plan and approved seed', async () => {
     const manifest = await json('config/supabase-fresh-project-baseline.json')
-    expect(manifest.migrations).toHaveLength(25)
-    expect(manifest.currentApplicationPlans.fresh.pendingMigrationCount).toBe(25)
-    expect(manifest.migrations.at(-1)?.filename).toBe('20260727150000_add_post_image_prompt_alt_update_rpc.sql')
-    expect(manifest.expectedFunctions.filter((name) => name === 'update_post_image_metadata')).toHaveLength(1)
+    expect(manifest.migrations).toHaveLength(26)
+    expect(manifest.currentApplicationPlans.fresh.pendingMigrationCount).toBe(26)
+    expect(manifest.migrations.at(-1)?.filename).toBe('20260729150000_get_dashboard_overview.sql')
+    expect(manifest.expectedFunctions.filter((name) => name === 'get_dashboard_overview')).toHaveLength(1)
     expect(manifest.expectedFunctions).toEqual([...manifest.expectedFunctions].sort())
     expect(validateDeploymentPlan(await inspection('fresh-empty-project.json'), manifest)).toEqual([])
   })
@@ -81,7 +81,7 @@ describe('Supabase fresh baseline deployment classification', () => {
     expect(validateDeploymentPlan(value, manifest, deploymentModes.fresh)).not.toEqual([])
   })
 
-  it('classifies a consistent 22+3 project as incremental ready', async () => {
+  it('classifies a consistent 22+4 project as incremental ready', async () => {
     const manifest = await json('config/supabase-fresh-project-baseline.json')
     const value = await inspection('existing-incremental-project.json')
     expect(classifyRemoteState(value, manifest)).toBe(deploymentModes.incremental)
@@ -90,6 +90,7 @@ describe('Supabase fresh baseline deployment classification', () => {
       '20260724190000_harden_wordpress_publication_attempt_retention.sql',
       '20260726190000_expand_news_briefing_prompt_recent_counts.sql',
       '20260727150000_add_post_image_prompt_alt_update_rpc.sql',
+      '20260729150000_get_dashboard_overview.sql',
     ])
     expect(validateDeploymentPlan(value, manifest)).toEqual([])
   })
@@ -98,21 +99,21 @@ describe('Supabase fresh baseline deployment classification', () => {
     const manifest = await json('config/supabase-fresh-project-baseline.json')
     const value = await inspection('existing-incremental-project.json')
     value.deploymentPlan = {
-      plannedMigrations: ['20260727150000_add_post_image_prompt_alt_update_rpc.sql'],
+      plannedMigrations: ['20260729150000_get_dashboard_overview.sql'],
       includeSeed: false,
       seedFiles: [],
     }
     expect(validateDeploymentPlan(value, manifest, deploymentModes.incremental)).not.toEqual([])
   })
 
-  it('rejects all 25 migrations for an incremental project', async () => {
+  it('rejects all 26 migrations for an incremental project', async () => {
     const manifest = await json('config/supabase-fresh-project-baseline.json')
     const value = await inspection('existing-incremental-project.json')
     value.deploymentPlan.plannedMigrationSet = 'all'
     expect(validateDeploymentPlan(value, manifest, deploymentModes.incremental)).not.toEqual([])
   })
 
-  it('classifies all 25 applied migrations as current with no deployment plan', async () => {
+  it('classifies all 26 applied migrations as current with no deployment plan', async () => {
     const manifest = await json('config/supabase-fresh-project-baseline.json')
     const value = await inspection('current-project.json')
     expect(classifyRemoteState(value, manifest)).toBe(deploymentModes.current)
@@ -212,19 +213,19 @@ describe('Supabase fresh baseline repository checker', () => {
     expect(namedCheck(await checkSupabaseFreshBaseline({ root }), 'migration inventory').pass).toBe(false)
   })
 
-  it('detects a missing Phase 5D migration and directory-manifest mismatch', async () => {
+  it('detects a missing Phase 5E migration and directory-manifest mismatch', async () => {
     const { root, manifest } = await repositoryFixture()
     await fs.rm(path.join(root, 'supabase/migrations', manifest.migrations.at(-1).filename))
     expect(namedCheck(await checkSupabaseFreshBaseline({ root }), 'migration inventory').pass).toBe(false)
   })
 
-  it('detects a latest migration that is not the canonical Phase 5D migration', async () => {
+  it('detects a latest migration that is not the canonical Phase 5E migration', async () => {
     const { root } = await repositoryFixture()
     const manifestFile = path.join(root, 'config/supabase-fresh-project-baseline.json')
     const manifest = JSON.parse(await fs.readFile(manifestFile, 'utf8'))
     const previousFilename = manifest.migrations.at(-1).filename
-    const replacementFilename = '20260728150000_noncanonical_latest.sql'
-    manifest.migrations.at(-1).version = '20260728150000'
+    const replacementFilename = '20260730150000_noncanonical_latest.sql'
+    manifest.migrations.at(-1).version = '20260730150000'
     manifest.migrations.at(-1).filename = replacementFilename
     await fs.rename(
       path.join(root, 'supabase/migrations', previousFilename),
