@@ -8,7 +8,7 @@ Daily Brief Note의 콘텐츠, SEO 정보, 출처, 뉴스 추적 이력과 생�
 
 인증된 단일 허용 사용자는 콘텐츠별 publication payload를 Dry Run으로 검토한 뒤 명시적 확인을 거쳐 WordPress `draft` 1건을 생성할 수 있습니다. 서버는 쓰기 직전에 RLS 범위의 DB 원본, taxonomy, duplicate slug, source `updated_at`과 canonical fingerprint를 다시 검증합니다. WordPress credential은 브라우저나 DB에 저장하지 않으며 publish·update·delete·media·taxonomy write와 자동 재시도는 수행하지 않습니다. 실제 원격 배포와 단일 draft smoke는 별도 승인 아래 [`docs/WORDPRESS_PRODUCTION_DEPLOYMENT_RUNBOOK.md`](docs/WORDPRESS_PRODUCTION_DEPLOYMENT_RUNBOOK.md)를 따릅니다.
 
-Phase 4B의 `/backups`에서는 공식 `core`·`full` JSON 백업을 생성하고, `/backups/restore`에서 read-only Dry Run과 결정적 복원 계획을 만든 뒤 `/backups/restore/execute`에서 원본 backup과 plan을 다시 검증해 core 데이터와 선택한 full Import 운영 이력을 실제 복원할 수 있습니다. `/backups/restore/jobs`는 영구 job·record·attempt, stage 진행률, 수동 retry, 취소·재개를 제공합니다.
+Phase 4B의 `/backups`에서는 공식 `core`·`full` JSON 백업을 생성하고, `/backups/restore`에서 read-only Dry Run과 결정적 복원 계획을 만든 뒤 `/backups/restore/execute`에서 원본 backup과 plan을 다시 검증해 core 데이터와 선택한 full Import 운영 이력을 실제 복원할 수 있습니다. `/backups/restore/jobs`는 영구 job·record·attempt, stage 진행률, 수동 retry, 취소·재개를 제공합니다. Phase 5F는 관계·민감정보·checksum 검증을 마친 동일 backup snapshot에서 posts, news topics, follow-ups, sources CSV를 추가로 다운로드합니다. CSV는 spreadsheet 검토 전용이며 import 또는 restore 입력으로 지원하지 않습니다. 데이터 이동과 복원의 canonical 형식은 기존 JSON backup입니다.
 
 복원 계획은 원본 백업과 분리된 `daily-brief-note-restore-plan` schema version 1 JSON입니다. 실행에는 두 파일이 모두 필요하고 checksum·fingerprint·category·DB 충돌을 직전에 다시 확인합니다. record별 transaction이므로 부분 성공할 수 있으며 브라우저가 닫혀 있는 동안 자동 실행하지 않습니다. 기존 row overwrite·merge, 자동 suffix와 restore undo는 지원하지 않습니다. 허용되는 기존 row 변경은 series counter의 단조 증가와 이번 job이 만든 뉴스 update의 previous 연결 완성으로 제한됩니다.
 

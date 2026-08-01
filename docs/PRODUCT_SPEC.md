@@ -1534,13 +1534,15 @@ Phase 2B-2의 generic `sources`는 기관명·원문 제목·URL·게시 시각�
 - 파일명은 `daily-brief-note-backup-{profile}-YYYY-MM-DD-HHmmss.json`이며 시각은 `Asia/Seoul` 기준이다.
 - 세부 형식과 결정적 정렬 규칙은 `docs/BACKUP_FORMAT.md`에서 관리한다.
 
-CSV는 검토와 내보내기 전용이며 전체 관계 복원에 사용하지 않는다.
+Phase 5F에서 CSV review export를 구현한다. 관계·민감정보·checksum 검증이 완료된 동일 owner-scoped backup snapshot의 row 순서와 explicit field allowlist를 사용하며 UTF-8 BOM, comma, CRLF, final newline, 결정적 quoting과 spreadsheet formula-injection 방어를 적용한다. 기존 JSON backup schema, serialization, filename, checksum, 검증과 restore 계약은 변경하지 않는다. CSV는 검토와 내보내기 전용이며 CSV import와 restore는 범위 밖이다. 고급 filtered export와 structured ChatGPT paste preview도 후속 단계로 미룬다.
 
 - 전체 JSON
 - posts CSV
 - news topics CSV
 - followups CSV
 - sources CSV
+- 검증된 snapshot에서 선택한 dataset의 row가 0개여도 CSV control은 사용할 수 있다. 이는 오류나 검증 실패가 아닌 정상 다운로드이며, non-empty dataset과 같은 파일명 규칙을 사용해 UTF-8 BOM, 해당 dataset의 ordered header와 CRLF만 포함하고 data row는 포함하지 않는다.
+- 한 번의 명시적 사용자 action은 선택한 CSV 파일 하나만 다운로드 시도하며, 실패가 JSON backup이나 다른 CSV action을 자동 실행하지 않는다. 실패 시 raw internal error나 validation detail 대신 정제된 일반 오류 메시지를 표시하고 자동 재시도하지 않으므로 사용자가 현재 검증된 snapshot 또는 새로 검증된 정상 snapshot에서 직접 다시 실행해야 한다. 성공하거나 정상 상태로 전환되면 이전 export 오류를 정리한다.
 
 ### 16.2 Phase 4B-2 복원 Dry Run과 호환성 검사
 
