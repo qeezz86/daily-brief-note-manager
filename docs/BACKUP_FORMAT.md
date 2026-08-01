@@ -117,6 +117,28 @@ checksum은 전송·저장 중 우발적 변경을 탐지하기 위한 것이며
 - 파일명은 `daily-brief-note-backup-{profile}-YYYY-MM-DD-HHmmss.json`이며 timestamp는 `Asia/Seoul` 기준이다.
 - 같은 생성 결과는 사용자가 다시 생성하기 전까지 checksum·manifest 복사와 재다운로드에 그대로 사용한다.
 
+## 9.1 Phase 5F CSV review exports
+
+관계 무결성, 민감정보와 checksum 검증을 마쳐 `BuiltBackup`이 된 현재 인증 사용자의 snapshot에서만 다음 네 CSV를 만든다. CSV 생성은 DB 또는 network를 다시 조회하지 않으며 snapshot의 row 순서를 그대로 보존한다. 공식 JSON backup은 데이터 이동과 restore의 canonical 형식으로 유지되며 CSV import와 restore는 지원하지 않는다.
+
+각 dataset은 runtime object key가 아니라 다음 explicit allowlist와 순서를 사용한다.
+
+- `posts` (20): `id`, `categoryId`, `seriesNo`, `briefingDate`, `publishedOn`, `displayId`, `title`, `summary`, `htmlBody`, `slug`, `wordpressUrl`, `contentStatus`, `publishedAt`, `sourceImportType`, `imagePrompt`, `imageAlt`, `imagePromptVersion`, `imagePromptUpdatedAt`, `createdAt`, `updatedAt`
+- `news_topics` (11): `id`, `categoryId`, `topicKey`, `canonicalTitle`, `topicSummary`, `status`, `closedReason`, `firstSeenAt`, `lastSeenAt`, `createdAt`, `updatedAt`
+- `follow_ups` (10): `id`, `topicId`, `checkText`, `status`, `dueDate`, `priority`, `resolutionNote`, `resolvedAt`, `createdAt`, `updatedAt`
+- `sources` (12): `id`, `postId`, `newsUpdateId`, `sourceName`, `sourceTitle`, `sourceUrl`, `sourcePublishedAt`, `checkedAt`, `checkedPoint`, `sortOrder`, `createdAt`, `updatedAt`
+
+`owner_id`, 인증·session·credential field, runtime field와 unknown field는 내보내지 않는다. 모든 파일은 UTF-8 BOM, comma delimiter, CRLF record separator와 final CRLF를 사용한다. header는 정확히 한 줄이며 empty dataset도 `BOM + header + CRLF`로 다운로드한다. comma, double quote, CR 또는 LF가 있는 cell은 double quote로 감싸고 내부 double quote를 두 번 쓴다. `null`과 `undefined`는 empty cell, boolean은 `true`/`false`, finite number는 locale-independent JavaScript decimal text로 기록한다. JSON-compatible array와 plain object는 whitespace 없는 JSON으로 기록하며 unsupported, non-finite 또는 cyclic value는 payload를 노출하지 않는 오류로 차단한다.
+
+Spreadsheet formula injection 방어는 string의 원문을 변경하지 않고 CSV 출력 앞에 apostrophe를 붙인다. 첫 문자가 tab·CR·LF이거나, leading whitespace 뒤 첫 effective character가 `=`, `+`, `-`, `@`이면 방어 대상이다. 따라서 string `-10`은 보호하지만 number `-10`은 numeric text를 유지한다. 이 방어는 끌 수 없다.
+
+파일명은 JSON의 `exportedAt`과 동일한 snapshot 시각을 `Asia/Seoul`로 변환한 `YYYY-MM-DD-HHmmss`를 사용한다.
+
+- `daily-brief-note-posts-YYYY-MM-DD-HHmmss.csv`
+- `daily-brief-note-news-topics-YYYY-MM-DD-HHmmss.csv`
+- `daily-brief-note-follow-ups-YYYY-MM-DD-HHmmss.csv`
+- `daily-brief-note-sources-YYYY-MM-DD-HHmmss.csv`
+
 ## 10. Phase 4B-2 복원 Dry Run
 
 `/backups/restore`는 이 문서의 version 1 JSON만 받으며 콘텐츠 Import bundle과 혼용하지 않는다. UTF-8 `.json` 파일 또는 JSON text 중 하나를 브라우저에서 읽고 100 MiB를 초과하면 parse 전에 차단한다. 입력은 외부 서버로 보내지 않는다.
