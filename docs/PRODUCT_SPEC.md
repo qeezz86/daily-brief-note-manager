@@ -856,9 +856,9 @@ JSON 입력 키는 camelCase를 사용한다. DB 컬럼은 snake_case를 유지�
 | `sourcePublishedAt` | `sources.source_published_at` |
 | `checkedPoint` | `sources.checked_point` |
 
-## 9.2 비구조화 응답 지원
+## 9.2 비구조화 응답 (향후 범위)
 
-기존 프로젝트 출력 순서인 다음 항목도 파싱한다.
+아래 출력 순서 파싱은 후속 단계의 기획 기록이다. Phase 5G 구조화 붙여넣기 mode는 비구조화/free-form text나 AI semantic interpretation을 지원하지 않는다.
 
 1. SEO 입력용 대표 제목
 2. SEO 대안 제목 4개
@@ -880,6 +880,24 @@ JSON 입력 키는 camelCase를 사용한다. DB 컬럼은 snake_case를 유지�
 5. 수동 수정
 
 동일 selector 또는 서로 다른 단계에서 여러 후보가 나오면 자동 확정하지 않고 후보와 경고를 표시한다. 필수 필드가 모호하면 저장을 차단한다.
+
+## 9.3 Phase 5G 구조화 붙여넣기 미리보기와 저장
+
+`/imports`의 **ChatGPT 구조화 붙여넣기** mode는 기존 JSON Import에 더해지는 단일 게시물 workflow다. 사용자가 plain text를 직접 붙여넣고 `로컬 미리보기 생성`을 누르면 브라우저 안의 결정적 parser가 `CONTENT_META_JSON`, `SEO_JSON`, `IMAGE_PROMPT_JSON`, `SOURCES_JSON`, `WORDPRESS_HTML`, 선택적인 `NEWS_TRACKING_JSON`을 분석한다. clipboard를 자동으로 읽거나 network·OpenAI API·외부 AI에 입력을 전송하지 않는다.
+
+미리보기는 content group, category, title, 제공된 summary, display ID 또는 series number, slug, 발행 날짜·시각, SEO 제목·설명·keyword·tags, sources, image prompt·ALT와 WordPress HTML을 표시한다. HTML은 실행 가능한 DOM으로 삽입하지 않고 escaped inert text로만 표시하며 URL이나 외부 이미지를 자동 조회하지 않는다. ignored field와 `NEWS_TRACKING_JSON`의 update/followup 개수, 차단 오류 수, 경고 수, 저장 가능 여부도 색상 외 텍스트로 알린다.
+
+- 필수 section·필드 누락, 잘못된 값, section/key 중복, 잘못된 JSON·section 문법, 금지 owner/auth/session/raw/provenance 키, resource limit 초과와 unsafe HTML은 차단 오류이며 확인 버튼을 비활성화한다.
+- 유효하지만 지원하지 않는 field·section, SEO 권장 범위와 인식만 하는 `NEWS_TRACKING_JSON`은 경고다. 저장 전 사용자가 경고 확인 checkbox를 명시적으로 승인해야 한다.
+- 입력을 수정하면 이전 미리보기, 경고 승인, parse/save 오류와 저장 자격을 즉시 무효화한다. 초기화는 raw input과 모든 transient 상태를 지우며 record를 만들지 않는다.
+- 저장은 유효한 미리보기와 경고 승인 뒤 `미리보기 확인 후 한 건 저장`을 눌러야 시작한다. confirmation 전, mode 전환, unmount 또는 page navigation만으로는 persistence가 발생하지 않는다.
+- confirmation 중에는 active RPC가 최대 하나이며 반복 click은 두 번째 요청을 만들지 않는다. 성공한 workflow에서는 다시 저장할 수 없고 생성된 `/content/:postId` 상세로 이동한다.
+- 저장 실패는 backend 원문을 숨긴 actionable 오류를 표시하고 validated preview를 유지한다. 자동·background retry는 없고 사용자가 누르는 수동 retry 한 번마다 정확히 한 요청만 새로 만든다.
+- 네트워크가 없어도 이미 로드된 앱에서 local parse/preview는 가능하지만 offline save queue, background sync 또는 자동 resync는 제공하지 않는다.
+
+저장 payload는 확정 allowlist로 새로 구성하며 raw paste, ignored field, `NEWS_TRACKING_JSON`, owner/auth/session, caller provenance를 포함하지 않는다. DB는 `auth.uid()`에서 owner를 결정하고 provenance를 `chatgpt_paste`로 고정해 하나의 draft post publication aggregate와 순서가 있는 sources를 transaction으로 저장한다. raw paste를 DB, log, telemetry, backup 또는 CSV에 보존하지 않는다.
+
+Chromium과 iPhone 크기의 WebKit에서 valid, blocked, explicit confirmation, redacted failure/manual retry, reset과 좁은 화면 control을 지원한다. Phase 5G 범위에는 free-form/AI semantic interpretation, bulk import, WordPress 자동 publish, CSV restore, image upload/storage, offline 저장·재동기화, news tracking 저장, automatic retry, 새 table/column 또는 backup schema 변경이 포함되지 않는다. 기존 JSON Import, Phase 5F CSV export, canonical JSON backup과 WordPress workflow는 그대로 유지한다.
 
 ---
 

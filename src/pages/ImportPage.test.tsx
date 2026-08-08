@@ -10,6 +10,7 @@ import { ImportPageContent } from './ImportPage'
 
 const prepareImportJobMock = vi.hoisted(() => vi.fn())
 const duplicateLookupMock = vi.hoisted(() => vi.fn())
+const saveChatGptPastePostMock = vi.hoisted(() => vi.fn())
 
 vi.mock('../features/imports/importDuplicates.queries', () => ({
   useImportCategoriesQuery: () => ({ data: importCategories, isPending: false, isError: false }),
@@ -22,8 +23,11 @@ vi.mock('../features/imports/importDuplicates.repository', () => ({
 
 vi.mock('../features/imports/prepareImportJob', () => ({ prepareImportJob: prepareImportJobMock }))
 
+vi.mock('../features/imports/chatGptPaste.repository', () => ({ saveChatGptPastePost: saveChatGptPastePostMock }))
+
 const client = {} as DatabaseClient
 const validText = JSON.stringify(validImportBundle())
+const validPasteText = `[CONTENT_META_JSON]\n{"contentGroup":"news","category":"economy","displayId":"#2026-08-01-ECO","title":"경제 브리핑","slug":"economy-briefing-2026-08-01","publishedOn":"2026-08-01","publishedAt":null}\n[/CONTENT_META_JSON]\n[SEO_JSON]\n{"representativeTitle":"대표 제목","alternativeTitles":["1","2","3","4"],"metaDescription":"${'가'.repeat(120)}","focusKeyword":"경제","tags":["금리","환율","물가","산업","정책"]}\n[/SEO_JSON]\n[IMAGE_PROMPT_JSON]\n{"prompt":"장면","alt":"장면"}\n[/IMAGE_PROMPT_JSON]\n[SOURCES_JSON]\n[]\n[/SOURCES_JSON]\n[WORDPRESS_HTML]\n<div class="daily-brief-note news-briefing economy"><h1>경제 브리핑</h1></div>\n[/WORDPRESS_HTML]`
 
 function renderPage(loadAnalysisModule: () => Promise<typeof importAnalysisModule> = () => Promise.resolve(importAnalysisModule)) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -42,6 +46,7 @@ describe('ImportPageContent', () => {
   beforeEach(() => {
     duplicateLookupMock.mockReset().mockResolvedValue({ databaseCheck: 'complete', referenceData: { posts: [], chineseUrls: [], newsTopics: [], existingTagKeys: [] } })
     prepareImportJobMock.mockReset().mockResolvedValue({ jobId: '00000000-0000-0000-0000-000000000001', isExisting: false, status: 'ready', sourceFingerprint: 'a'.repeat(64) })
+    saveChatGptPastePostMock.mockReset()
     vi.spyOn(window, 'confirm').mockReturnValue(true)
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: vi.fn().mockResolvedValue(undefined) } })
   })
@@ -232,5 +237,56 @@ describe('ImportPageContent', () => {
     renderPage(); await switchToTextAndValidate()
     expect(screen.getByRole('link', { name: '작업 이력' })).toHaveAttribute('href', '/imports/history')
     expect(screen.queryByRole('button', { name: '결과 복사' })).not.toBeInTheDocument()
+  })
+
+  it('기존 JSON Import와 ChatGPT 붙여넣기를 접근 가능한 additive mode로 제공한다', () => {
+    renderPage()
+    expect(screen.getByRole('radio', { name: '기존 JSON Import' })).toBeChecked()
+    expect(screen.getByRole('radio', { name: 'ChatGPT 구조화 붙여넣기' })).not.toBeChecked()
+    expect(screen.getByRole('group', { name: '가져오기 방식' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'ChatGPT 구조화 응답 붙여넣기' })).not.toBeInTheDocument()
+  })
+
+  it('붙여넣기 mode 전환만으로 persistence를 호출하지 않는다', async () => {
+    renderPage()
+    await userEvent.click(screen.getByRole('radio', { name: 'ChatGPT 구조화 붙여넣기' }))
+    expect(await screen.findByRole('heading', { name: 'ChatGPT 구조화 응답 붙여넣기' })).toBeInTheDocument()
+    expect(prepareImportJobMock).not.toHaveBeenCalled()
+    expect(saveChatGptPastePostMock).not.toHaveBeenCalled()
+  })
+
+  it('붙여넣기 parser workflow에서 차단 상태와 valid save 상태를 구분한다', async () => {
+    renderPage()
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('radio', { name: 'ChatGPT 구조화 붙여넣기' }))
+    fireEvent.change(await screen.findByLabelText('구조화 ChatGPT 응답 plain text'), { target: { value: '[CONTENT_META_JSON]\n{}\n[/CONTENT_META_JSON]' } })
+    await user.click(screen.getByRole('button', { name: '로컬 미리보기 생성' }))
+    expect(screen.getByRole('button', { name: '미리보기 확인 후 한 건 저장' })).toBeDisabled()
+    await user.click(screen.getByRole('button', { name: '붙여넣기 초기화' }))
+    fireEvent.change(screen.getByLabelText('구조화 ChatGPT 응답 plain text'), { target: { value: validPasteText } })
+    await user.click(screen.getByRole('button', { name: '로컬 미리보기 생성' }))
+    expect(screen.getByRole('button', { name: '미리보기 확인 후 한 건 저장' })).toBeEnabled()
+  })
+
+  it('mode를 왕복해도 기존 JSON Dry Run과 붙여넣기 오류가 서로 제출되지 않는다', async () => {
+    renderPage()
+    const user = await switchToTextAndValidate()
+    expect(await screen.findByRole('heading', { name: 'Dry Run 요약' })).toBeInTheDocument()
+    await user.click(screen.getByRole('radio', { name: 'ChatGPT 구조화 붙여넣기' }))
+    fireEvent.change(await screen.findByLabelText('구조화 ChatGPT 응답 plain text'), { target: { value: 'invalid' } })
+    await user.click(screen.getByRole('button', { name: '로컬 미리보기 생성' }))
+    expect(screen.getByRole('alert')).toHaveTextContent('차단 오류')
+    await user.click(screen.getByRole('radio', { name: '기존 JSON Import' }))
+    expect(screen.getByRole('heading', { name: 'Dry Run 요약' })).toBeInTheDocument()
+    expect(screen.queryByText(/구조화 section 밖/)).not.toBeInTheDocument()
+    expect(prepareImportJobMock).not.toHaveBeenCalled()
+  })
+
+  it('모바일에서도 사용할 explicit input, preview, reset label을 제공한다', async () => {
+    renderPage()
+    await userEvent.click(screen.getByRole('radio', { name: 'ChatGPT 구조화 붙여넣기' }))
+    expect(await screen.findByLabelText('구조화 ChatGPT 응답 plain text')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '로컬 미리보기 생성' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '붙여넣기 초기화' })).toBeInTheDocument()
   })
 })
