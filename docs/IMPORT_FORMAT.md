@@ -305,7 +305,7 @@ WordPress 글 편집 화면
 
 `CONTENT_META_JSON`, `SEO_JSON`, `IMAGE_PROMPT_JSON`, `SOURCES_JSON`, `NEWS_TRACKING_JSON`은 표준 JSON이어야 한다. 주석, trailing comma, HTML을 담은 JSON 문자열은 허용하지 않는다.
 
-구조화 블록에 없는 필드는 `[WORDPRESS_HTML]`의 DOM 구조에서 추출하고 미리보기에서 사용자가 보완한다. MVP의 구조화 형식은 위에 정의된 키만 필수 지원 대상으로 삼으며, 카테고리별 메타데이터는 DOM 추출 또는 수동 입력으로 보완한다.
+4절과 7절에 기술한 별도의 기존 WordPress HTML 가져오기 규칙은 `DOMParser`로 후보 값을 추출하고 사용자가 미리보기에서 보완하는 흐름을 다룬다. 이 규칙은 Phase 5G ChatGPT 구조화 붙여넣기 mode에 적용되지 않으며, Phase 5G에서 다른 parser로 fallback하는 경로를 의미하지 않는다.
 
 ### 5.1 JSON 키와 DB 컬럼 매핑
 
@@ -327,9 +327,37 @@ JSON 입력 키는 camelCase를 사용한다. DB 컬럼은 snake_case를 유지�
 | `sourcePublishedAt` | `sources.source_published_at` |
 | `checkedPoint` | `sources.checked_point` |
 
-## 6. ChatGPT 비구조화 응답
+### 5.2 Phase 5G accepted contract
 
-기존 프로젝트 출력 순서도 지원한다.
+Phase 5G의 `/imports` ChatGPT 붙여넣기 mode는 위의 시작·종료 태그 형식만 결정적으로 파싱한다. format version이나 bundle wrapper는 추가하지 않으며 한 입력은 게시물 publication aggregate 정확히 한 건만 나타낸다.
+
+Phase 5G는 아래에 문서화된 tagged structured section block만 받아들이며 `WORDPRESS_HTML`에서 DOM 값을 추출하거나, 자연어 의미를 해석해 값을 보완하거나, 누락된 필수 필드를 추론·수동 완성하지 않는다. 누락된 필수 section과 필드, malformed section grammar는 계속 차단 오류며 다른 parser나 입력 mode로 fallback하지 않는다.
+
+필수 section과 accepted field는 다음과 같다.
+
+| Section | 필수 accepted field |
+|---|---|
+| `CONTENT_META_JSON` | `contentGroup`, `category`, `displayId`, `title`, `slug`, `publishedOn`, `publishedAt` |
+| `SEO_JSON` | `representativeTitle`, `alternativeTitles`, `metaDescription`, `focusKeyword`, `tags` |
+| `IMAGE_PROMPT_JSON` | `prompt`, `alt` |
+| `SOURCES_JSON` item | `sourceName`, `sourceTitle`, `sourceUrl`, `sourcePublishedAt`, `checkedPoint` |
+| `WORDPRESS_HTML` | 시작·종료 태그 사이의 비어 있지 않은 inert text body |
+
+JSON field 기준 필수 accepted field는 19개다. `CONTENT_META_JSON`에는 기존 단일 post Import schema와 맞추기 위해 `summary`, `seriesNo`, `wordpressUrl` 세 field만 선택적으로 인식한다. 누락된 `summary`의 저장값은 검증된 `metaDescription`을 사용하고, `seriesNo`와 `wordpressUrl`은 null로 정규화한다. 그 밖의 optional field나 generic object passthrough는 없다.
+
+`NEWS_TRACKING_JSON`은 선택적으로 인식하며 `updates`와 `followups` 배열의 존재와 개수만 미리보기에 표시한다. 이 section 전체는 게시물 저장 payload에서 제외하고 news topic, update 또는 followup을 만들지 않는다.
+
+- 필수 persistence section 누락, 대응하지 않는/중첩된 tag, section 밖 non-whitespace text, 중복 section, 같은 object 안의 중복 JSON key와 malformed JSON은 차단 오류다. 중복 key를 silent last-write-wins로 처리하지 않는다.
+- owner, owner ID, user ID, auth, session/token, raw paste, `sourceImportType`/`source_import_type`, provenance에 해당하는 키는 어느 깊이에서도 금지하며 차단한다.
+- 문법상 유효하지만 allowlist 밖인 field와 unknown section은 이름·path를 ignored warning으로 표시하고 persistence payload에는 포함하지 않는다.
+- `WORDPRESS_HTML`의 줄바꿈과 내용은 section 경계의 한 줄만 제외하고 그대로 inert string으로 유지한다. pasted HTML에는 `dangerouslySetInnerHTML`을 사용하지 않는다. JSON 안의 multiline string은 표준 JSON escape가 필요하다.
+- UTF-8 전체 입력은 20 MiB 이하, 개별 decoded JSON string은 5 MiB 이하, object/array nesting은 30단계 이하여야 한다. 경계값은 허용하고 초과값은 차단한다.
+- 같은 입력은 같은 normalized preview, issue ordering, ignored metadata와 persistence payload를 만든다. parser는 local-only이며 network, OpenAI API, AI inference, script 실행 또는 dynamic code execution을 사용하지 않는다.
+- raw paste는 workflow component의 transient state에만 있고 RPC, DB, log, telemetry, backup 또는 CSV로 보내거나 보존하지 않는다.
+
+## 6. ChatGPT 비구조화 응답 (향후 범위)
+
+아래 내용은 후속 단계의 기획 기록이며 Phase 5G 붙여넣기 mode는 비구조화/free-form text를 지원하거나 AI로 의미 해석하지 않는다.
 
 1. SEO 입력용 대표 제목
 2. SEO 대안 제목 4개

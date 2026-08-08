@@ -1715,3 +1715,51 @@ a {
   gap: 0.75rem;
   padding-left: 1.25rem;
 }
+
+.import-mode-selector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  margin: 18px 0;
+  padding: 16px;
+  border: 1px solid #d9dfdc;
+  border-radius: 8px;
+  background: #fff;
+}
+.import-mode-selector legend { padding: 0 6px; font-weight: 800; }
+.import-mode-selector label { display: inline-flex; min-height: 44px; align-items: center; gap: 8px; }
+.chatgpt-paste-workflow { display: grid; min-width: 0; gap: 18px; }
+.chatgpt-paste-input label { display: block; margin-bottom: 8px; font-weight: 700; }
+.chatgpt-paste-textarea { width: 100%; min-height: 18rem; max-height: 70dvh; box-sizing: border-box; resize: vertical; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: .875rem; }
+.chatgpt-paste-actions, .chatgpt-paste-confirm { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; }
+.chatgpt-paste-actions button, .chatgpt-paste-confirm button { min-height: 44px; }
+.chatgpt-paste-confirm p { margin: 0; color: #53605c; }
+.paste-result-announcement:focus, .form-alert:focus { outline: 3px solid #1f6f55; outline-offset: 3px; }
+.paste-eligibility { max-width: 24rem; color: #8b2f2f; text-align: right; }
+.paste-eligibility--ready { color: #1f6f55; }
+.paste-issues { margin: 16px 0; padding: 14px 16px; border: 1px solid #bf6161; border-radius: 7px; background: #fff7f7; }
+.paste-issues--warning { border-color: #c7a84b; background: #fffbea; }
+.paste-issues h3 { margin-top: 0; }
+.paste-issues ul { margin-bottom: 0; padding-left: 20px; }
+.paste-issues li { margin-top: 7px; overflow-wrap: anywhere; }
+.chatgpt-paste-preview__content { display: grid; gap: 18px; }
+.chatgpt-paste-preview__content > section { min-width: 0; padding-top: 4px; border-top: 1px solid #e1e6e3; }
+.paste-preview-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.paste-preview-grid > div { min-width: 0; padding: 12px; border-radius: 6px; background: #f5f7f6; }
+.paste-preview-grid dt { color: #65716d; font-size: .78rem; font-weight: 700; }
+.paste-preview-grid dd { margin: 5px 0 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+.paste-source-list { display: grid; gap: 10px; padding-left: 22px; }
+.paste-source-list li { min-width: 0; padding: 10px; }
+.paste-source-list span { display: block; margin-top: 4px; overflow-wrap: anywhere; color: #53605c; }
+.paste-html-preview { max-width: 100%; max-height: 32rem; overflow: auto; box-sizing: border-box; padding: 14px; border-radius: 6px; background: #17201d; color: #edf5f1; white-space: pre-wrap; overflow-wrap: anywhere; }
+.paste-warning-acknowledgement { display: flex; min-height: 44px; align-items: center; gap: 10px; padding: 12px 14px; border: 1px solid #c7a84b; border-radius: 7px; background: #fffbea; font-weight: 700; }
+.paste-tracking-status { padding: 12px; border-radius: 6px; background: #eef3f1; overflow-wrap: anywhere; }
+
+@media (max-width: 540px) {
+  .import-mode-selector { display: grid; }
+  .chatgpt-paste-textarea { min-height: 22rem; font-size: 1rem; }
+  .chatgpt-paste-actions, .chatgpt-paste-confirm { align-items: stretch; flex-direction: column; }
+  .chatgpt-paste-actions button, .chatgpt-paste-confirm button { width: 100%; justify-content: center; }
+  .paste-preview-grid { grid-template-columns: 1fr; }
+  .paste-eligibility { max-width: none; text-align: left; }
+}
