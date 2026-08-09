@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { promises as fs } from 'node:fs'
+import { createRequire } from 'node:module'
 import os from 'node:os'
 import path from 'node:path'
 
@@ -10,9 +11,10 @@ import {
 } from './check-supabase-fresh-baseline.mjs'
 
 const runningUnderVitest = process.env.VITEST === 'true' || process.env.VITEST_WORKER_ID !== undefined
+const nodeRequire = createRequire(import.meta.url)
 const registerTest = runningUnderVitest
   ? (await import('vitest')).test
-  : (await import('node:test')).test
+  : nodeRequire('node:test').test
 
 const expectedMigrations = ['20260710080000', '20260801120000']
 const expectedMigration = '20260801120000'
