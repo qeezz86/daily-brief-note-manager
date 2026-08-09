@@ -110,7 +110,9 @@ select is((select count(*)::integer from public.sources source left join public.
 set local "request.jwt.claims" = '{"sub":"00000000-0000-0000-0000-000000005f02","role":"authenticated"}';
 select lives_ok($$ select public.save_chatgpt_paste_post(public.test_chatgpt_paste_payload('2026-08-01')) $$, '33 owner B may create the same owner-scoped identity');
 select is((select count(*)::integer from public.posts where owner_id = '00000000-0000-0000-0000-000000005f02'), 1, '34 owner B aggregate is isolated');
+set local "request.jwt.claims" = '{"sub":"00000000-0000-0000-0000-000000005f01","role":"authenticated"}';
 select is((select count(*)::integer from public.posts where owner_id = '00000000-0000-0000-0000-000000005f01'), 1, '35 owner A aggregate remains unchanged');
+set local "request.jwt.claims" = '{"sub":"00000000-0000-0000-0000-000000005f02","role":"authenticated"}';
 select throws_ok($$ select public.save_chatgpt_paste_post(jsonb_set(public.test_chatgpt_paste_payload('2026-08-03'), '{content,post_id}', '"00000000-0000-0000-0000-000000005f01"'::jsonb)) $$, '22023', 'CHATGPT_PASTE_FORBIDDEN_FIELD', '36 cross-owner post reference rejected');
 
 set local "request.jwt.claims" = '{"sub":"00000000-0000-0000-0000-000000005f01","role":"authenticated"}';
