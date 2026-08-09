@@ -1744,6 +1744,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      save_chatgpt_paste_post: { Args: { p_item: Json }; Returns: Json }
       save_chinese_publication_bundle: {
         Args: {
           p_alternative_titles: string[]
@@ -2361,3 +2362,4 @@ export const Constants = {
     Enums: {},
   },
 } as const
+

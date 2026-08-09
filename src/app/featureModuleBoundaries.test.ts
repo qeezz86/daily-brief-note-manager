@@ -15,7 +15,9 @@ import backupLoaderSource from '../features/backups/backupGeneration.loader.ts?r
 import restoreExecutionLoaderSource from '../features/backups/restoreExecution.loader.ts?raw'
 import restorePlanLoaderSource from '../features/backups/restorePlan.loader.ts?raw'
 import restoreValidationLoaderSource from '../features/backups/restoreValidation.loader.ts?raw'
+import chatGptPasteWorkflowSource from '../features/imports/ChatGptPasteWorkflow.tsx?raw'
 import importLoaderSource from '../features/imports/importAnalysis.loader.ts?raw'
+import importAnalysisModuleSource from '../features/imports/importAnalysis.module.ts?raw'
 
 describe('feature module boundaries', () => {
   it('keeps heavy Backup, Restore, and Import engines out of page static imports', () => {
@@ -27,6 +29,8 @@ describe('feature module boundaries', () => {
     expect(importPageSource).not.toContain("from '../features/imports/importSchema'")
     expect(importPageSource).not.toContain("from '../features/imports/validateImportBundle'")
     expect(importPageSource).not.toContain("from '../features/imports/prepareImportJob'")
+    expect(importPageSource).not.toMatch(/from\s+['"]\.\.\/features\/imports\/ChatGptPasteWorkflow['"]/)
+    expect(importPageSource).toContain("import('../features/imports/ChatGptPasteWorkflow')")
   })
 
   it('uses static literal imports in every feature loader', () => {
@@ -38,6 +42,11 @@ describe('feature module boundaries', () => {
     for (const source of [backupLoaderSource, restoreValidationLoaderSource, restorePlanLoaderSource, restoreExecutionLoaderSource, importLoaderSource]) {
       expect(source).not.toMatch(/import\(`|import\([^'"]/)
     }
+  })
+
+  it('keeps the ChatGPT paste parser in its workflow boundary', () => {
+    expect(importAnalysisModuleSource).not.toMatch(/(?:from\s+|import\()\s*['"]\.\/parseChatGptPaste['"]/)
+    expect(chatGptPasteWorkflowSource).toMatch(/from\s+['"]\.\/parseChatGptPaste['"]/)
   })
 
   it('keeps job list and detail pages independent from analysis and plan engines', () => {

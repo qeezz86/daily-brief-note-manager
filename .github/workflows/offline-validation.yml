@@ -16,7 +16,7 @@ jobs:
   offline-validation:
     name: offline-validation
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -33,3 +33,64 @@ jobs:
         run: npm run check:supabase-fresh-baseline
       - name: Check WordPress production readiness
         run: npm run check:wordpress-production-readiness
+      - name: Test Supabase database evidence checker
+        run: node --test scripts/check-supabase-fresh-baseline.test.mjs
+      # This runner-scoped start is CI-only and is not part of developer local start accounting.
+      - name: Start CI-only ephemeral Supabase
+        run: npx --no-install supabase start
+      - name: Capture migrated local schema state
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --no-install supabase migration list --local --output-format json > "$RUNNER_TEMP/supabase-migrations.json"
+          test -s "$RUNNER_TEMP/supabase-migrations.json"
+      - name: Lint migrated local database
+        run: npm run db:lint
+      - name: Run focused ChatGPT paste pgTAP
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f supabase/tests/chatgpt_paste_post.test.sql
+          npm run test:db -- supabase/tests/chatgpt_paste_post.test.sql
+          PGPASSWORD=postgres psql \
+            --host=127.0.0.1 \
+            --port=54322 \
+            --username=postgres \
+            --dbname=postgres \
+            --no-psqlrc \
+            --quiet \
+            --tuples-only \
+            --no-align \
+            --set=ON_ERROR_STOP=1 \
+            --file=supabase/tests/chatgpt_paste_post.test.sql \
+            > "$RUNNER_TEMP/chatgpt-paste-post.tap"
+          test -s "$RUNNER_TEMP/chatgpt-paste-post.tap"
+      - name: Generate migrated local database types as temporary evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --no-install supabase gen types typescript --local > "$RUNNER_TEMP/database.types.ts"
+          test -s "$RUNNER_TEMP/database.types.ts"
+          (
+            cd "$RUNNER_TEMP"
+            sha256sum database.types.ts > database.types.ts.sha256
+          )
+          test -s "$RUNNER_TEMP/database.types.ts.sha256"
+      - name: Upload Phase 5G generated database types evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase-5g-generated-types-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            ${{ runner.temp }}/database.types.ts
+            ${{ runner.temp }}/database.types.ts.sha256
+          if-no-files-found: error
+          retention-days: 1
+      - name: Check migrated database runtime evidence
+        run: >-
+          node scripts/check-supabase-fresh-baseline.mjs
+          --migration-json "$RUNNER_TEMP/supabase-migrations.json"
+          --pgtap "$RUNNER_TEMP/chatgpt-paste-post.tap"
+          --generated-types "$RUNNER_TEMP/database.types.ts"
+          --tracked-types src/shared/supabase/database.types.ts
+          --expected-migration 20260801120000
+      # GitHub-hosted runner disposal removes the ephemeral database and RUNNER_TEMP evidence.

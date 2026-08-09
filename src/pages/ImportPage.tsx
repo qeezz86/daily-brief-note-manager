@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { copyTextToClipboard } from '../features/briefingPrompts/copyTextToClipboard'
 import { useAuth } from '../features/auth/useAuth'
@@ -12,6 +12,12 @@ import { useImportCategoriesQuery } from '../features/imports/importDuplicates.q
 import { getImportDuplicateReferenceData } from '../features/imports/importDuplicates.repository'
 import type { ImportValidationResult } from '../features/imports/importValidation.types'
 import { supabase, type DatabaseClient } from '../shared/supabase/client'
+
+const ChatGptPasteWorkflow = lazy(() =>
+  import('../features/imports/ChatGptPasteWorkflow').then((module) => ({
+    default: module.ChatGptPasteWorkflow,
+  })),
+)
 
 const emptyDuplicateReferenceData = { posts: [], chineseUrls: [], newsTopics: [], existingTagKeys: [] }
 
@@ -41,6 +47,7 @@ export function ImportPageContent({
   const [moduleLoadError, setModuleLoadError] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [copyMessage, setCopyMessage] = useState<string | null>(null)
+  const [importMode, setImportMode] = useState<'json' | 'chatgpt-paste'>('json')
   const mountedRef = useRef(true)
   const resultText = useMemo(() => result ? JSON.stringify(result, null, 2) : '', [result])
   const categories = useMemo(() => categoriesQuery.data ?? [], [categoriesQuery.data])
@@ -140,19 +147,28 @@ export function ImportPageContent({
   return <section className="content-page import-page" aria-labelledby="import-page-title" aria-busy={moduleLoading}>
     <div className="content-page__heading"><div><p className="dashboard__eyebrow">Validated durable import</p><h1 id="import-page-title">콘텐츠 가져오기</h1><p>Dry Run을 통과한 선택 항목을 불변 snapshot으로 저장한 뒤 작업 상세에서 순차 실행합니다.</p></div><Link className="secondary-button" to="/imports/history">작업 이력</Link></div>
     <div className="import-notice"><strong>Phase 4A-4</strong><p>동일 bundle은 기존 작업으로 연결됩니다. 새로고침 후 resume, 단계별 수동 retry와 안전한 취소를 지원하며 브라우저가 닫힌 동안 자동 실행하지 않습니다.</p></div>
-    {categoriesQuery.isPending ? <div className="content-state" role="status">카테고리 설정을 불러오고 있습니다.</div> : null}
-    {categoriesQuery.isError ? <div className="content-state content-state--error" role="alert">카테고리 설정을 불러오지 못했습니다.</div> : null}
-    {!client ? <p className="form-alert" role="status">Supabase가 설정되지 않아 Dry Run DB 조회와 작업 생성을 사용할 수 없습니다.</p> : null}
-    <ImportInputForm disabled={busy || categoriesQuery.isPending} onValidate={validate} onReset={resetResult} />
-    {moduleLoading ? <p role="status">가져오기 분석 도구를 불러오는 중입니다.</p> : null}
-    {moduleLoadError ? <p className="form-alert" role="alert">IMPORT_MODULE_LOAD_FAILED 필요한 기능을 불러오지 못했습니다. 네트워크 상태를 확인한 뒤 다시 시도하세요.</p> : null}
-    {result ? <>
+    <fieldset className="import-mode-selector">
+      <legend>가져오기 방식</legend>
+      <label><input type="radio" name="import-mode" value="json" checked={importMode === 'json'} onChange={() => setImportMode('json')} /> 기존 JSON Import</label>
+      <label><input type="radio" name="import-mode" value="chatgpt-paste" checked={importMode === 'chatgpt-paste'} onChange={() => setImportMode('chatgpt-paste')} /> ChatGPT 구조화 붙여넣기</label>
+    </fieldset>
+    {importMode === 'json' ? <>
+      {categoriesQuery.isPending ? <div className="content-state" role="status">카테고리 설정을 불러오고 있습니다.</div> : null}
+      {categoriesQuery.isError ? <div className="content-state content-state--error" role="alert">카테고리 설정을 불러오지 못했습니다.</div> : null}
+      {!client ? <p className="form-alert" role="status">Supabase가 설정되지 않아 Dry Run DB 조회와 작업 생성을 사용할 수 없습니다.</p> : null}
+      <ImportInputForm disabled={busy || categoriesQuery.isPending} onValidate={validate} onReset={resetResult} />
+      {moduleLoading ? <p role="status">가져오기 분석 도구를 불러오는 중입니다.</p> : null}
+      {moduleLoadError ? <p className="form-alert" role="alert">IMPORT_MODULE_LOAD_FAILED 필요한 기능을 불러오지 못했습니다. 네트워크 상태를 확인한 뒤 다시 시도하세요.</p> : null}
+      {result ? <>
       {metadata ? <p className="import-input-metadata">입력: {metadata.fileName ?? '붙여넣은 JSON'} · {(metadata.fileSize ?? 0).toLocaleString()} bytes</p> : null}
       <ImportDryRunSummary result={result} />
       {result.items.length ? <><ImportDryRunList result={result} categories={categories} /><ImportSelectionPanel result={result} categories={categories} selected={selected} approvedWarnings={approvedWarnings} disabled={busy} onToggleSelected={toggleSelected} onToggleWarningApproval={toggleWarningApproval} onSelectAllReady={selectAllReady} />
         <section className="import-panel import-execution-actions"><div><h2>영구 작업 준비</h2><p>DB 중복 검사: <strong>{databaseCheckLabel(result.databaseCheck)}</strong> · 선택 {selectedCount}개</p>{result.databaseCheck !== 'complete' ? <p className="form-alert">DB 중복 검사가 complete가 아니므로 작업을 만들 수 없습니다.</p> : null}{categoryStale ? <p className="form-alert">카테고리 설정이 변경되었습니다. Dry Run을 다시 실행해 주세요.</p> : null}{message ? <p className="field-help" role="status">{message}</p> : null}</div><button className="primary-button" type="button" disabled={!canCreate} onClick={() => void createJob()}>{busy ? '작업 준비 중' : 'Import 작업 만들기'}</button></section></> : null}
       <section className="import-panel"><div className="import-panel__heading"><div><h2>검증 결과 JSON</h2><p>원본 htmlBody와 내부 DB ID는 제외했습니다.</p></div><button className="secondary-button" type="button" onClick={() => void copyDryRun()}>전체 결과 복사</button></div>{copyMessage ? <p className="field-help" role="status">{copyMessage}</p> : null}<textarea className="import-result-json" readOnly value={resultText} aria-label="다운로드용 검증 결과 JSON text" /></section>
-    </> : null}
+      </> : null}
+    </> : <Suspense fallback={<div className="content-state" role="status">ChatGPT 붙여넣기 도구를 불러오는 중입니다.</div>}>
+      <ChatGptPasteWorkflow client={client} />
+    </Suspense>}
   </section>
 }
 

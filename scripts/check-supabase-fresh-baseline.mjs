@@ -18,6 +18,39 @@ const protectedEnvironmentNames = new Set([
   'supabase/functions/.env.local',
 ])
 
+const databaseEvidenceFlags = Object.freeze([
+  '--migration-json',
+  '--pgtap',
+  '--generated-types',
+  '--tracked-types',
+  '--expected-migration',
+])
+
+const databaseEvidenceFlagSet = new Set(databaseEvidenceFlags)
+const utf8Decoder = new TextDecoder('utf-8', { fatal: true })
+
+const diagnostic = Object.freeze({
+  argumentUnknown: 'ARGUMENT_UNKNOWN',
+  argumentDuplicate: 'ARGUMENT_DUPLICATE',
+  argumentValueMissing: 'ARGUMENT_VALUE_MISSING',
+  argumentRequiredMissing: 'ARGUMENT_REQUIRED_MISSING',
+  evidenceFileMissing: 'EVIDENCE_FILE_MISSING',
+  evidenceFileInvalid: 'EVIDENCE_FILE_INVALID',
+  migrationEvidenceInvalid: 'MIGRATION_EVIDENCE_INVALID',
+  migrationExpectedIdMissing: 'MIGRATION_EXPECTED_ID_MISSING',
+  migrationPendingOrDivergent: 'MIGRATION_PENDING_OR_DIVERGENT',
+  pgTapPlanInvalid: 'PGTAP_PLAN_INVALID',
+  pgTapAssertionInvalid: 'PGTAP_ASSERTION_INVALID',
+  pgTapMalformed: 'PGTAP_TRUNCATED_OR_MALFORMED',
+  generatedTypesInvalid: 'GENERATED_TYPES_INVALID',
+  generatedTypesMismatch: 'GENERATED_TYPES_MISMATCH',
+  rpcContractMismatch: 'RPC_CONTRACT_MISMATCH',
+  remoteOrLinkedMarker: 'REMOTE_OR_LINKED_MARKER_DETECTED',
+  productionCredentialMarker: 'PRODUCTION_CREDENTIAL_MARKER_DETECTED',
+  forbiddenRepairOrResetMarker: 'FORBIDDEN_REPAIR_OR_RESET_MARKER',
+  resultMaskingMarker: 'RESULT_MASKING_MARKER_DETECTED',
+})
+
 function normalize(relativePath) {
   return relativePath.split(path.sep).join('/')
 }
@@ -199,7 +232,7 @@ export async function checkSupabaseFreshBaseline(options = {}) {
     if (migration.filename !== `${migration.version}_${migration.filename.slice(15)}`) migrationIssues.push(`${migration.filename}: version and filename disagree`)
   }
   if (expectedMigrationFiles[0] !== '20260710080000_initial_schema.sql') migrationIssues.push('first migration must be the initial schema')
-  if (expectedMigrationFiles.at(-1) !== '20260729150000_get_dashboard_overview.sql') migrationIssues.push('last migration must add the operational dashboard overview RPC')
+  if (expectedMigrationFiles.at(-1) !== '20260801120000_save_chatgpt_paste_post.sql') migrationIssues.push('last migration must add the structured ChatGPT paste RPC')
   const existingPlan = manifest.currentApplicationPlans?.existing
   const freshPlan = manifest.currentApplicationPlans?.fresh
   if (freshPlan?.requiredAppliedMigrationCount !== 0 || freshPlan?.pendingMigrationCount !== expectedMigrationFiles.length || freshPlan?.seedRequired !== true) {
@@ -268,6 +301,372 @@ export function formatSupabaseFreshBaselineReport(report) {
   return lines.join('\n')
 }
 
+function evidenceResult(name, issues) {
+  return result(name, [...new Set(issues)])
+}
+
+function decodeUtf8(buffer, label, issues) {
+  if (buffer.includes(0)) {
+    issues.push(`${diagnostic.evidenceFileInvalid}: ${label}: NUL or binary content`)
+    return undefined
+  }
+  try {
+    return utf8Decoder.decode(buffer)
+  } catch {
+    issues.push(`${diagnostic.evidenceFileInvalid}: ${label}: invalid UTF-8`)
+    return undefined
+  }
+}
+
+async function readEvidence(relativeOrAbsolutePath, label) {
+  try {
+    const metadata = await fs.lstat(relativeOrAbsolutePath)
+    if (metadata.isSymbolicLink() || !metadata.isFile()) {
+      return { value: undefined, issues: [`${diagnostic.evidenceFileInvalid}: ${label} path is not a regular file`] }
+    }
+    const value = await fs.readFile(relativeOrAbsolutePath)
+    return {
+      value,
+      issues: value.length === 0
+        ? [`${diagnostic.evidenceFileInvalid}: ${label}: evidence is empty`]
+        : [],
+    }
+  } catch (error) {
+    const code = error && typeof error === 'object' && 'code' in error ? error.code : undefined
+    const category = code === 'ENOENT' ? diagnostic.evidenceFileMissing : diagnostic.evidenceFileInvalid
+    return { value: undefined, issues: [`${category}: ${label}: evidence is missing or unreadable`] }
+  }
+}
+
+function unsafeEvidenceMarkerIssues(label, source) {
+  const markers = [
+    [diagnostic.resultMaskingMarker, /(?:"(?:exitCode|exit_code)"\s*:\s*[1-9]\d*|"(?:commandSucceeded|command_succeeded|success)"\s*:\s*false|\bcommand failed\b|continue[-_ ]on[-_ ]error|\|\|\s*true|\bignored[-_ ]failure\b|\bmasked[-_ ]exit[-_ ]status\b|\ballowed[-_ ]failure\b|"(?:ignoredFailure|maskedExitStatus|allowedFailure|masked|resultMasked|result_masked)"\s*:\s*true|(?:\bvalidation\b|\bchecker\b|\btest\b).{0,40}\bretr(?:y|ies)\b|\bretr(?:y|ies)\b.{0,40}(?:\bvalidation\b|\bchecker\b|\btest\b))/i],
+    [diagnostic.remoteOrLinkedMarker, /(?:--linked\b|--project-ref\b|--db-url\b|"linked"\s*:\s*true|\bproject[_-]ref\b|\bsupabase\s+link\b|\blinked[-_ ]project\b|\bremote[-_ ](?:project|database|migration)\b|\bremote[-_ ]type[-_ ]generation\b|postgres(?:ql)?:\/\/(?!localhost\b|127\.0\.0\.1\b)|(?:\bdb\.)?[a-z0-9-]+\.supabase\.co\b)/i],
+    [diagnostic.productionCredentialMarker, /(?:\bproduction[-_ ](?:database|credential|secret|project[-_ ]ref)\b|\bservice[_-]role\b|\bSUPABASE_(?:ACCESS_TOKEN|DB_PASSWORD|SERVICE_ROLE_KEY)\b|\bDATABASE_URL\b|\bPOSTGRES_URL\b|\bhosted[-_ ](?:db|database)[-_ ]password\b)/i],
+    [diagnostic.forbiddenRepairOrResetMarker, /(?:\b(?:supabase\s+)?migration[-_ ]repair\b|\b(?:supabase\s+)?db[-_ ]reset\b|\bmigration[-_ ]history[-_ ]rewrite\b|\bmigration[-_ ]squash\b|\bpersistent[-_ ]remote[-_ ]apply\b)/i],
+  ]
+  return markers
+    .filter(([, pattern]) => pattern.test(source))
+    .map(([category]) => `${category}: prohibited marker detected in ${label}`)
+}
+
+function migrationRowsFromJson(value) {
+  if (Array.isArray(value)) return value
+  if (!value || typeof value !== 'object') return undefined
+  if (Array.isArray(value.migrations)) return value.migrations
+  if (Array.isArray(value.result)) return value.result
+
+  const local = value.local ?? value.Local
+  const remote = value.remote ?? value.Remote
+  const time = value.time ?? value.Time
+  if (!Array.isArray(local) || !Array.isArray(remote) || local.length !== remote.length) return undefined
+  if (time !== undefined && (!Array.isArray(time) || time.length !== local.length)) return undefined
+  return local.map((localVersion, index) => ({
+    local: localVersion,
+    remote: remote[index],
+    ...(time === undefined ? {} : { time: time[index] }),
+  }))
+}
+
+function migrationVersion(row, field) {
+  if (!row || typeof row !== 'object' || Array.isArray(row)) return undefined
+  const entry = Object.entries(row).find(([key]) => key.toLowerCase() === field)
+  const value = entry?.[1]
+  if (value === null || value === '') return ''
+  return typeof value === 'string' && /^\d{14}$/.test(value.trim()) ? value.trim() : undefined
+}
+
+function validateMigrationEvidence(source, expectedMigrations, expectedMigration) {
+  const issues = []
+  if (source.trim() === '') return [`${diagnostic.migrationEvidenceInvalid}: migration state: evidence is empty`]
+
+  let parsed
+  try {
+    parsed = JSON.parse(source)
+  } catch {
+    return [`${diagnostic.migrationEvidenceInvalid}: migration state: malformed JSON`]
+  }
+  const rows = migrationRowsFromJson(parsed)
+  if (!rows || rows.length === 0) return [`${diagnostic.migrationEvidenceInvalid}: migration state: JSON contains no migration rows`]
+
+  const local = []
+  const appliedToLocalDatabase = []
+  for (const row of rows) {
+    const localVersion = migrationVersion(row, 'local')
+    const remoteVersion = migrationVersion(row, 'remote')
+    if (localVersion === undefined || remoteVersion === undefined) {
+      issues.push(`${diagnostic.migrationEvidenceInvalid}: migration state: malformed migration row`)
+      continue
+    }
+    if (localVersion === '') issues.push(`${diagnostic.migrationPendingOrDivergent}: migration state: unexpected database-only migration`)
+    if (remoteVersion === '') issues.push(`${diagnostic.migrationPendingOrDivergent}: migration state: unexpected pending migration`)
+    if (localVersion !== '' && remoteVersion !== '' && localVersion !== remoteVersion) {
+      issues.push(`${diagnostic.migrationPendingOrDivergent}: migration state: divergent migration identity`)
+    }
+    if (localVersion !== '') local.push(localVersion)
+    if (remoteVersion !== '') appliedToLocalDatabase.push(remoteVersion)
+  }
+
+  if (!same(local, expectedMigrations)) issues.push(`${diagnostic.migrationPendingOrDivergent}: migration state: repository migration inventory is incomplete or reordered`)
+  if (!same(appliedToLocalDatabase, expectedMigrations)) issues.push(`${diagnostic.migrationPendingOrDivergent}: migration state: migrated local database history is incomplete or reordered`)
+  if (!local.includes(expectedMigration) || !appliedToLocalDatabase.includes(expectedMigration)) {
+    issues.push(`${diagnostic.migrationExpectedIdMissing}: migration state: expected migration ${expectedMigration} is missing`)
+  }
+  return issues
+}
+
+function validatePgTapEvidence(source) {
+  const issues = []
+  if (source.trim() === '') return [`${diagnostic.evidenceFileInvalid}: pgTAP: evidence is empty`]
+  if (/\r(?!\n)/.test(source)) issues.push(`${diagnostic.pgTapMalformed}: bare CR is forbidden`)
+  if (!source.endsWith('\n')) issues.push(`${diagnostic.pgTapMalformed}: TAP stream must end with a complete newline`)
+
+  const lines = source.replace(/\r\n/g, '\n').split('\n')
+  const assertions = []
+  const planIndexes = []
+  let versionCount = 0
+  let yamlOpen = false
+  let yamlParentFailed = false
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index]
+    if (yamlOpen) {
+      if (line === '  ...') {
+        yamlOpen = false
+        yamlParentFailed = false
+      } else if (!/^  \S/.test(line) && line !== '') {
+        issues.push(`${diagnostic.pgTapMalformed}: malformed TAP diagnostic YAML indentation`)
+      }
+      continue
+    }
+    const mayStartYaml = yamlParentFailed
+    yamlParentFailed = false
+    if (line === '' || /^\s*#/.test(line)) {
+      if (/^\s*#\s*(?:S|SK|SKI|T|TO|TOD)\s*$/i.test(line)) {
+        issues.push(`${diagnostic.pgTapMalformed}: partial TAP directive`)
+      }
+      continue
+    }
+    if (line === 'TAP version 13') {
+      versionCount += 1
+      if (index !== 0 || versionCount > 1) issues.push(`${diagnostic.pgTapMalformed}: TAP version line is misplaced or duplicated`)
+      continue
+    }
+    if (line === '1..40') {
+      planIndexes.push(index)
+      continue
+    }
+    if (/^(?:\d+)\.\.(?:\d+)/.test(line)) {
+      planIndexes.push(index)
+      issues.push(`${diagnostic.pgTapPlanInvalid}: exact plan 1..40 is required`)
+      continue
+    }
+    if (/^Bail out!/i.test(line) || /^Bail(?:\s+out?)?\s*!?$/i.test(line)) {
+      issues.push(`${diagnostic.pgTapMalformed}: bailout or truncated bailout detected`)
+      continue
+    }
+    const directive = line.match(/\s+#\s*(SKIP|TODO)\b.*$/i)
+    if (line.includes('#') && !directive) {
+      issues.push(`${diagnostic.pgTapMalformed}: malformed or partial TAP directive`)
+      continue
+    }
+    const assertionText = directive ? line.slice(0, directive.index) : line
+    const assertion = assertionText.match(/^(not ok|ok)\s+([1-9]\d*)(?:\s+-\s+(\S.*?))?\s*$/i)
+    if (assertion) {
+      assertions.push({
+        passed: assertion[1].toLowerCase() === 'ok',
+        number: Number(assertion[2]),
+        skipped: directive?.[1].toLowerCase() === 'skip',
+        todo: directive?.[1].toLowerCase() === 'todo',
+      })
+      yamlParentFailed = assertion[1].toLowerCase() === 'not ok'
+      continue
+    }
+    if (line === '  ---') {
+      if (!mayStartYaml) issues.push(`${diagnostic.pgTapMalformed}: diagnostic YAML has no failing parent assertion`)
+      yamlOpen = true
+      continue
+    }
+    issues.push(`${diagnostic.pgTapMalformed}: malformed assertion line or unrecognized TAP content`)
+  }
+
+  if (yamlOpen) issues.push(`${diagnostic.pgTapMalformed}: unclosed TAP diagnostic YAML block`)
+  if (planIndexes.length !== 1 || lines[planIndexes[0]] !== '1..40') {
+    issues.push(`${diagnostic.pgTapPlanInvalid}: exact plan 1..40 is required exactly once`)
+  } else {
+    const assertionIndexes = lines
+      .map((line, index) => /^(?:not ok|ok)\s+[1-9]\d*/i.test(line) ? index : -1)
+      .filter((index) => index >= 0)
+    const planIndex = planIndexes[0]
+    const planIsLeading = assertionIndexes.length > 0 && planIndex < assertionIndexes[0]
+    const planIsTrailing = assertionIndexes.length > 0 && planIndex > assertionIndexes.at(-1)
+    if (!planIsLeading && !planIsTrailing) issues.push(`${diagnostic.pgTapPlanInvalid}: plan must precede or follow the complete assertion sequence`)
+  }
+  if (assertions.length !== 40) issues.push(`${diagnostic.pgTapAssertionInvalid}: expected 40 assertions, found ${assertions.length}`)
+  if (!same(assertions.map((assertion) => assertion.number), Array.from({ length: 40 }, (_, index) => index + 1))) {
+    issues.push(`${diagnostic.pgTapAssertionInvalid}: assertion numbers must be exactly 1 through 40`)
+    issues.push(`${diagnostic.pgTapMalformed}: truncated, duplicate, missing, or out-of-range assertion number`)
+  }
+  const failed = assertions.filter((assertion) => !assertion.passed).length
+  const skipped = assertions.filter((assertion) => assertion.skipped).length
+  const todos = assertions.filter((assertion) => assertion.todo).length
+  const passed = assertions.filter((assertion) => assertion.passed && !assertion.skipped && !assertion.todo).length
+  if (failed > 0) issues.push(`${diagnostic.pgTapAssertionInvalid}: ${failed} failed assertion(s)`)
+  if (skipped > 0) issues.push(`${diagnostic.pgTapAssertionInvalid}: ${skipped} skipped assertion(s)`)
+  if (todos > 0) issues.push(`${diagnostic.pgTapAssertionInvalid}: ${todos} todo assertion(s)`)
+  if (passed !== 40) issues.push(`${diagnostic.pgTapAssertionInvalid}: expected 40 passed assertions, found ${passed}`)
+  return issues
+}
+
+function normalizedTypeEvidence(buffer, label, issues) {
+  const hasBom = buffer.length >= 3 && buffer[0] === 0xef && buffer[1] === 0xbb && buffer[2] === 0xbf
+  const body = hasBom ? buffer.subarray(3) : buffer
+  const source = decodeUtf8(body, label, issues)
+  if (source === undefined) return undefined
+  if (/\r(?!\n)/.test(source)) {
+    issues.push(`${diagnostic.generatedTypesInvalid}: ${label}: bare CR newline is forbidden`)
+    return undefined
+  }
+  return { hasBom, source: source.replace(/\r\n/g, '\n') }
+}
+
+function validateGeneratedTypes(generatedBuffer, trackedBuffer) {
+  const issues = []
+  const generated = normalizedTypeEvidence(generatedBuffer, 'generated types', issues)
+  const tracked = normalizedTypeEvidence(trackedBuffer, 'tracked types', issues)
+  if (!generated || !tracked) return issues
+  if (generated.hasBom !== tracked.hasBom) issues.push(`${diagnostic.generatedTypesMismatch}: generated types: UTF-8 BOM status differs from tracked types`)
+  if (generated.source !== tracked.source) issues.push(`${diagnostic.generatedTypesMismatch}: generated types: normalized raw bytes differ from tracked types`)
+
+  const rpcContract = /save_chatgpt_paste_post\s*:\s*\{\s*Args\s*:\s*\{\s*p_item\s*:\s*Json\s*\}\s*;\s*Returns\s*:\s*Json\s*\}/g
+  const generatedContracts = [...generated.source.matchAll(rpcContract)].length
+  const trackedContracts = [...tracked.source.matchAll(rpcContract)].length
+  if (generatedContracts !== 1 || trackedContracts !== 1) {
+    issues.push(`${diagnostic.rpcContractMismatch}: generated types: save_chatgpt_paste_post must have exact Args { p_item: Json } and Returns Json`)
+  }
+  return issues
+}
+
+async function repositoryMigrationVersions(root) {
+  const filenames = await filesIn(root, 'supabase/migrations')
+  const versions = filenames.map((filename) => filename.match(/^(\d{14})_[A-Za-z0-9_]+\.sql$/)?.[1])
+  if (versions.some((version) => version === undefined) || !orderedUnique(versions)) {
+    throw new Error('repository migration inventory is malformed')
+  }
+  return versions
+}
+
+export async function checkDatabaseRuntimeEvidence(options) {
+  const checks = []
+  const migrationRead = await readEvidence(options.migrationJson, 'migration state')
+  const pgTapRead = await readEvidence(options.pgTap, 'pgTAP')
+  const generatedRead = await readEvidence(options.generatedTypes, 'generated types')
+  const trackedRead = await readEvidence(options.trackedTypes, 'tracked types')
+
+  let expectedMigrations = options.expectedMigrations
+  const inventoryIssues = []
+  if (!Array.isArray(expectedMigrations)) {
+    try {
+      expectedMigrations = await repositoryMigrationVersions(path.resolve(options.root ?? path.join(path.dirname(fileURLToPath(import.meta.url)), '..')))
+    } catch {
+      expectedMigrations = []
+      inventoryIssues.push(`${diagnostic.migrationEvidenceInvalid}: migration state: repository migration inventory is unavailable or malformed`)
+    }
+  }
+  if (!/^\d{14}$/.test(options.expectedMigration ?? '')) {
+    inventoryIssues.push(`${diagnostic.migrationEvidenceInvalid}: migration state: expected migration identity must be 14 digits`)
+  } else if (!expectedMigrations.includes(options.expectedMigration)) {
+    inventoryIssues.push(`${diagnostic.migrationExpectedIdMissing}: migration state: expected migration identity is absent from repository inventory`)
+  }
+
+  const migrationIssues = [...migrationRead.issues, ...inventoryIssues]
+  const pgTapIssues = [...pgTapRead.issues]
+  const generatedIssues = [...generatedRead.issues, ...trackedRead.issues]
+  const boundaryIssues = []
+
+  if (migrationRead.value) {
+    const source = decodeUtf8(migrationRead.value, 'migration state', migrationIssues)
+    if (source !== undefined) {
+      migrationIssues.push(...validateMigrationEvidence(source, expectedMigrations, options.expectedMigration))
+      boundaryIssues.push(...unsafeEvidenceMarkerIssues('migration state', source))
+    }
+  }
+  if (pgTapRead.value) {
+    const source = decodeUtf8(pgTapRead.value, 'pgTAP', pgTapIssues)
+    if (source !== undefined) {
+      pgTapIssues.push(...validatePgTapEvidence(source))
+      boundaryIssues.push(...unsafeEvidenceMarkerIssues('pgTAP', source))
+    }
+  }
+  if (generatedRead.value && trackedRead.value) generatedIssues.push(...validateGeneratedTypes(generatedRead.value, trackedRead.value))
+  if (generatedRead.value) {
+    const generatedSource = decodeUtf8(generatedRead.value, 'generated types', generatedIssues)
+    if (generatedSource !== undefined) boundaryIssues.push(...unsafeEvidenceMarkerIssues('generated types', generatedSource))
+  }
+  if (trackedRead.value) {
+    const trackedSource = decodeUtf8(trackedRead.value, 'tracked types', generatedIssues)
+    if (trackedSource !== undefined) boundaryIssues.push(...unsafeEvidenceMarkerIssues('tracked types', trackedSource))
+  }
+
+  checks.push(evidenceResult('migration state', migrationIssues))
+  checks.push(evidenceResult('pgTAP 40/40', pgTapIssues))
+  checks.push(evidenceResult('generated type freshness and RPC contract', generatedIssues))
+  checks.push(evidenceResult('local-only security boundary', boundaryIssues))
+
+  return {
+    pass: checks.every((check) => check.pass),
+    checks,
+    operations: Object.freeze({
+      lifecycleCommands: 0,
+      databaseCommands: 0,
+      networkRequests: 0,
+      repositoryWrites: 0,
+      retries: 0,
+      resultMasking: 0,
+    }),
+  }
+}
+
+export function formatDatabaseRuntimeEvidenceReport(report) {
+  const lines = [`Supabase database runtime evidence: ${report.pass ? 'PASS' : 'FAIL'}`]
+  for (const check of report.checks) {
+    lines.push(`- ${check.name}: ${check.pass ? 'PASS' : 'FAIL'}`)
+    for (const issue of check.issues) lines.push(`  - ${issue}`)
+  }
+  lines.push(`- lifecycle commands: ${report.operations.lifecycleCommands}`)
+  lines.push(`- database commands: ${report.operations.databaseCommands}`)
+  lines.push(`- network requests: ${report.operations.networkRequests}`)
+  lines.push(`- repository writes: ${report.operations.repositoryWrites}`)
+  lines.push(`- retries: ${report.operations.retries}`)
+  lines.push(`- result masking: ${report.operations.resultMasking}`)
+  return lines.join('\n')
+}
+
+export function parseDatabaseEvidenceArguments(args) {
+  if (args.length === 0 || (args.length === 2 && args[0] === '--fixture')) return undefined
+  const values = new Map()
+  for (let index = 0; index < args.length;) {
+    const flag = args[index]
+    if (!databaseEvidenceFlagSet.has(flag)) throw new Error(diagnostic.argumentUnknown)
+    if (values.has(flag)) throw new Error(diagnostic.argumentDuplicate)
+    const value = args[index + 1]
+    if (value === undefined || value === '' || value.startsWith('-')) {
+      throw new Error(diagnostic.argumentValueMissing)
+    }
+    values.set(flag, value)
+    index += 2
+  }
+  const missing = databaseEvidenceFlags.filter((flag) => !values.has(flag))
+  if (missing.length > 0) throw new Error(diagnostic.argumentRequiredMissing)
+  return {
+    migrationJson: values.get('--migration-json'),
+    pgTap: values.get('--pgtap'),
+    generatedTypes: values.get('--generated-types'),
+    trackedTypes: values.get('--tracked-types'),
+    expectedMigration: values.get('--expected-migration'),
+  }
+}
+
 function parseFixtureArgument(args) {
   const index = args.indexOf('--fixture')
   if (index === -1) return undefined
@@ -278,7 +677,21 @@ function parseFixtureArgument(args) {
 }
 
 if (process.argv[1] && pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url) {
-  const report = await checkSupabaseFreshBaseline({ fixture: parseFixtureArgument(process.argv.slice(2)) })
-  process.stdout.write(`${formatSupabaseFreshBaselineReport(report)}\n`)
-  if (!report.pass) process.exitCode = 1
+  try {
+    const args = process.argv.slice(2)
+    const databaseEvidenceOptions = parseDatabaseEvidenceArguments(args)
+    if (databaseEvidenceOptions) {
+      const report = await checkDatabaseRuntimeEvidence(databaseEvidenceOptions)
+      process.stdout.write(`${formatDatabaseRuntimeEvidenceReport(report)}\n`)
+      if (!report.pass) process.exitCode = 1
+    } else {
+      const report = await checkSupabaseFreshBaseline({ fixture: parseFixtureArgument(args) })
+      process.stdout.write(`${formatSupabaseFreshBaselineReport(report)}\n`)
+      if (!report.pass) process.exitCode = 1
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'unknown checker error'
+    process.stderr.write(`Supabase database runtime evidence: FAIL\n- input: ${message}\n`)
+    process.exitCode = 1
+  }
 }
