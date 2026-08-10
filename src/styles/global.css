@@ -1754,6 +1754,13 @@ a {
 .paste-html-preview { max-width: 100%; max-height: 32rem; overflow: auto; box-sizing: border-box; padding: 14px; border-radius: 6px; background: #17201d; color: #edf5f1; white-space: pre-wrap; overflow-wrap: anywhere; }
 .paste-warning-acknowledgement { display: flex; min-height: 44px; align-items: center; gap: 10px; padding: 12px 14px; border: 1px solid #c7a84b; border-radius: 7px; background: #fffbea; font-weight: 700; }
 .paste-tracking-status { padding: 12px; border-radius: 6px; background: #eef3f1; overflow-wrap: anywhere; }
+.wordpress-html-workflow { display: grid; min-width: 0; gap: 18px; }
+.wordpress-html-raw { width: 100%; min-height: 18rem; max-height: 70dvh; box-sizing: border-box; resize: vertical; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: .875rem; }
+.wordpress-html-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.wordpress-html-form-grid label, .wordpress-html-source label { display: grid; min-width: 0; gap: 6px; font-weight: 700; }
+.wordpress-html-source { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; padding: 14px; border: 1px solid #d9dfdc; border-radius: 7px; }
+.wordpress-html-save-actions { display: grid; gap: 12px; }
+.wordpress-html-save-actions button { min-height: 44px; justify-self: start; }
 
 @media (max-width: 540px) {
   .import-mode-selector { display: grid; }
@@ -1762,4 +1769,7 @@ a {
   .chatgpt-paste-actions button, .chatgpt-paste-confirm button { width: 100%; justify-content: center; }
   .paste-preview-grid { grid-template-columns: 1fr; }
   .paste-eligibility { max-width: none; text-align: left; }
+  .wordpress-html-raw { min-height: 22rem; font-size: 1rem; }
+  .wordpress-html-form-grid, .wordpress-html-source { grid-template-columns: 1fr; }
+  .wordpress-html-save-actions button { width: 100%; justify-self: stretch; justify-content: center; }
 }

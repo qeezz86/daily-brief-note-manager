@@ -10,10 +10,10 @@ Fresh project는 다음을 모두 만족한다.
 
 - `supabase_migrations.schema_migrations`가 없거나 0행이다.
 - 예상 public application table과 application function이 없다.
-- 로컬 canonical migration 27개가 순서대로 전부 pending이다.
+- 로컬 canonical migration 28개가 순서대로 전부 pending이다.
 - whitelist 밖 remote application object와 remote-only migration이 없다.
 
-2026-07-21 read-only inspection은 retention hardening 도입 전의 역사적 evidence로, 당시 application table/function과 migration history가 0건이고 당시 baseline 22개가 pending임을 확인했다. 이 기록은 현재 실행 지침이 아니다. 현재 source of truth는 owner-scoped structured ChatGPT paste RPC까지 포함한 아래 27개이며, fresh 상태에서는 27개 전체가 pending이어야 `FRESH_PROJECT_BASELINE_REQUIRED`로 판정한다. 과거 Gate 2의 “마지막 3개만 pending” 판단과 Phase 5B·5C의 19+3 rollout은 legacy rollout path일 뿐 현재 적용 계획으로 사용하지 않는다.
+2026-07-21 read-only inspection은 retention hardening 도입 전의 역사적 evidence로, 당시 application table/function과 migration history가 0건이고 당시 baseline 22개가 pending임을 확인했다. 이 기록은 현재 실행 지침이 아니다. 현재 source of truth는 owner-scoped structured ChatGPT paste와 manual WordPress HTML RPC까지 포함한 아래 28개이며, fresh 상태에서는 28개 전체가 pending이어야 `FRESH_PROJECT_BASELINE_REQUIRED`로 판정한다. 과거 Gate 2의 “마지막 3개만 pending” 판단과 Phase 5B·5C의 19+3 rollout은 legacy rollout path일 뿐 현재 적용 계획으로 사용하지 않는다.
 
 ## 3. migration 순서와 dependency
 
@@ -46,6 +46,7 @@ Fresh project는 다음을 모두 만족한다.
 | 25 | `20260727150000_add_post_image_prompt_alt_update_rpc.sql` | 이미지 프롬프트·ALT 전용 원자 저장 | 24 | owner-scoped RPC 추가, 데이터 rewrite 없음 |
 | 26 | `20260729150000_get_dashboard_overview.sql` | 읽기 전용 operational dashboard overview | 25 | owner-scoped `SECURITY INVOKER` RPC 추가, 데이터 rewrite 없음 |
 | 27 | `20260801120000_save_chatgpt_paste_post.sql` | 명시 확인된 구조화 ChatGPT 붙여넣기 한 건 저장 RPC | 19, 26 | owner-scoped `SECURITY DEFINER` RPC 추가, 데이터 rewrite 없음 |
+| 28 | `20260809120000_save_wordpress_manual_post.sql` | 명시 확인된 수동 WordPress HTML 한 건 저장 및 provenance 고정 RPC | 13, 27 | owner-scoped `SECURITY INVOKER` RPC 추가, 데이터 rewrite 없음 |
 
 정적 검수 결과 `DROP TABLE`, `TRUNCATE`, 무조건 `DELETE`, 기존 `posts` 대량 rewrite, credential literal, 실제 UUID/email, production URL literal은 없다. `DROP FUNCTION`, `DROP INDEX`, constraint/function rename은 replacement를 위한 forward hardening이며 table/data 파괴와 구분한다. 상세 object와 flag는 manifest에 기록한다.
 
@@ -55,7 +56,7 @@ Fresh project는 다음을 모두 만족한다.
 
 | 파일 | 대상 | 방식 | fresh 적용 | existing 재실행 |
 |---|---|---|---|---|
-| `supabase/seed/01_categories.sql` | `public.categories` | `INSERT ... ON CONFLICT (id) DO UPDATE` | migration 27개 뒤 | 기술적으로 idempotent지만 existing 22+5 배포에서는 기본 금지 |
+| `supabase/seed/01_categories.sql` | `public.categories` | `INSERT ... ON CONFLICT (id) DO UPDATE` | migration 28개 뒤 | 기술적으로 idempotent지만 existing 22+6 배포에서는 기본 금지 |
 
 허용 데이터는 제품 동작에 필요한 정적 category definition뿐이다. 사용자, 이메일, UUID, post/HTML/news, taxonomy mapping ID, publication attempt, URL, credential/token은 금지한다. Seed는 특정 Auth user나 FK user를 요구하지 않는다.
 
@@ -65,9 +66,9 @@ Expected category ID는 다음 8개다: `economy`, `global`, `technology`, `soci
 
 ## 5. deployment mode 분류
 
-- `FRESH_PROJECT_BASELINE_REQUIRED`: history 0, application object 0, pending이 canonical 27개 전체와 순서까지 정확히 일치하고 remote-only/unknown object가 없음.
-- `EXISTING_PROJECT_INCREMENTAL_READY`: 앞 22개 history/schema가 정확히 일치하고 retention hardening, prompt recent-count, image metadata 저장, dashboard overview, ChatGPT paste 저장 RPC migration 5개가 순서대로 pending. Seed 재적용 없음.
-- `MIGRATION_BASELINE_CURRENT`: canonical 27개가 순서대로 모두 applied이고 pending이 없음. 추가 migration이나 seed 적용 계획 없음.
+- `FRESH_PROJECT_BASELINE_REQUIRED`: history 0, application object 0, pending이 canonical 28개 전체와 순서까지 정확히 일치하고 remote-only/unknown object가 없음.
+- `EXISTING_PROJECT_INCREMENTAL_READY`: 앞 22개 history/schema가 정확히 일치하고 retention hardening, prompt recent-count, image metadata 저장, dashboard overview, ChatGPT paste 저장 RPC, WordPress manual HTML 저장 RPC의 migration 6개(`20260724190000`, `20260726190000`, `20260727150000`, `20260729150000`, `20260801120000`, `20260809120000`)가 순서대로 pending. Seed 재적용 없음.
+- `MIGRATION_BASELINE_CURRENT`: canonical 28개가 순서대로 모두 applied이고 pending이 없음. 추가 migration이나 seed 적용 계획 없음.
 - `PARTIAL_BASELINE_BLOCKED`: 일부 migration/object만 존재하거나 pending set이 어느 승인 경로와도 일치하지 않음.
 - `HISTORY_MISMATCH_BLOCKED`: schema가 있으나 history가 없거나, remote-only version, history/schema 불일치, checksum 상태 불명확.
 - `UNEXPECTED_REMOTE_OBJECTS_BLOCKED`: fresh로 예상한 프로젝트에 whitelist 밖 application table/function/object가 존재.
@@ -83,8 +84,8 @@ Checker는 `scripts/fixtures/supabase-fresh-baseline/`의 sanitized JSON 또는 
 3. sanitized remote classification
 4. manifest와 checker PASS
 5. local reset/lint/pgTAP, Vitest, Deno, smoke, E2E, lint, build, bundle PASS
-6. canonical migration 27개와 seed 1개의 exact whitelist
-7. 예상 변경: public table 23개, manifest의 expected RPC(구조화 붙여넣기 RPC 포함), RLS/policies/index, category 8개
+6. canonical migration 28개와 seed 1개의 exact whitelist
+7. 예상 변경: public table 23개, manifest의 expected RPC(구조화·WordPress manual 붙여넣기 RPC 포함), RLS/policies/index, category 8개
 8. 원격 baseline migration과 seed를 실행한다는 별도 명시적 사용자 승인
 
 승인 범위는 DB baseline/seed까지만이다. WordPress secrets, Functions, frontend와 draft smoke는 이 승인에 포함하지 않는다.
@@ -103,7 +104,7 @@ Checker는 `scripts/fixtures/supabase-fresh-baseline/`의 sanitized JSON 또는 
 다음 SQL은 mutation이 없으며 실제 배포 승인 뒤 SQL Editor에서 실행한다. 이번 planning phase에는 원격에서 실행하지 않는다.
 
 ```sql
--- migration history: exact version inventory and count 27
+-- migration history: exact version inventory and count 28
 select version, name
 from supabase_migrations.schema_migrations
 order by version;
@@ -168,26 +169,26 @@ union all select 'wordpress_publication_attempts', count(*) from public.wordpres
 order by object_name;
 ```
 
-특히 `transition_wordpress_publication_attempt_service`는 `SECURITY DEFINER`, 빈 `search_path`, anon/authenticated execute false, service_role execute true여야 한다. `save_chatgpt_paste_post(jsonb)`는 `SECURITY DEFINER`, 빈 `search_path`, anon execute false, authenticated execute true이고 40개 assertion의 `chatgpt_paste_post.test.sql` 대상이어야 한다. `wordpress_publication_attempts_content_execution_key`는 `executing`, `succeeded`, `uncertain` 상태에 대한 partial unique guard여야 한다.
+특히 `transition_wordpress_publication_attempt_service`는 `SECURITY DEFINER`, 빈 `search_path`, anon/authenticated execute false, service_role execute true여야 한다. `save_chatgpt_paste_post(jsonb)`는 `SECURITY DEFINER`와 40개 assertion, `save_wordpress_manual_post(jsonb)`는 `SECURITY INVOKER`와 30개 assertion 대상이며 둘 다 빈 `search_path`, anon execute false, authenticated execute true여야 한다. `wordpress_publication_attempts_content_execution_key`는 `executing`, `succeeded`, `uncertain` 상태에 대한 partial unique guard여야 한다.
 
 ## 9. failure stop과 recovery
 
-Migration 하나라도 실패하거나 history, RLS, policy, RPC privilege, 40-assertion ChatGPT paste pgTAP, index, category 또는 초기 row-count가 다르면 즉시 중단한다. 자동 `migration repair`, history row 직접 insert, 일부 migration 임의 선택, manual schema creation, remote reset, seed 반복, Function/secret/WordPress 단계 진행은 금지한다.
+Migration 하나라도 실패하거나 history, RLS, policy, RPC privilege, manifest에 등록된 40-assertion ChatGPT paste·30-assertion WordPress manual pgTAP, index, category 또는 초기 row-count가 다르면 즉시 중단한다. 자동 `migration repair`, history row 직접 insert, 일부 migration 임의 선택, manual schema creation, remote reset, seed 반복, Function/secret/WordPress 단계 진행은 금지한다.
 
 DDL rollback을 자동화하지 않는다. 적용된 migration과 실제 catalog를 read-only로 보존·조사하고 새 versioned migration으로 forward-fix한다. Supabase Free plan에서는 PITR을 전제하지 않으므로 배포 직전 플랫폼 backup 가능 범위와 별도 export를 확인하고 복구 담당자·보존 기간을 기록한다.
 
-WordPress 단계는 migration history 27, table/RLS/policy/RPC/index, category 8, initial user data 0, 첫 운영 사용자 login/owner-scope 검증이 모두 끝난 뒤에만 시작한다.
+WordPress 단계는 migration history 28, table/RLS/policy/RPC/index, category 8, initial user data 0, 첫 운영 사용자 login/owner-scope 검증이 모두 끝난 뒤에만 시작한다.
 
 ## 10. required `offline-validation`의 database runtime coverage
 
 기존 required check인 `offline-validation`은 애플리케이션 정적 검증이 끝난 뒤 동일한 blocking job 안에서 database runtime validation을 수행한다. GitHub-hosted `ubuntu-latest` runner마다 Supabase CLI 2.109.1을 `npx --no-install supabase`로 호출해 일회성 Supabase 환경을 정확히 한 번 시작한다. 이 CI 전용 start는 개발자 workstation의 local start 횟수와 lifecycle budget에 포함되지 않으며, job 종료 시 runner와 `$RUNNER_TEMP`가 함께 폐기되어 실행 간 상태가 남지 않는다.
 
-CI 환경은 production database, remote database 또는 linked Supabase project를 사용하지 않는다. project ref, access token, database password, service-role key나 새 repository secret도 필요하지 않다. `supabase start`가 repository migration 전체를 자동 적용하므로 별도 migration apply나 `db reset`을 실행하지 않는다. 이어서 `migration list --local --output json`의 임시 evidence로 canonical 27개 migration과 `20260801120000`의 local database 적용 상태가 정확히 일치하는지 확인하며, pending·누락·분기·malformed evidence는 모두 실패 처리한다. Migration history 불일치에 대한 자동 `migration repair`도 금지한다.
+CI 환경은 production database, remote database 또는 linked Supabase project를 사용하지 않는다. project ref, access token, database password, service-role key나 새 repository secret도 필요하지 않다. `supabase start`가 repository migration 전체를 자동 적용하므로 별도 migration apply나 `db reset`을 실행하지 않는다. 이어서 `migration list --local --output json`의 임시 evidence로 canonical 28개 migration과 마지막 `20260809120000`의 local database 적용 상태가 정확히 일치하는지 확인하며, pending·누락·분기·malformed evidence는 모두 실패 처리한다. Migration history 불일치에 대한 자동 `migration repair`도 금지한다.
 
-마이그레이션된 local schema를 대상으로 `npm run db:lint`를 실행하고, `supabase/tests/chatgpt_paste_post.test.sql`만 지정해 pgTAP plan과 결과가 정확히 40/40인지 검증한다. 실패, skip, TODO, malformed·empty TAP 또는 plan 불일치는 허용하지 않는다. 이 coverage는 인증된 owner A와 owner B, 비인증 persona를 포함한 함수 signature·권한·owner isolation·atomicity·provenance 계약을 blocking 상태로 유지한다.
+마이그레이션된 local schema를 대상으로 `npm run db:lint`를 실행하고 manifest의 `databaseRuntimeEvidence.pgTapSuites`를 순서대로 소비해 `chatgpt_paste_post` 40/40과 `wordpress_manual_post` 30/30을 각각 검증한다. 실패, skip, TODO, malformed·empty TAP 또는 suite별 plan 불일치는 허용하지 않는다. 이 phase-neutral multi-suite coverage는 인증된 owner A와 owner B, 비인증 persona를 포함한 함수 signature·권한·owner isolation·atomicity·provenance 계약을 blocking 상태로 유지한다.
 
-같은 schema에서 생성한 TypeScript database types는 `$RUNNER_TEMP/database.types.ts`에만 기록한다. 추적 파일 `src/shared/supabase/database.types.ts`를 덮어쓰거나 format하지 않으며, CRLF를 LF로만 정규화한 raw-byte 비교에서 bare CR, BOM 상태, non-newline byte와 final newline을 보존한다. 차이가 있거나 `save_chatgpt_paste_post`의 `Args: { p_item: Json }`, `Returns: Json` 계약이 다르면 required check가 실패한다.
+같은 schema에서 생성한 TypeScript database types는 `$RUNNER_TEMP/database.types.ts`에만 기록한다. 추적 파일 `src/shared/supabase/database.types.ts`를 덮어쓰거나 format하지 않으며, CRLF를 LF로만 정규화한 raw-byte 비교에서 bare CR, BOM 상태, non-newline byte와 final newline을 보존한다. 차이가 있거나 manifest의 `save_chatgpt_paste_post`·`save_wordpress_manual_post` 각각에 대해 `Args: { p_item: Json }`, `Returns: Json` 계약이 다르면 required check가 실패한다. Phase 5H 구현 중 추적 파일에 더한 WordPress RPC 선언은 required CI가 canonical freshness를 확인할 때까지 provisional이다.
 
-Evidence checker 자체의 23개 Node 테스트도 database start 전에 blocking으로 실행한다. Database command는 fail-fast와 pipeline failure propagation을 유지하며 `continue-on-error`, `|| true`, retry 또는 결과 masking을 사용하지 않는다. 따라서 migration state, lint, pgTAP, generated types 또는 checker 중 하나라도 실패하면 `offline-validation` job과 workflow가 실패해 merge를 차단한다.
+Evidence checker 자체의 60개 Node 테스트도 database start 전에 blocking으로 실행한다. Database command는 fail-fast와 pipeline failure propagation을 유지하며 `continue-on-error`, `|| true`, retry 또는 결과 masking을 사용하지 않는다. 따라서 migration state, lint, pgTAP, generated types 또는 checker 중 하나라도 실패하면 `offline-validation` job과 workflow가 실패해 merge를 차단한다.
 
 이 section은 CI 계약을 설명하며 이번 구현 작업에서 local Supabase, database 또는 Docker runtime을 실행했다는 결과를 주장하지 않는다. CI 문제를 조사할 때도 먼저 임시 evidence와 checker diagnostic을 확인하고, production/remote/linked database, `db reset`, migration repair, history rewrite 또는 결과 masking으로 우회하지 않는다. Runtime 재현이 필요하면 개발자 local lifecycle budget과 별도의 승인 Gate에서만 진행한다.

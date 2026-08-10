@@ -2072,6 +2072,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      save_wordpress_manual_post: { Args: { p_item: Json }; Returns: Json }
       set_news_briefing_prompt_run_pinned: {
         Args: { p_is_pinned: boolean; p_prompt_run_id: string }
         Returns: {
@@ -2362,4 +2363,3 @@ export const Constants = {
     Enums: {},
   },
 } as const
-

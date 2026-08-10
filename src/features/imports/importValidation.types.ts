@@ -134,6 +134,7 @@ export interface ImportValidationResult {
 }
 
 export type ImportDatabaseCheckStatus = 'complete' | 'partial' | 'unavailable'
+export type ImportValidationPurpose = 'content-import' | 'wordpress-manual'
 
 export interface ExistingImportPost {
   categoryId: string

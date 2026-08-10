@@ -231,6 +231,10 @@ unique 조건:
 
 반환 JSON은 `postId`, `title`, `categoryId`, `status`, `slug`, `displayId`, `publishedOn`, `wordpressUrl` 여덟 key만 포함한다. raw paste, owner, auth 또는 session은 입력 허용 경계와 반환값 모두에 없다. 함수 실행 권한은 PUBLIC과 anon에서 revoke하고 authenticated에만 grant한다. 새 table, column, enum, constraint, index, trigger 또는 RLS policy 변경은 없다.
 
+`save_wordpress_manual_post(p_item jsonb) returns jsonb`는 Phase 5H 수동 WordPress HTML Import 한 건 저장 전용 `SECURITY INVOKER` 함수다. 빈 `search_path`를 고정하고 PUBLIC·anon 실행을 revoke하며 authenticated에만 실행을 허용한다. 기존 authenticated `posts UPDATE` grant와 owner RLS 아래에서 동작하고 `owner_id` 입력이나 `SECURITY DEFINER` 우회 경로는 추가하지 않는다.
+
+함수는 caller payload를 바꾸지 않고 기존 `import_content_post(p_item)`에 전달한다. 그 함수가 반환한 정확한 `postId` 중 현재 `auth.uid()`가 소유하고 provenance가 `json_import`인 방금 생성된 한 행만 `wordpress_manual`로 update하며, updated row가 정확히 하나가 아니면 오류로 전체 statement transaction을 중단한다. 원래 `import_content_post` 반환 JSON을 그대로 반환하고 exception을 success로 숨기지 않으므로 import·child publication·series counter·provenance finalization 중 하나라도 실패하면 모두 rollback된다. caller-supplied `sourceImportType`, `source_import_type`, owner/auth/session/token과 news tracking persistence data는 기존 unknown/forbidden key validation에 의해 거부되며 `import_content_post`의 일반 JSON Import provenance는 계속 `json_import`다.
+
 `import_news_tracking_for_post(p_post_id uuid, p_tracking jsonb)`는 Phase 4A-3의 뉴스 게시물 한 건 tracking Import 전용 `SECURITY DEFINER` 함수다. `auth.uid()` 소유 post를 잠그고 post에서 category를 결정한 뒤 topic 생성 또는 정확한 key의 기존 topic 재사용, 초기 상태 이력, update graph, 1-based source order 연결과 followup을 하나의 transaction으로 저장한다. owner, category, 내부 UUID와 생성·수정 시각은 입력받지 않는다. 기존 topic의 제목·요약·상태·종료 사유는 변경하지 않으며 충돌하면 전체 tracking transaction을 rollback한다. 같은 payload 내부의 `update_external_key`만 previous 참조에 사용할 수 있고 missing/self/cycle/cross-topic 참조를 차단한다. post에 update가 이미 있거나 source가 연결돼 있으면 덮어쓰지 않는다. 이 transaction 실패는 앞서 완료된 `import_content_post` transaction의 post·SEO·태그·출처를 삭제하거나 변경하지 않는다.
 
 ### 5.6 Phase 4A-4 Import job
