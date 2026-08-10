@@ -16,6 +16,14 @@ begin
     raise exception 'WORDPRESS_MANUAL_AUTH_REQUIRED' using errcode = '42501';
   end if;
 
+  if jsonb_typeof(p_item) = 'object' then
+    if p_item ? 'sourceImportType'
+       or p_item ? 'source_import_type' then
+      raise exception 'IMPORT_FORBIDDEN_FIELD'
+        using errcode = '22023';
+    end if;
+  end if;
+
   imported_result := public.import_content_post(p_item);
   saved_post_id := (imported_result ->> 'postId')::uuid;
 
