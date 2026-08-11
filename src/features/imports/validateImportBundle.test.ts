@@ -61,6 +61,32 @@ describe('공통 게시물 검증', () => {
   })
 })
 
+describe('WordPress manual validation purpose', () => {
+  it('keeps ready/published JSON news tracking mandatory by default', () => {
+    const result = validateImportBundle(validImportBundle([validNewsPost({ newsTracking: null })]), emptyImportReferenceData)
+    expect(result.items[0].issues.map((issue) => issue.code)).toContain('NEWS_UPDATES_REQUIRED')
+    expect(result.status).toBe('invalid')
+  })
+
+  it('omits only persistent newsTracking presence for wordpress-manual', () => {
+    const result = validateImportBundle(
+      { ...validImportBundle([validNewsPost({ newsTracking: null })]), validationMode: 'legacy' },
+      emptyImportReferenceData,
+      'complete',
+      'wordpress-manual',
+    )
+    expect(result.items[0].issues.map((issue) => issue.code)).not.toContain('NEWS_UPDATES_REQUIRED')
+    expect(result.status).toBe('valid')
+  })
+
+  it('does not weaken HTML security or other canonical requirements', () => {
+    const post = validNewsPost({ newsTracking: null, htmlBody: '<div class="daily-brief-note news-briefing economy"><h1>경제</h1><script>alert(1)</script></div>' })
+    const result = validateImportBundle({ ...validImportBundle([post]), validationMode: 'legacy' }, emptyImportReferenceData, 'complete', 'wordpress-manual')
+    expect(result.items[0].issues.map((issue) => issue.code)).toContain('HTML_SCRIPT_FORBIDDEN')
+    expect(result.status).toBe('invalid')
+  })
+})
+
 describe('HTML 검증 재사용', () => {
   const cases: Array<[string, string]> = [
     ['<div class="daily-brief-note news-briefing economy"><p>x</p></div>', 'HTML_H1_MISSING'],

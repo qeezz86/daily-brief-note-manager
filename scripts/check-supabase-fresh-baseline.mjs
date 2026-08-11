@@ -20,10 +20,9 @@ const protectedEnvironmentNames = new Set([
 
 const databaseEvidenceFlags = Object.freeze([
   '--migration-json',
-  '--pgtap',
+  '--pgtap-dir',
   '--generated-types',
   '--tracked-types',
-  '--expected-migration',
 ])
 
 const databaseEvidenceFlagSet = new Set(databaseEvidenceFlags)
@@ -36,6 +35,7 @@ const diagnostic = Object.freeze({
   argumentRequiredMissing: 'ARGUMENT_REQUIRED_MISSING',
   evidenceFileMissing: 'EVIDENCE_FILE_MISSING',
   evidenceFileInvalid: 'EVIDENCE_FILE_INVALID',
+  manifestEvidenceInvalid: 'MANIFEST_DATABASE_EVIDENCE_INVALID',
   migrationEvidenceInvalid: 'MIGRATION_EVIDENCE_INVALID',
   migrationExpectedIdMissing: 'MIGRATION_EXPECTED_ID_MISSING',
   migrationPendingOrDivergent: 'MIGRATION_PENDING_OR_DIVERGENT',
@@ -65,6 +65,96 @@ function orderedUnique(values) {
 
 function result(name, issues) {
   return { name, pass: issues.length === 0, issues: [...issues].sort() }
+}
+
+function isPlainObject(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+export function validateDatabaseRuntimeEvidenceManifest(manifest) {
+  const issues = []
+  const evidence = manifest?.databaseRuntimeEvidence
+  if (!isPlainObject(evidence)) {
+    return [`${diagnostic.manifestEvidenceInvalid}: databaseRuntimeEvidence must be an object`]
+  }
+  if (evidence.schemaVersion !== 1 || !Number.isInteger(evidence.schemaVersion)) {
+    issues.push(`${diagnostic.manifestEvidenceInvalid}: databaseRuntimeEvidence schemaVersion must be integer 1`)
+  }
+
+  const suites = evidence.pgTapSuites
+  if (!Array.isArray(suites) || suites.length === 0) {
+    issues.push(`${diagnostic.manifestEvidenceInvalid}: pgTapSuites must be a non-empty array`)
+  } else {
+    const ids = new Set()
+    const files = new Set()
+    for (const [index, suite] of suites.entries()) {
+      const label = `pgTapSuites[${index}]`
+      if (!isPlainObject(suite)) {
+        issues.push(`${diagnostic.manifestEvidenceInvalid}: ${label} must be an object`)
+        continue
+      }
+      if (typeof suite.id !== 'string' || !/^[a-z0-9][a-z0-9_-]*$/.test(suite.id)) {
+        issues.push(`${diagnostic.manifestEvidenceInvalid}: ${label}.id is unsafe or invalid`)
+      } else if (ids.has(suite.id)) {
+        issues.push(`${diagnostic.manifestEvidenceInvalid}: duplicate pgTAP suite id ${suite.id}`)
+      } else {
+        ids.add(suite.id)
+      }
+      if (typeof suite.file !== 'string' || !/^supabase\/tests\/[A-Za-z0-9][A-Za-z0-9._-]*\.test\.sql$/.test(suite.file)) {
+        issues.push(`${diagnostic.manifestEvidenceInvalid}: ${label}.file must be a safe supabase/tests/*.test.sql path`)
+      } else if (files.has(suite.file)) {
+        issues.push(`${diagnostic.manifestEvidenceInvalid}: duplicate pgTAP suite file ${suite.file}`)
+      } else {
+        files.add(suite.file)
+      }
+      if (!Number.isInteger(suite.expectedAssertions) || suite.expectedAssertions <= 0 || suite.expectedAssertions > 10000) {
+        issues.push(`${diagnostic.manifestEvidenceInvalid}: ${label}.expectedAssertions must be an integer from 1 to 10000`)
+      }
+    }
+  }
+
+  const contracts = evidence.requiredRpcContracts
+  if (!Array.isArray(contracts) || contracts.length === 0) {
+    issues.push(`${diagnostic.manifestEvidenceInvalid}: requiredRpcContracts must be a non-empty array`)
+  } else {
+    const names = new Set()
+    for (const [index, contract] of contracts.entries()) {
+      const label = `requiredRpcContracts[${index}]`
+      if (!isPlainObject(contract)) {
+        issues.push(`${diagnostic.manifestEvidenceInvalid}: ${label} must be an object`)
+        continue
+      }
+      if (typeof contract.name !== 'string' || !/^[a-z_][a-z0-9_]*$/.test(contract.name)) {
+        issues.push(`${diagnostic.manifestEvidenceInvalid}: ${label}.name is unsafe or invalid`)
+      } else if (names.has(contract.name)) {
+        issues.push(`${diagnostic.manifestEvidenceInvalid}: duplicate required RPC name ${contract.name}`)
+      } else {
+        names.add(contract.name)
+      }
+      if (!isPlainObject(contract.args) || Object.keys(contract.args).length === 0) {
+        issues.push(`${diagnostic.manifestEvidenceInvalid}: ${label}.args must be a non-empty object`)
+      } else {
+        const argNames = Object.keys(contract.args)
+        if (!same(argNames, [...argNames].sort())) {
+          issues.push(`${diagnostic.manifestEvidenceInvalid}: ${label}.args keys must be deterministically sorted`)
+        }
+        for (const [argName, typeToken] of Object.entries(contract.args)) {
+          if (!/^[a-z_][a-z0-9_]*$/.test(argName)) issues.push(`${diagnostic.manifestEvidenceInvalid}: ${label}.args contains an unsafe name`)
+          if (typeof typeToken !== 'string' || !/^[A-Za-z_$][A-Za-z0-9_$]*(?:\[\])?$/.test(typeToken)) {
+            issues.push(`${diagnostic.manifestEvidenceInvalid}: ${label}.args.${argName} has an unsupported type token`)
+          }
+        }
+      }
+      if (typeof contract.returns !== 'string' || !/^[A-Za-z_$][A-Za-z0-9_$]*(?:\[\])?$/.test(contract.returns)) {
+        issues.push(`${diagnostic.manifestEvidenceInvalid}: ${label}.returns has an unsupported type token`)
+      }
+    }
+  }
+  return issues
 }
 
 async function readJson(root, relativePath) {
@@ -232,7 +322,6 @@ export async function checkSupabaseFreshBaseline(options = {}) {
     if (migration.filename !== `${migration.version}_${migration.filename.slice(15)}`) migrationIssues.push(`${migration.filename}: version and filename disagree`)
   }
   if (expectedMigrationFiles[0] !== '20260710080000_initial_schema.sql') migrationIssues.push('first migration must be the initial schema')
-  if (expectedMigrationFiles.at(-1) !== '20260801120000_save_chatgpt_paste_post.sql') migrationIssues.push('last migration must add the structured ChatGPT paste RPC')
   const existingPlan = manifest.currentApplicationPlans?.existing
   const freshPlan = manifest.currentApplicationPlans?.fresh
   if (freshPlan?.requiredAppliedMigrationCount !== 0 || freshPlan?.pendingMigrationCount !== expectedMigrationFiles.length || freshPlan?.seedRequired !== true) {
@@ -242,6 +331,7 @@ export async function checkSupabaseFreshBaseline(options = {}) {
   if (!same(existingPlan?.pendingMigrations, expectedMigrationFiles.slice(existingPlan?.requiredAppliedMigrationCount ?? 0))) migrationIssues.push('existing project plan must contain the exact ordered canonical suffix')
   if (existingPlan?.seedRequired !== false) migrationIssues.push('existing project plan metadata must not require seed reapplication')
   checks.push(result('migration inventory', migrationIssues))
+  checks.push(result('database runtime evidence manifest', validateDatabaseRuntimeEvidenceManifest(manifest)))
 
   const migrationSafety = []
   for (const filename of migrationFiles.filter((name) => name.endsWith('.sql'))) {
@@ -376,7 +466,7 @@ function migrationVersion(row, field) {
   return typeof value === 'string' && /^\d{14}$/.test(value.trim()) ? value.trim() : undefined
 }
 
-function validateMigrationEvidence(source, expectedMigrations, expectedMigration) {
+function validateMigrationEvidence(source, expectedMigrations) {
   const issues = []
   if (source.trim() === '') return [`${diagnostic.migrationEvidenceInvalid}: migration state: evidence is empty`]
 
@@ -409,13 +499,14 @@ function validateMigrationEvidence(source, expectedMigrations, expectedMigration
 
   if (!same(local, expectedMigrations)) issues.push(`${diagnostic.migrationPendingOrDivergent}: migration state: repository migration inventory is incomplete or reordered`)
   if (!same(appliedToLocalDatabase, expectedMigrations)) issues.push(`${diagnostic.migrationPendingOrDivergent}: migration state: migrated local database history is incomplete or reordered`)
-  if (!local.includes(expectedMigration) || !appliedToLocalDatabase.includes(expectedMigration)) {
-    issues.push(`${diagnostic.migrationExpectedIdMissing}: migration state: expected migration ${expectedMigration} is missing`)
+  const newestExpectedMigration = expectedMigrations.at(-1)
+  if (newestExpectedMigration && (!local.includes(newestExpectedMigration) || !appliedToLocalDatabase.includes(newestExpectedMigration))) {
+    issues.push(`${diagnostic.migrationExpectedIdMissing}: migration state: expected migration ${newestExpectedMigration} is missing`)
   }
   return issues
 }
 
-function validatePgTapEvidence(source) {
+function validatePgTapEvidence(source, expectedAssertions) {
   const issues = []
   if (source.trim() === '') return [`${diagnostic.evidenceFileInvalid}: pgTAP: evidence is empty`]
   if (/\r(?!\n)/.test(source)) issues.push(`${diagnostic.pgTapMalformed}: bare CR is forbidden`)
@@ -452,13 +543,13 @@ function validatePgTapEvidence(source) {
       if (index !== 0 || versionCount > 1) issues.push(`${diagnostic.pgTapMalformed}: TAP version line is misplaced or duplicated`)
       continue
     }
-    if (line === '1..40') {
+    if (line === `1..${expectedAssertions}`) {
       planIndexes.push(index)
       continue
     }
     if (/^(?:\d+)\.\.(?:\d+)/.test(line)) {
       planIndexes.push(index)
-      issues.push(`${diagnostic.pgTapPlanInvalid}: exact plan 1..40 is required`)
+      issues.push(`${diagnostic.pgTapPlanInvalid}: exact plan 1..${expectedAssertions} is required`)
       continue
     }
     if (/^Bail out!/i.test(line) || /^Bail(?:\s+out?)?\s*!?$/i.test(line)) {
@@ -491,8 +582,8 @@ function validatePgTapEvidence(source) {
   }
 
   if (yamlOpen) issues.push(`${diagnostic.pgTapMalformed}: unclosed TAP diagnostic YAML block`)
-  if (planIndexes.length !== 1 || lines[planIndexes[0]] !== '1..40') {
-    issues.push(`${diagnostic.pgTapPlanInvalid}: exact plan 1..40 is required exactly once`)
+  if (planIndexes.length !== 1 || lines[planIndexes[0]] !== `1..${expectedAssertions}`) {
+    issues.push(`${diagnostic.pgTapPlanInvalid}: exact plan 1..${expectedAssertions} is required exactly once`)
   } else {
     const assertionIndexes = lines
       .map((line, index) => /^(?:not ok|ok)\s+[1-9]\d*/i.test(line) ? index : -1)
@@ -502,9 +593,9 @@ function validatePgTapEvidence(source) {
     const planIsTrailing = assertionIndexes.length > 0 && planIndex > assertionIndexes.at(-1)
     if (!planIsLeading && !planIsTrailing) issues.push(`${diagnostic.pgTapPlanInvalid}: plan must precede or follow the complete assertion sequence`)
   }
-  if (assertions.length !== 40) issues.push(`${diagnostic.pgTapAssertionInvalid}: expected 40 assertions, found ${assertions.length}`)
-  if (!same(assertions.map((assertion) => assertion.number), Array.from({ length: 40 }, (_, index) => index + 1))) {
-    issues.push(`${diagnostic.pgTapAssertionInvalid}: assertion numbers must be exactly 1 through 40`)
+  if (assertions.length !== expectedAssertions) issues.push(`${diagnostic.pgTapAssertionInvalid}: expected ${expectedAssertions} assertions, found ${assertions.length}`)
+  if (!same(assertions.map((assertion) => assertion.number), Array.from({ length: expectedAssertions }, (_, index) => index + 1))) {
+    issues.push(`${diagnostic.pgTapAssertionInvalid}: assertion numbers must be exactly 1 through ${expectedAssertions}`)
     issues.push(`${diagnostic.pgTapMalformed}: truncated, duplicate, missing, or out-of-range assertion number`)
   }
   const failed = assertions.filter((assertion) => !assertion.passed).length
@@ -514,7 +605,7 @@ function validatePgTapEvidence(source) {
   if (failed > 0) issues.push(`${diagnostic.pgTapAssertionInvalid}: ${failed} failed assertion(s)`)
   if (skipped > 0) issues.push(`${diagnostic.pgTapAssertionInvalid}: ${skipped} skipped assertion(s)`)
   if (todos > 0) issues.push(`${diagnostic.pgTapAssertionInvalid}: ${todos} todo assertion(s)`)
-  if (passed !== 40) issues.push(`${diagnostic.pgTapAssertionInvalid}: expected 40 passed assertions, found ${passed}`)
+  if (passed !== expectedAssertions) issues.push(`${diagnostic.pgTapAssertionInvalid}: expected ${expectedAssertions} passed assertions, found ${passed}`)
   return issues
 }
 
@@ -530,7 +621,17 @@ function normalizedTypeEvidence(buffer, label, issues) {
   return { hasBom, source: source.replace(/\r\n/g, '\n') }
 }
 
-function validateGeneratedTypes(generatedBuffer, trackedBuffer) {
+function rpcContractPattern(contract) {
+  const args = Object.entries(contract.args)
+    .map(([name, typeToken]) => `${escapeRegExp(name)}\\s*:\\s*${escapeRegExp(typeToken)}\\s*[;,]?`)
+    .join('\\s*')
+  return new RegExp(
+    `(?<![A-Za-z0-9_$])${escapeRegExp(contract.name)}(?![A-Za-z0-9_$])\\s*:\\s*\\{\\s*Args\\s*:\\s*\\{\\s*${args}\\s*\\}\\s*[;,]?\\s*Returns\\s*:\\s*${escapeRegExp(contract.returns)}\\s*[;,]?\\s*\\}`,
+    'g',
+  )
+}
+
+function validateGeneratedTypes(generatedBuffer, trackedBuffer, requiredRpcContracts) {
   const issues = []
   const generated = normalizedTypeEvidence(generatedBuffer, 'generated types', issues)
   const tracked = normalizedTypeEvidence(trackedBuffer, 'tracked types', issues)
@@ -538,67 +639,148 @@ function validateGeneratedTypes(generatedBuffer, trackedBuffer) {
   if (generated.hasBom !== tracked.hasBom) issues.push(`${diagnostic.generatedTypesMismatch}: generated types: UTF-8 BOM status differs from tracked types`)
   if (generated.source !== tracked.source) issues.push(`${diagnostic.generatedTypesMismatch}: generated types: normalized raw bytes differ from tracked types`)
 
-  const rpcContract = /save_chatgpt_paste_post\s*:\s*\{\s*Args\s*:\s*\{\s*p_item\s*:\s*Json\s*\}\s*;\s*Returns\s*:\s*Json\s*\}/g
-  const generatedContracts = [...generated.source.matchAll(rpcContract)].length
-  const trackedContracts = [...tracked.source.matchAll(rpcContract)].length
-  if (generatedContracts !== 1 || trackedContracts !== 1) {
-    issues.push(`${diagnostic.rpcContractMismatch}: generated types: save_chatgpt_paste_post must have exact Args { p_item: Json } and Returns Json`)
+  for (const contract of requiredRpcContracts) {
+    const generatedContracts = [...generated.source.matchAll(rpcContractPattern(contract))].length
+    const trackedContracts = [...tracked.source.matchAll(rpcContractPattern(contract))].length
+    if (generatedContracts !== 1 || trackedContracts !== 1) {
+      const args = Object.entries(contract.args).map(([name, typeToken]) => `${name}: ${typeToken}`).join(', ')
+      issues.push(`${diagnostic.rpcContractMismatch}: generated types: ${contract.name} must occur exactly once with Args { ${args} } and Returns ${contract.returns}`)
+    }
   }
   return issues
 }
 
-async function repositoryMigrationVersions(root) {
+async function repositoryMigrationInventory(root) {
   const filenames = await filesIn(root, 'supabase/migrations')
   const versions = filenames.map((filename) => filename.match(/^(\d{14})_[A-Za-z0-9_]+\.sql$/)?.[1])
   if (versions.some((version) => version === undefined) || !orderedUnique(versions)) {
     throw new Error('repository migration inventory is malformed')
   }
-  return versions
+  return { filenames, versions }
+}
+
+async function readPgTapDirectory(directoryPath, suites) {
+  const issues = []
+  const evidence = new Map()
+  let entries
+  try {
+    const metadata = await fs.lstat(directoryPath)
+    if (metadata.isSymbolicLink() || !metadata.isDirectory()) {
+      throw new Error('not a regular directory')
+    }
+    entries = await fs.readdir(directoryPath, { withFileTypes: true })
+  } catch (error) {
+    const code = error && typeof error === 'object' && 'code' in error ? error.code : undefined
+    const category = code === 'ENOENT' ? diagnostic.evidenceFileMissing : diagnostic.evidenceFileInvalid
+    issues.push(`${category}: pgTAP evidence directory is missing, unreadable, or invalid`)
+    for (const suite of suites) {
+      evidence.set(suite.id, { value: undefined, issues: [`${diagnostic.evidenceFileMissing}: pgTAP ${suite.id}: evidence is missing or unreadable`] })
+    }
+    return { issues, evidence }
+  }
+
+  const expectedNames = new Set(suites.map((suite) => `${suite.id}.tap`))
+  const logicalNames = new Set()
+  for (const entry of entries) {
+    const logicalName = entry.name.toLowerCase()
+    if (logicalNames.has(logicalName)) issues.push(`${diagnostic.evidenceFileInvalid}: duplicate logical pgTAP evidence ${logicalName}`)
+    logicalNames.add(logicalName)
+    if (!/^[a-z0-9][a-z0-9_-]*\.tap$/.test(entry.name)) {
+      issues.push(`${diagnostic.evidenceFileInvalid}: unsafe pgTAP evidence filename ${entry.name}`)
+    }
+    if (!expectedNames.has(entry.name)) issues.push(`${diagnostic.evidenceFileInvalid}: unexpected pgTAP evidence file ${entry.name}`)
+  }
+
+  const entriesByName = new Map(entries.map((entry) => [entry.name, entry]))
+  for (const suite of suites) {
+    const filename = `${suite.id}.tap`
+    const entry = entriesByName.get(filename)
+    if (!entry) {
+      const missing = `${diagnostic.evidenceFileMissing}: pgTAP ${suite.id}: configured evidence file is missing`
+      issues.push(missing)
+      evidence.set(suite.id, { value: undefined, issues: [missing] })
+      continue
+    }
+    if (!entry.isFile()) issues.push(`${diagnostic.evidenceFileInvalid}: pgTAP ${suite.id}: expected path is not a regular file`)
+    evidence.set(suite.id, await readEvidence(path.join(directoryPath, filename), `pgTAP ${suite.id}`))
+  }
+  return { issues, evidence }
 }
 
 export async function checkDatabaseRuntimeEvidence(options) {
+  const root = path.resolve(options.root ?? path.join(path.dirname(fileURLToPath(import.meta.url)), '..'))
   const checks = []
   const migrationRead = await readEvidence(options.migrationJson, 'migration state')
-  const pgTapRead = await readEvidence(options.pgTap, 'pgTAP')
   const generatedRead = await readEvidence(options.generatedTypes, 'generated types')
   const trackedRead = await readEvidence(options.trackedTypes, 'tracked types')
 
-  let expectedMigrations = options.expectedMigrations
-  const inventoryIssues = []
-  if (!Array.isArray(expectedMigrations)) {
+  let manifest = options.manifest
+  const manifestIssues = []
+  if (!manifest) {
     try {
-      expectedMigrations = await repositoryMigrationVersions(path.resolve(options.root ?? path.join(path.dirname(fileURLToPath(import.meta.url)), '..')))
+      manifest = await readJson(root, manifestRelativePath)
     } catch {
-      expectedMigrations = []
+      manifestIssues.push(`${diagnostic.manifestEvidenceInvalid}: baseline manifest is missing, unreadable, or malformed`)
+    }
+  }
+  if (manifest) manifestIssues.push(...validateDatabaseRuntimeEvidenceManifest(manifest))
+
+  let expectedMigrations = []
+  let expectedMigrationFiles = []
+  const inventoryIssues = []
+  if (!Array.isArray(manifest?.migrations) || manifest.migrations.length === 0) {
+    inventoryIssues.push(`${diagnostic.migrationEvidenceInvalid}: migration state: manifest migration inventory is unavailable or malformed`)
+  } else {
+    expectedMigrations = manifest.migrations.map((migration) => migration?.version)
+    expectedMigrationFiles = manifest.migrations.map((migration) => migration?.filename)
+    if (expectedMigrations.some((version) => typeof version !== 'string' || !/^\d{14}$/.test(version)) || !orderedUnique(expectedMigrations)) {
+      inventoryIssues.push(`${diagnostic.migrationEvidenceInvalid}: migration state: manifest migration versions are unavailable or malformed`)
+    }
+    if (expectedMigrationFiles.some((filename, index) => filename !== `${expectedMigrations[index]}_${filename?.slice(15)}`)) {
+      inventoryIssues.push(`${diagnostic.migrationEvidenceInvalid}: migration state: manifest migration filename/version mismatch`)
+    }
+  }
+  if (inventoryIssues.length === 0) {
+    try {
+      const repositoryInventory = await repositoryMigrationInventory(root)
+      if (!same(repositoryInventory.filenames, expectedMigrationFiles) || !same(repositoryInventory.versions, expectedMigrations)) {
+        inventoryIssues.push(`${diagnostic.migrationPendingOrDivergent}: migration state: repository migration inventory does not exactly match the manifest`)
+      }
+    } catch {
       inventoryIssues.push(`${diagnostic.migrationEvidenceInvalid}: migration state: repository migration inventory is unavailable or malformed`)
     }
   }
-  if (!/^\d{14}$/.test(options.expectedMigration ?? '')) {
-    inventoryIssues.push(`${diagnostic.migrationEvidenceInvalid}: migration state: expected migration identity must be 14 digits`)
-  } else if (!expectedMigrations.includes(options.expectedMigration)) {
-    inventoryIssues.push(`${diagnostic.migrationExpectedIdMissing}: migration state: expected migration identity is absent from repository inventory`)
-  }
 
   const migrationIssues = [...migrationRead.issues, ...inventoryIssues]
-  const pgTapIssues = [...pgTapRead.issues]
   const generatedIssues = [...generatedRead.issues, ...trackedRead.issues]
   const boundaryIssues = []
+  const suites = manifestIssues.length === 0 ? manifest.databaseRuntimeEvidence.pgTapSuites : []
+  const requiredRpcContracts = manifestIssues.length === 0 ? manifest.databaseRuntimeEvidence.requiredRpcContracts : []
+  const pgTapDirectory = await readPgTapDirectory(options.pgTapDir, suites)
 
   if (migrationRead.value) {
     const source = decodeUtf8(migrationRead.value, 'migration state', migrationIssues)
     if (source !== undefined) {
-      migrationIssues.push(...validateMigrationEvidence(source, expectedMigrations, options.expectedMigration))
+      migrationIssues.push(...validateMigrationEvidence(source, expectedMigrations))
       boundaryIssues.push(...unsafeEvidenceMarkerIssues('migration state', source))
     }
   }
-  if (pgTapRead.value) {
-    const source = decodeUtf8(pgTapRead.value, 'pgTAP', pgTapIssues)
-    if (source !== undefined) {
-      pgTapIssues.push(...validatePgTapEvidence(source))
-      boundaryIssues.push(...unsafeEvidenceMarkerIssues('pgTAP', source))
+  const pgTapChecks = []
+  for (const suite of suites) {
+    const read = pgTapDirectory.evidence.get(suite.id) ?? { value: undefined, issues: [`${diagnostic.evidenceFileMissing}: pgTAP ${suite.id}: evidence is missing`] }
+    const suiteIssues = [...read.issues]
+    if (read.value) {
+      const source = decodeUtf8(read.value, `pgTAP ${suite.id}`, suiteIssues)
+      if (source !== undefined) {
+        suiteIssues.push(...validatePgTapEvidence(source, suite.expectedAssertions))
+        boundaryIssues.push(...unsafeEvidenceMarkerIssues(`pgTAP ${suite.id}`, source))
+      }
     }
+    pgTapChecks.push(evidenceResult(`pgTAP ${suite.id} ${suite.expectedAssertions}/${suite.expectedAssertions}`, suiteIssues))
   }
-  if (generatedRead.value && trackedRead.value) generatedIssues.push(...validateGeneratedTypes(generatedRead.value, trackedRead.value))
+  if (generatedRead.value && trackedRead.value && manifestIssues.length === 0) {
+    generatedIssues.push(...validateGeneratedTypes(generatedRead.value, trackedRead.value, requiredRpcContracts))
+  }
   if (generatedRead.value) {
     const generatedSource = decodeUtf8(generatedRead.value, 'generated types', generatedIssues)
     if (generatedSource !== undefined) boundaryIssues.push(...unsafeEvidenceMarkerIssues('generated types', generatedSource))
@@ -608,8 +790,10 @@ export async function checkDatabaseRuntimeEvidence(options) {
     if (trackedSource !== undefined) boundaryIssues.push(...unsafeEvidenceMarkerIssues('tracked types', trackedSource))
   }
 
+  checks.push(evidenceResult('database runtime evidence manifest', manifestIssues))
   checks.push(evidenceResult('migration state', migrationIssues))
-  checks.push(evidenceResult('pgTAP 40/40', pgTapIssues))
+  checks.push(evidenceResult('pgTAP evidence file set', pgTapDirectory.issues))
+  checks.push(...pgTapChecks)
   checks.push(evidenceResult('generated type freshness and RPC contract', generatedIssues))
   checks.push(evidenceResult('local-only security boundary', boundaryIssues))
 
@@ -660,10 +844,9 @@ export function parseDatabaseEvidenceArguments(args) {
   if (missing.length > 0) throw new Error(diagnostic.argumentRequiredMissing)
   return {
     migrationJson: values.get('--migration-json'),
-    pgTap: values.get('--pgtap'),
+    pgTapDir: values.get('--pgtap-dir'),
     generatedTypes: values.get('--generated-types'),
     trackedTypes: values.get('--tracked-types'),
-    expectedMigration: values.get('--expected-migration'),
   }
 }
 

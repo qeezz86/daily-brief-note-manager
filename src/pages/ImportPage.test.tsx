@@ -11,6 +11,7 @@ import { ImportPageContent } from './ImportPage'
 const prepareImportJobMock = vi.hoisted(() => vi.fn())
 const duplicateLookupMock = vi.hoisted(() => vi.fn())
 const saveChatGptPastePostMock = vi.hoisted(() => vi.fn())
+const saveWordPressManualPostMock = vi.hoisted(() => vi.fn())
 
 vi.mock('../features/imports/importDuplicates.queries', () => ({
   useImportCategoriesQuery: () => ({ data: importCategories, isPending: false, isError: false }),
@@ -24,6 +25,10 @@ vi.mock('../features/imports/importDuplicates.repository', () => ({
 vi.mock('../features/imports/prepareImportJob', () => ({ prepareImportJob: prepareImportJobMock }))
 
 vi.mock('../features/imports/chatGptPaste.repository', () => ({ saveChatGptPastePost: saveChatGptPastePostMock }))
+vi.mock('../features/imports/wordPressManual.repository', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../features/imports/wordPressManual.repository')>()
+  return { ...actual, saveWordPressManualPost: saveWordPressManualPostMock }
+})
 
 const client = {} as DatabaseClient
 const validText = JSON.stringify(validImportBundle())
@@ -47,6 +52,7 @@ describe('ImportPageContent', () => {
     duplicateLookupMock.mockReset().mockResolvedValue({ databaseCheck: 'complete', referenceData: { posts: [], chineseUrls: [], newsTopics: [], existingTagKeys: [] } })
     prepareImportJobMock.mockReset().mockResolvedValue({ jobId: '00000000-0000-0000-0000-000000000001', isExisting: false, status: 'ready', sourceFingerprint: 'a'.repeat(64) })
     saveChatGptPastePostMock.mockReset()
+    saveWordPressManualPostMock.mockReset()
     vi.spyOn(window, 'confirm').mockReturnValue(true)
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: vi.fn().mockResolvedValue(undefined) } })
   })
@@ -239,12 +245,14 @@ describe('ImportPageContent', () => {
     expect(screen.queryByRole('button', { name: '결과 복사' })).not.toBeInTheDocument()
   })
 
-  it('기존 JSON Import와 ChatGPT 붙여넣기를 접근 가능한 additive mode로 제공한다', () => {
+  it('기존 JSON, ChatGPT, WordPress HTML을 접근 가능한 additive mode로 제공하고 JSON을 기본 유지한다', () => {
     renderPage()
     expect(screen.getByRole('radio', { name: '기존 JSON Import' })).toBeChecked()
     expect(screen.getByRole('radio', { name: 'ChatGPT 구조화 붙여넣기' })).not.toBeChecked()
+    expect(screen.getByRole('radio', { name: 'WordPress HTML 붙여넣기' })).not.toBeChecked()
     expect(screen.getByRole('group', { name: '가져오기 방식' })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'ChatGPT 구조화 응답 붙여넣기' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'WordPress HTML 붙여넣기' })).not.toBeInTheDocument()
   })
 
   it('붙여넣기 mode 전환만으로 persistence를 호출하지 않는다', async () => {
@@ -253,6 +261,33 @@ describe('ImportPageContent', () => {
     expect(await screen.findByRole('heading', { name: 'ChatGPT 구조화 응답 붙여넣기' })).toBeInTheDocument()
     expect(prepareImportJobMock).not.toHaveBeenCalled()
     expect(saveChatGptPastePostMock).not.toHaveBeenCalled()
+  })
+
+  it('WordPress workflow를 mode 선택 시에만 lazy 렌더링하고 전환만으로 저장하지 않는다', async () => {
+    renderPage()
+    expect(screen.queryByLabelText('WordPress HTML 원문')).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('radio', { name: 'WordPress HTML 붙여넣기' }))
+    expect(await screen.findByRole('heading', { name: 'WordPress HTML 붙여넣기' })).toBeInTheDocument()
+    expect(screen.getByLabelText('WordPress HTML 원문')).toBeInTheDocument()
+    expect(prepareImportJobMock).not.toHaveBeenCalled()
+    expect(saveChatGptPastePostMock).not.toHaveBeenCalled()
+    expect(saveWordPressManualPostMock).not.toHaveBeenCalled()
+  })
+
+  it('세 mode의 UI state와 persistence 경계를 서로 격리한다', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await user.click(screen.getByRole('radio', { name: 'WordPress HTML 붙여넣기' }))
+    fireEvent.change(await screen.findByLabelText('WordPress HTML 원문'), { target: { value: '<div>draft</div>' } })
+    await user.click(screen.getByRole('radio', { name: 'ChatGPT 구조화 붙여넣기' }))
+    expect(await screen.findByLabelText('구조화 ChatGPT 응답 plain text')).toBeInTheDocument()
+    expect(screen.queryByLabelText('WordPress HTML 원문')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('radio', { name: '기존 JSON Import' }))
+    expect(screen.getByLabelText('JSON 파일')).toBeInTheDocument()
+    expect(screen.queryByLabelText('구조화 ChatGPT 응답 plain text')).not.toBeInTheDocument()
+    expect(prepareImportJobMock).not.toHaveBeenCalled()
+    expect(saveChatGptPastePostMock).not.toHaveBeenCalled()
+    expect(saveWordPressManualPostMock).not.toHaveBeenCalled()
   })
 
   it('붙여넣기 parser workflow에서 차단 상태와 valid save 상태를 구분한다', async () => {

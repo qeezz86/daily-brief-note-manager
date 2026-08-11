@@ -2,9 +2,11 @@
 
 Daily Brief Note의 콘텐츠, SEO 정보, 출처, 뉴스 추적 이력과 생성 프롬프트를 관리하기 위한 비공개 웹앱입니다.
 
-현재 저장소의 canonical migration inventory는 27개입니다. 앞 22개가 적용된 기존 환경에는 publication-attempt retention, news prompt recent-count, article image prompt·ALT 전용 저장 RPC, operational dashboard overview RPC, structured ChatGPT paste 저장 RPC migration을 순서대로 적용하는 incremental plan을 사용합니다. Machine-readable whitelist와 offline checker는 [`config/supabase-fresh-project-baseline.json`](config/supabase-fresh-project-baseline.json), 전체 승인·검증 정책은 [`docs/SUPABASE_FRESH_PROJECT_BASELINE.md`](docs/SUPABASE_FRESH_PROJECT_BASELINE.md)를 따릅니다. Phase 5G migration 적용, generated Supabase type 재생성, lint, Vitest, pgTAP, Playwright, build와 baseline checker 실행은 Implementation Review 이후의 별도 Validation Gate까지 보류합니다.
+현재 저장소의 canonical migration inventory는 28개입니다. 앞 22개가 적용된 기존 환경에는 publication-attempt retention, news prompt recent-count, article image prompt·ALT 전용 저장 RPC, operational dashboard overview RPC, structured ChatGPT paste 저장 RPC, manual WordPress HTML 저장 RPC migration을 순서대로 적용하는 incremental plan을 사용합니다. Machine-readable whitelist와 offline checker는 [`config/supabase-fresh-project-baseline.json`](config/supabase-fresh-project-baseline.json), 전체 승인·검증 정책은 [`docs/SUPABASE_FRESH_PROJECT_BASELINE.md`](docs/SUPABASE_FRESH_PROJECT_BASELINE.md)를 따릅니다. 추적 database types의 Phase 5H RPC declaration은 compilation용 provisional 상태이며 canonical generated-types freshness와 database runtime은 required CI evidence가 확정합니다.
 
-Phase 5G의 `/imports`에는 기존 JSON Import와 격리된 **ChatGPT 구조화 붙여넣기** mode가 추가됩니다. 브라우저의 결정적 로컬 parser가 지원 section을 미리보기로 만들고 차단 오류·무시 필드·저장하지 않는 `NEWS_TRACKING_JSON`을 표시합니다. 경고는 명시적으로 확인해야 하며, 유효한 미리보기도 사용자가 한 건 저장을 확인하기 전에는 DB 요청을 보내지 않습니다. raw paste는 RPC payload, 로그, telemetry 또는 백업에 포함하지 않고, 저장 실패는 원문 DB 오류를 숨긴 채 미리보기를 유지하여 수동 재시도만 허용합니다. 기존 JSON Import, WordPress workflow, canonical JSON backup과 Phase 5F 검토용 CSV export 형식은 변경하지 않습니다.
+Phase 5G의 `/imports`에는 기존 JSON Import와 격리된 **ChatGPT 구조화 붙여넣기** mode가 있습니다. 브라우저의 결정적 로컬 parser가 지원 section을 미리보기로 만들고 차단 오류·무시 필드·저장하지 않는 `NEWS_TRACKING_JSON`을 표시합니다. 경고는 명시적으로 확인해야 하며, 유효한 미리보기도 사용자가 한 건 저장을 확인하기 전에는 DB 요청을 보내지 않습니다. raw paste는 RPC payload, 로그, telemetry 또는 백업에 포함하지 않고, 저장 실패는 원문 DB 오류를 숨긴 채 미리보기를 유지하여 수동 재시도만 허용합니다.
+
+Phase 5H는 같은 `/imports`에 lazy-loaded **WordPress HTML 붙여넣기** mode를 추가합니다. 최대 20 MiB 원문을 WordPress fetch 없이 브라우저 `DOMParser`로만 분석하고, 원문 문자열은 재직렬화하지 않은 채 editable textarea와 구조 필드 미리보기로 유지합니다. runtime category wrapper로 분류하고 모호한 후보를 사용자가 보완한 뒤 legacy-default canonical validation과 exact duplicate 검사를 수행합니다. 저장 직전 duplicate를 다시 확인하고 명시적 confirmation 뒤에만 `save_wordpress_manual_post(jsonb)`를 한 번 호출합니다. 서버는 새 post의 provenance를 `wordpress_manual`로 원자적으로 고정하며 뉴스 issue/change-log/watch-points는 Phase 5H에서 preview-only이고 tracking row로 저장하지 않습니다.
 
 `/dashboard`는 로그인 사용자의 전체·발행 준비 콘텐츠, active 뉴스 주제, pending 후속 항목, 활성 카테고리별 콘텐츠 수, 최근 콘텐츠와 최근 저장 프롬프트를 표시하는 읽기 전용 operational overview입니다. `get_dashboard_overview(p_recent_limit integer default 5)`는 `auth.uid()`와 기존 RLS를 사용하는 `SECURITY INVOKER` RPC이며 HTML, 이미지 metadata, prompt/context 전문, `owner_id`를 반환하지 않습니다. 대시보드는 쓰기, polling, private-data offline cache, offline write queue 또는 WordPress 요청을 수행하지 않습니다. Derived dashboard response는 backup schema version 1 payload에 저장하지 않습니다.
 
@@ -75,7 +77,7 @@ npm run bundle:check
 
 `npm run build:budget`은 production build와 budget 검사를 연속 실행합니다. 의도된 bundle 변화의 원인을 검토한 뒤에만 `npm run bundle:baseline`으로 기존 `dist`의 승인 baseline을 갱신하고, 생성된 `config/bundle-baseline.json` diff를 코드 리뷰에 포함합니다.
 
-`npm run check:supabase-fresh-baseline`은 canonical migration inventory 26개와 category seed whitelist, fresh 26개·existing 22+4 적용 계획, 금지 SQL·literal, runbook deployment mode와 sanitized fixture를 로컬 파일만으로 검증합니다. Protected env를 읽거나 network, linked Supabase CLI 또는 원격 명령을 실행하지 않습니다.
+`npm run check:supabase-fresh-baseline`은 canonical migration inventory 28개와 category seed whitelist, fresh 28개·existing 22+6 적용 계획, 금지 SQL·literal, runbook deployment mode와 sanitized fixture를 로컬 파일만으로 검증합니다. Protected env를 읽거나 network, linked Supabase CLI 또는 원격 명령을 실행하지 않습니다.
 
 Bundle budget CI는 Supabase module을 포함한 production graph를 일정하게 만들기 위해 로컬 주소와 비밀정보가 아닌 공개 placeholder key를 build-time 환경변수로 사용합니다. CI는 앱을 실행하거나 원격 Supabase에 연결하지 않으며 실제 credential이나 GitHub secret을 저장하지 않습니다. Raw 최대 chunk와 gzip 최대 chunk는 서로 다른 asset일 수 있으므로 각각 독립적으로 측정합니다.
 
@@ -84,9 +86,9 @@ Bundle budget CI는 Supabase module을 포함한 production graph를 일정하�
 모든 Pull Request와 `main` push에서 다음 두 workflow를 secret 없이 실행합니다.
 
 - `bundle-budget`: production build와 bundle budget을 검증하고 report artifact를 보존합니다.
-- `offline-validation`: lint, 전체 Vitest suite, Supabase fresh baseline checker와 WordPress production readiness checker를 실행합니다.
+- `offline-validation`: lint, 전체 Vitest suite, Supabase fresh baseline checker, WordPress production readiness checker와 manifest-driven database runtime evidence를 실행합니다.
 
-현재 repository CI 범위에는 DB lint, pgTAP, Deno, E2E와 WordPress smoke가 포함되지 않습니다. Vercel status는 repository validation과 별도이며, Vercel required 설정도 이 workflow에서 다루지 않습니다. 현재 repository ruleset #19760818에서 `bundle-budget`과 `offline-validation`을 required checks로 적용하고 있습니다.
+`offline-validation`의 database evidence 단계는 GitHub-hosted 임시 로컬 Supabase를 한 번만 시작하고 DB lint, manifest에 등록된 `chatgpt_paste_post` 40개·`wordpress_manual_post` 30개 pgTAP suite, generated database types의 RPC contract를 phase-neutral하게 검증합니다. 개발자 workstation DB lifecycle, 원격·linked Supabase와 production DB는 사용하지 않습니다. E2E와 WordPress smoke는 이 workflow 범위 밖이며 Vercel status도 repository validation과 별도입니다.
 
 ## WordPress read-only 진단
 

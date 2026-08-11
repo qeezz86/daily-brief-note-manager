@@ -19,6 +19,12 @@ const ChatGptPasteWorkflow = lazy(() =>
   })),
 )
 
+const WordPressHtmlImportWorkflow = lazy(() =>
+  import('../features/imports/WordPressHtmlImportWorkflow').then((module) => ({
+    default: module.WordPressHtmlImportWorkflow,
+  })),
+)
+
 const emptyDuplicateReferenceData = { posts: [], chineseUrls: [], newsTopics: [], existingTagKeys: [] }
 
 function record(value: unknown): Record<string, unknown> | null { return value !== null && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : null }
@@ -47,7 +53,7 @@ export function ImportPageContent({
   const [moduleLoadError, setModuleLoadError] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [copyMessage, setCopyMessage] = useState<string | null>(null)
-  const [importMode, setImportMode] = useState<'json' | 'chatgpt-paste'>('json')
+  const [importMode, setImportMode] = useState<'json' | 'chatgpt-paste' | 'wordpress-html'>('json')
   const mountedRef = useRef(true)
   const resultText = useMemo(() => result ? JSON.stringify(result, null, 2) : '', [result])
   const categories = useMemo(() => categoriesQuery.data ?? [], [categoriesQuery.data])
@@ -151,6 +157,7 @@ export function ImportPageContent({
       <legend>가져오기 방식</legend>
       <label><input type="radio" name="import-mode" value="json" checked={importMode === 'json'} onChange={() => setImportMode('json')} /> 기존 JSON Import</label>
       <label><input type="radio" name="import-mode" value="chatgpt-paste" checked={importMode === 'chatgpt-paste'} onChange={() => setImportMode('chatgpt-paste')} /> ChatGPT 구조화 붙여넣기</label>
+      <label><input type="radio" name="import-mode" value="wordpress-html" checked={importMode === 'wordpress-html'} onChange={() => setImportMode('wordpress-html')} /> WordPress HTML 붙여넣기</label>
     </fieldset>
     {importMode === 'json' ? <>
       {categoriesQuery.isPending ? <div className="content-state" role="status">카테고리 설정을 불러오고 있습니다.</div> : null}
@@ -166,8 +173,10 @@ export function ImportPageContent({
         <section className="import-panel import-execution-actions"><div><h2>영구 작업 준비</h2><p>DB 중복 검사: <strong>{databaseCheckLabel(result.databaseCheck)}</strong> · 선택 {selectedCount}개</p>{result.databaseCheck !== 'complete' ? <p className="form-alert">DB 중복 검사가 complete가 아니므로 작업을 만들 수 없습니다.</p> : null}{categoryStale ? <p className="form-alert">카테고리 설정이 변경되었습니다. Dry Run을 다시 실행해 주세요.</p> : null}{message ? <p className="field-help" role="status">{message}</p> : null}</div><button className="primary-button" type="button" disabled={!canCreate} onClick={() => void createJob()}>{busy ? '작업 준비 중' : 'Import 작업 만들기'}</button></section></> : null}
       <section className="import-panel"><div className="import-panel__heading"><div><h2>검증 결과 JSON</h2><p>원본 htmlBody와 내부 DB ID는 제외했습니다.</p></div><button className="secondary-button" type="button" onClick={() => void copyDryRun()}>전체 결과 복사</button></div>{copyMessage ? <p className="field-help" role="status">{copyMessage}</p> : null}<textarea className="import-result-json" readOnly value={resultText} aria-label="다운로드용 검증 결과 JSON text" /></section>
       </> : null}
-    </> : <Suspense fallback={<div className="content-state" role="status">ChatGPT 붙여넣기 도구를 불러오는 중입니다.</div>}>
+    </> : importMode === 'chatgpt-paste' ? <Suspense fallback={<div className="content-state" role="status">ChatGPT 붙여넣기 도구를 불러오는 중입니다.</div>}>
       <ChatGptPasteWorkflow client={client} />
+    </Suspense> : <Suspense fallback={<div className="content-state" role="status">WordPress HTML 가져오기 도구를 불러오는 중입니다.</div>}>
+      <WordPressHtmlImportWorkflow client={client} categories={categories} />
     </Suspense>}
   </section>
 }

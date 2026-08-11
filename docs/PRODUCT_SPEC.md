@@ -770,6 +770,18 @@ HTML은 정규표현식만으로 파싱하지 않는다. 브라우저 `DOMParser
 - 새 버전으로 저장하지 않고 취소
 - 후속 뉴스로 연결
 
+## 8.6 Phase 5H 수동 WordPress HTML 구현 계약
+
+`/imports`의 **WordPress HTML 붙여넣기** mode는 기존 JSON Import와 ChatGPT 구조화 붙여넣기에 더해지는 lazy-loaded 단일 게시물 workflow다. 입력은 UTF-8 20 MiB까지 허용하며 정확한 경계는 받되 초과 입력은 DOM parsing 전에 차단한다. 브라우저 `DOMParser`만 사용하고 WordPress fetch, network, AI 호출 또는 parser의 DB 접근은 없다.
+
+붙여넣은 원문 문자열 자체가 `html_body` 후보이며 DOM을 재직렬화해 저장하지 않는다. 원문은 escaped editable textarea로만 표시하고 parsed node를 live DOM에 mount하지 않으므로 외부 resource와 script/event handler가 실행되지 않는다. 원문을 편집하면 이전 parse·validation·duplicate 상태와 경고 승인은 모두 무효화되어 다시 분석해야 한다.
+
+카테고리는 runtime `categories.wrapper_class`로 감지한다. 제목·날짜·display ID·series number·slug·URL·출처 해석 후보가 충돌하면 자동으로 첫 값을 선택하지 않고 수동 해결 전까지 차단한다. AI·정보DB metadata, SEO, 태그, sources, image prompt·ALT와 CCTV source-check 후보는 미리보기에서 사용자가 보완한다. 뉴스 issue, change log와 watch points는 구조 미리보기에만 쓰며 Phase 5H는 `news_topics`, `news_updates`, `news_followups`를 저장하지 않는다.
+
+검증 기본값은 `legacy`이고 기존 canonical Import validation과 exact duplicate lookup을 재사용한다. legacy는 문서화된 과거 class·inline style·slug 차이만 승인 가능한 warning으로 낮추며 보안, 필수 저장 데이터, exact duplicate, 인증·소유권과 DB constraint를 우회하지 않는다. DB duplicate 상태가 `complete`가 아니면 저장할 수 없고, 명시적 confirmation 뒤 저장 직전에 최종 edited 값으로 exact duplicate를 다시 검사한다.
+
+클라이언트는 normalized content item만 `save_wordpress_manual_post(p_item jsonb)`에 전달한다. RPC는 `SECURITY INVOKER`, 빈 `search_path`, authenticated-only 권한으로 기존 `import_content_post(p_item)`를 호출하고 반환된 새 owner post 한 행의 `source_import_type`만 `wordpress_manual`로 고정한다. import나 provenance finalization이 실패하면 aggregate 전체가 같은 statement transaction에서 rollback된다. caller는 provenance·owner·auth/session/token 또는 news tracking persistence payload를 제공할 수 없다.
+
 ---
 
 ## 9. ChatGPT 응답 붙여넣기

@@ -27,7 +27,7 @@ import type {
   ImportItemValidationResult,
   ImportPost,
   ImportReferenceData,
-  ImportValidationResult,
+  ImportValidationPurpose, ImportValidationResult,
 } from './importValidation.types'
 
 const issueOrder = { error: 0, warning: 1, info: 2 } as const
@@ -170,6 +170,7 @@ function validateItem(
   index: number,
   categories: ImportCategory[],
   mode: 'strict' | 'legacy',
+  validationPurpose: ImportValidationPurpose,
 ): { post: ImportPost; result: ImportItemValidationResult } {
   const issues: ImportIssue[] = []
   const rawRecord = asRecord(raw)
@@ -215,7 +216,7 @@ function validateItem(
           graphIssue.code, 'error', graphIssue.message, path(`newsTracking.${graphIssue.path}`), index,
         )))
       }
-      if (isCompleteStatus && !(post.newsTracking?.updates.length)) addIssue(issues, issue('NEWS_UPDATES_REQUIRED', 'error', '발행 준비 또는 발행됨 뉴스에는 뉴스 항목이 1개 이상 필요합니다.', path('newsTracking.updates'), index))
+      if (validationPurpose === 'content-import' && isCompleteStatus && !(post.newsTracking?.updates.length)) addIssue(issues, issue('NEWS_UPDATES_REQUIRED', 'error', '발행 준비 또는 발행됨 뉴스에는 뉴스 항목이 1개 이상 필요합니다.', path('newsTracking.updates'), index))
       post.newsTracking?.topics.forEach((topic, topicIndex) => {
         if (!topicKeyPattern.test(topic.topicKey)) addIssue(issues, issue('NEWS_TOPIC_KEY_INVALID', 'error', '뉴스 주제 키는 영문 소문자·숫자·단일 하이픈 형식이어야 합니다.', path(`newsTracking.topics[${topicIndex}].topicKey`), index))
       })
@@ -359,6 +360,7 @@ export function validateImportBundle(
   input: unknown,
   referenceData: ImportReferenceData,
   databaseCheck: ImportValidationResult['databaseCheck'] = 'complete',
+  validationPurpose: ImportValidationPurpose = 'content-import',
 ): ImportValidationResult {
   const bundleIssues: ImportIssue[] = []
   const root = asRecord(input)
@@ -387,7 +389,7 @@ export function validateImportBundle(
   if (root?.validationMode != null && !['strict', 'legacy'].includes(String(root.validationMode))) addIssue(bundleIssues, issue('BUNDLE_VALIDATION_MODE_INVALID', 'error', 'validationMode는 strict 또는 legacy여야 합니다.', '$.validationMode'))
   const mode = root?.validationMode === 'legacy' ? 'legacy' : 'strict'
   const limitedPosts = rawPosts.slice(0, MAX_IMPORT_POSTS)
-  const validated = limitedPosts.map((post, index) => validateItem(post, index, referenceData.categories, mode))
+  const validated = limitedPosts.map((post, index) => validateItem(post, index, referenceData.categories, mode, validationPurpose))
   const posts = validated.map((entry) => entry.post)
   const items = validated.map((entry) => entry.result)
   detectInternalDuplicates(posts, items)

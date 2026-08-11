@@ -241,6 +241,16 @@ WordPress 글 편집 화면
 → 저장
 ```
 
+### 4.3 Phase 5H accepted contract
+
+`/imports`의 `wordpress-html` mode는 최대 20 MiB UTF-8 HTML 한 건을 local `DOMParser`로 분석한다. WordPress URL을 fetch하거나 AI·network·DB operation으로 metadata를 보완하지 않는다. 원문 HTML string은 canonical `htmlBody` 후보로 그대로 보존하며 parser DOM을 serialize하거나 live application DOM에 삽입하지 않는다. 원문 textarea를 수정하면 parse, validation, duplicate 결과와 저장 자격을 즉시 무효화한다.
+
+runtime `categories.wrapper_class`가 category 감지 authority다. 0개 일치는 차단하고, 여러 category·title·date·display ID·series number·slug·URL·source interpretation 후보는 사용자가 필드를 확정할 때까지 ambiguity로 차단한다. 공통 구조, news issue/change-log/watch-points와 CCTV `#source-check` 표는 deterministic preview 후보로만 추출한다. 뉴스 tracking 후보는 Phase 5H 저장 payload에 포함하지 않는다.
+
+미리보기에서는 SEO, 태그, sources, image prompt·ALT, AI·정보DB metadata와 CCTV metadata를 수동 보완할 수 있다. `validationMode`는 `legacy`로 고정하며 canonical Import validation을 `wordpress-manual` purpose로 재사용한다. 이 purpose는 ready/published 뉴스의 persistent `newsTracking` 존재만 요구하지 않으며 JSON Import의 tracking 규칙과 HTML 보안·필수 metadata·SEO·tag·source·identifier 검증은 바꾸지 않는다.
+
+DB exact duplicate 상태가 `complete`여야 하고 최종 confirmation 뒤 edited values로 한 번 더 조회한다. 저장 payload는 normalized snake_case Import content allowlist뿐이며 owner/auth/session/token, provenance, parser diagnostics, DOM node와 news tracking data를 포함하지 않는다. `save_wordpress_manual_post(p_item jsonb)`가 기존 `import_content_post`와 owner RLS를 재사용해 한 transaction으로 저장하고 서버에서 provenance를 정확히 `wordpress_manual`로 고정한다. 취소와 mode 전환은 write 0건이며 실패 후 원문과 preview를 유지하고 자동 retry하지 않는다.
+
 ## 5. ChatGPT 구조화 응답
 
 시작·종료 태그가 있는 다음 구조화 JSON 형식을 우선 파싱한다.

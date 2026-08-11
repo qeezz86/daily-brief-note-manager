@@ -46,25 +46,51 @@ jobs:
           test -s "$RUNNER_TEMP/supabase-migrations.json"
       - name: Lint migrated local database
         run: npm run db:lint
-      - name: Run focused ChatGPT paste pgTAP
+      - name: Run full database test suite
+        run: npm run test:db
+      - name: Capture configured raw pgTAP evidence
         shell: bash
         run: |
           set -euo pipefail
-          test -f supabase/tests/chatgpt_paste_post.test.sql
-          npm run test:db -- supabase/tests/chatgpt_paste_post.test.sql
-          PGPASSWORD=postgres psql \
-            --host=127.0.0.1 \
-            --port=54322 \
-            --username=postgres \
-            --dbname=postgres \
-            --no-psqlrc \
-            --quiet \
-            --tuples-only \
-            --no-align \
-            --set=ON_ERROR_STOP=1 \
-            --file=supabase/tests/chatgpt_paste_post.test.sql \
-            > "$RUNNER_TEMP/chatgpt-paste-post.tap"
-          test -s "$RUNNER_TEMP/chatgpt-paste-post.tap"
+          node --input-type=module <<'NODE' > "$RUNNER_TEMP/pgtap-suites.tsv"
+          import { readFile } from 'node:fs/promises'
+
+          const manifest = JSON.parse(await readFile('config/supabase-fresh-project-baseline.json', 'utf8'))
+          const suites = manifest.databaseRuntimeEvidence?.pgTapSuites
+          if (!Array.isArray(suites) || suites.length === 0) throw new Error('pgTapSuites must be a non-empty array')
+          const seenIds = new Set()
+          const seenFiles = new Set()
+          for (const suite of suites) {
+            if (!suite || typeof suite !== 'object' || Array.isArray(suite)) throw new Error('invalid pgTAP suite')
+            if (typeof suite.id !== 'string' || !/^[a-z0-9][a-z0-9_-]*$/.test(suite.id)) throw new Error('invalid pgTAP suite id')
+            if (typeof suite.file !== 'string' || !/^supabase\/tests\/[A-Za-z0-9][A-Za-z0-9._-]*\.test\.sql$/.test(suite.file)) throw new Error('invalid pgTAP suite file')
+            if (!Number.isInteger(suite.expectedAssertions) || suite.expectedAssertions <= 0 || suite.expectedAssertions > 10000) throw new Error('invalid pgTAP assertion count')
+            if (seenIds.has(suite.id) || seenFiles.has(suite.file)) throw new Error('duplicate pgTAP suite')
+            seenIds.add(suite.id)
+            seenFiles.add(suite.file)
+            process.stdout.write(`${suite.id}\t${suite.file}\t${suite.expectedAssertions}\n`)
+          }
+          NODE
+          test -s "$RUNNER_TEMP/pgtap-suites.tsv"
+          mkdir -p "$RUNNER_TEMP/pgtap-evidence"
+          while IFS=$'\t' read -r suite_id suite_file expected_assertions; do
+            test -n "$expected_assertions"
+            test -f "$suite_file"
+            evidence_file="$RUNNER_TEMP/pgtap-evidence/${suite_id}.tap"
+            PGPASSWORD=postgres psql \
+              --host=127.0.0.1 \
+              --port=54322 \
+              --username=postgres \
+              --dbname=postgres \
+              --no-psqlrc \
+              --quiet \
+              --tuples-only \
+              --no-align \
+              --set=ON_ERROR_STOP=1 \
+              --file="$suite_file" \
+              > "$evidence_file"
+            test -s "$evidence_file"
+          done < "$RUNNER_TEMP/pgtap-suites.tsv"
       - name: Generate migrated local database types as temporary evidence
         shell: bash
         run: |
@@ -76,10 +102,10 @@ jobs:
             sha256sum database.types.ts > database.types.ts.sha256
           )
           test -s "$RUNNER_TEMP/database.types.ts.sha256"
-      - name: Upload Phase 5G generated database types evidence
+      - name: Upload generated database types evidence
         uses: actions/upload-artifact@v4
         with:
-          name: phase-5g-generated-types-${{ github.event.pull_request.head.sha || github.sha }}
+          name: database-generated-types-${{ github.event.pull_request.head.sha || github.sha }}
           path: |
             ${{ runner.temp }}/database.types.ts
             ${{ runner.temp }}/database.types.ts.sha256
@@ -89,8 +115,7 @@ jobs:
         run: >-
           node scripts/check-supabase-fresh-baseline.mjs
           --migration-json "$RUNNER_TEMP/supabase-migrations.json"
-          --pgtap "$RUNNER_TEMP/chatgpt-paste-post.tap"
+          --pgtap-dir "$RUNNER_TEMP/pgtap-evidence"
           --generated-types "$RUNNER_TEMP/database.types.ts"
           --tracked-types src/shared/supabase/database.types.ts
-          --expected-migration 20260801120000
       # GitHub-hosted runner disposal removes the ephemeral database and RUNNER_TEMP evidence.
