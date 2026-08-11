@@ -343,46 +343,57 @@ JSON 블록의 입력 키는 camelCase를 사용한다. DB 컬럼은 snake_case�
 
 ## 9. 다른 콘텐츠 그룹의 중복 방지 컨텍스트
 
-뉴스 외 카테고리는 같은 DB에서 최근 글 정보를 사용하되 뉴스 브리핑 규칙을 그대로 적용하지 않는다.
+Phase 5I의 `/non-news-contexts`는 뉴스 외 카테고리의 기존 글 정보를 읽어 중복 검토용 일반 텍스트를 만든다. 뉴스 브리핑 규칙이나 최종 글 생성 지시를 적용하지 않는다. 지원 category ID와 고정 limit은 `ai-column` 20개, `info-db` 30개, `chinese-study` 20개이며 기본 선택은 `ai-column`이다.
 
 ### 9.1 AI 칼럼
 
 - `ready`, `published` 상태의 최근 20개를 컨텍스트로 사용
-- AI ID
+- 표시 ID
 - 제목
-- 핵심 개념
+- slug
 - 요약
+- 발행일
 - 포커스 키워드
 - 태그
-- 유사 주제
-- 기존 글과 겹치지 않아야 할 범위
+- AI metadata 분야
 
 ### 9.2 정보DB
 
 - `ready`, `published` 상태의 최근 30개를 컨텍스트로 사용
-- 정보DB ID
+- 표시 ID
 - 제목
-- 정의 대상
+- slug
 - 요약
-- 비교한 유사 개념
-- 흔한 오해
+- 발행일
 - 포커스 키워드
+- 정보DB metadata 분야
 
 ### 9.3 중국어 학습
 
 - `ready`, `published` 상태의 최근 20개를 컨텍스트로 사용
 - 시리즈 번호
 - 제목
+- slug
+- 요약
+- 발행일
 - CCTV 프로그램명
 - 원문 제목
 - 개별 원문 URL
-- 뉴스 주제
-- 핵심 단어·문장 구조 요약
-- 동일 원문 URL 및 동일 주제 중복 금지
+- 학습 주제
+- 학습 포인트
 
 중국어 학습 컨텍스트에는 브리핑 ID를 생성하지 않는다.
 
-비뉴스 recent context는 `published_on DESC NULLS LAST, updated_at DESC`로 정렬한다. 최근 컨텍스트 범위와 별도로 해당 사용자의 `draft`, `ready`, `published`, `archived` 전체 데이터에서 exact title, slug, focus keyword 중복을 검사한다. 중국어 학습은 전체 데이터에서 `original_url`도 검사하며 동일 URL이면 저장을 차단한다.
+조회는 owner ID를 입력받지 않고 현재 인증 사용자의 기존 RLS 범위를 사용한다. 선택 category ID와 `ready`, `published` 상태만 명시적 projection으로 DB-side limit까지 조회하며 `published_on DESC NULLS LAST`, `updated_at DESC`, `id ASC`로 정렬한다. 컨텍스트의 시작은 다음 두 줄과 category·실제/최대 count다.
+
+```text
+[비뉴스 중복 방지 컨텍스트]
+목적: 기존 글 목록은 새 글의 중복 방지와 주제 참고를 위한 자료입니다.
+```
+
+항목은 repository 순서대로 `--- 항목 1 ---`부터 번호를 붙인다. 일반 문자열은 앞뒤 공백 제거와 안전한 내부 공백 축소를 적용하고 URL 문자열은 손상하지 않는다. AI 태그는 Unicode code point 순서로 정렬해 쉼표로 연결한다. 빈 요약은 줄을 생략하며 새 요약을 만들지 않는다. 빈 결과는 `기존 글이 없습니다.`로 표시한다.
+
+출력 allowlist 밖의 owner·auth·session·내부 UUID·HTML body·WordPress URL·source import type·이미지 metadata·created/updated/published timestamp·credential·secret·감사 metadata·생성 프롬프트·뉴스 추적·source 전문은 포함하지 않는다. 중국어 원문 전문·전체 자막·전체 번역을 조회하거나 네트워크로 보완하지 않는다. 결과는 inert text로 미리보고 기존 clipboard helper로 복사할 수 있지만 DB·서버·외부 네트워크에는 쓰지 않는다. Phase 5I는 자동 중복 차단, fuzzy/AI 유사도 판정, 최종 글 프롬프트·템플릿·모드, 저장되는 설정을 제공하지 않는다.
 
 ## 10. 생성 기록
 

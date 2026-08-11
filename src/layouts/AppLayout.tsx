@@ -30,6 +30,7 @@ export function AppLayout() {
             <NavLink to="/news-topics">뉴스 주제</NavLink>
             <NavLink to="/news-followups">후속 확인</NavLink>
             <NavLink to="/briefing-prompts">브리핑 프롬프트</NavLink>
+            <NavLink to="/non-news-contexts">비뉴스 컨텍스트</NavLink>
             <NavLink to="/backups">백업</NavLink>
             <NavLink to="/backups/restore">복원 Dry Run</NavLink>
             <NavLink to="/backups/restore/jobs">복원 작업</NavLink>
