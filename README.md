@@ -162,6 +162,8 @@ npx supabase gen types typescript --local > src/shared/supabase/database.types.t
 
 `/briefing-prompts`에서는 활성 뉴스 카테고리와 최근 글 수 `5`·`10`·`15`(기본 `5`)를 선택할 수 있습니다. 읽기 전용 `get_news_briefing_prompt_context` RPC가 현재 사용자 데이터에서 기준일 이전의 발행 게시물을 요청 수까지, 해당 뉴스 업데이트, `active`·`monitoring`·`reopened` 주제, pending 후속 항목과 최근 종료 주제 최대 20개를 결정적 순서로 집계합니다. 글이 요청 수보다 적으면 모두 사용하고 요청 수와 실제 사용 수를 구분해 표시합니다. 최근 글 수는 생성 모드와 독립적으로 유지됩니다. 종료 조회 기간은 기본 90일, 최대 180일입니다. context schema version은 1이며 WordPress HTML 전문, 이미지 프롬프트, 사용자 이메일과 원문 기사 전문은 포함하지 않습니다. 미리보기 설정이 바뀌면 stale로 표시되어 재생성 전에는 저장할 수 없습니다.
 
+Phase 5I의 보호 경로 `/non-news-contexts`는 AI 칼럼 20개, 정보DB 30개, 중국어 학습 20개의 중복 방지용 historical context를 생성합니다. 현재 인증 사용자의 RLS 범위에서 선택 카테고리의 `ready`·`published` 글만 `published_on DESC NULLS LAST`, `updated_at DESC`, `id ASC`로 제한 조회하고, 카테고리별 허용 필드만 결정적 일반 텍스트로 표시·복사합니다. WordPress HTML, owner·인증 정보, 비밀값과 내부 정렬 식별자는 출력하지 않습니다. 이 화면은 DB 저장, 외부 AI·CCTV·WordPress 호출, 자동 중복 판정, 최종 글 프롬프트·템플릿·모드 또는 영구 limit 설정을 제공하지 않습니다.
+
 `/briefing-prompts/history`와 상세 경로에서는 저장 당시 설정, 요청 최근 글 수, 실제 사용 수, 정확한 프롬프트와 context snapshot을 조회·복사하고 고정 상태를 변경합니다. 새 snapshot에는 `promptTemplateVersion`을 선택 필드로 기록하고 상세 화면에서 적용 버전을 표시합니다. 버전이 없던 과거 이력도 안전하게 표시하며, 현재 category rules나 뉴스 데이터로 과거 prompt text와 count를 다시 생성·추론하지 않습니다. 프롬프트와 snapshot은 저장 후 수정할 수 없고 현재 뉴스 데이터가 바뀌어도 과거 이력은 변하지 않습니다. 사용자·카테고리별 미고정 최근 30개를 보존하며 고정 이력은 한도와 자동 정리에서 제외됩니다. 오래된 이력을 고정 해제하면 같은 카테고리의 retention이 다시 적용됩니다. 쓰기는 전용 RPC만 사용하며 외부 AI API는 호출하지 않습니다.
 
 카테고리별 결정적 작성 규칙은 `src/features/briefingPrompts/categoryPromptRules.ts`에 category ID를 key로 두고 관리합니다. 경제·국제·과학기술·사회·환경·에너지의 조사 범위, 출처 우선순위와 검증 지침만 구조화하며 wrapper class, briefing ID pattern과 slug pattern은 DB category 설정을 사용합니다. 프롬프트 화면의 적용 규칙 영역에서 선택 템플릿, wrapper, ID·slug 예시와 template version을 확인할 수 있습니다.
@@ -214,3 +216,9 @@ supabase/
 - 중국어 학습: `cctv-chinese-news-###`
 
 신규 글은 현재 category 설정을 사용합니다. 설정 변경이나 복원 과정에서 이미 발행된 게시물의 slug와 WordPress URL을 자동 변경하지 않습니다.
+
+## Phase 5I 비뉴스 중복 방지 컨텍스트
+
+보호 경로 `/non-news-contexts`는 AI 칼럼 20개, 정보DB 30개, 중국어 학습 20개의 historical context를 생성합니다. 현재 인증 사용자의 RLS 범위에서 선택 카테고리의 `ready`·`published` 글만 `published_on DESC NULLS LAST`, `updated_at DESC`, `id ASC`로 제한 조회하고, 카테고리별 허용 필드만 결정적 일반 텍스트로 표시·복사합니다.
+
+WordPress HTML, owner·인증 정보, 비밀값과 내부 정렬 식별자는 출력하지 않습니다. 이 화면은 DB 저장, 외부 AI·CCTV·WordPress 호출, 자동 중복 판정, 최종 글 프롬프트·템플릿·모드 또는 영구 limit 설정을 제공하지 않습니다.

@@ -1221,32 +1221,32 @@ generated_at       timestamptz
 
 ## 11. AI·정보DB·중국어 학습 컨텍스트 생성
 
-뉴스 프롬프트 생성이 MVP 핵심이다. 나머지 카테고리도 같은 DB를 이용해 중복 방지용 컨텍스트를 생성한다.
+Phase 5I는 보호 경로 `/non-news-contexts`에서 같은 DB의 기존 글을 이용해 읽기 전용 중복 방지 컨텍스트를 생성한다. 지원 카테고리는 canonical `categories.id`가 `ai-column`, `info-db`, `chinese-study`인 세 종류뿐이며 기본 선택은 `ai-column`이다.
 
 ### 11.1 AI 칼럼
 
 `ready`, `published` 상태의 최근 20개를 제공한다.
 
-- AI ID
+- 표시 ID
 - 제목
-- 핵심 개념
+- slug
 - 요약
+- 발행일
 - 포커스 키워드
 - 태그
-- 유사 주제
-- 기존 글과 겹치지 않아야 할 범위
+- AI metadata 분야
 
 ### 11.2 정보DB
 
 `ready`, `published` 상태의 최근 30개를 제공한다.
 
-- 정보DB ID
+- 표시 ID
 - 제목
-- 정의 대상
+- slug
 - 요약
-- 비교한 유사 개념
-- 흔한 오해
+- 발행일
 - 포커스 키워드
+- 정보DB metadata 분야
 
 ### 11.3 중국어 학습
 
@@ -1254,16 +1254,20 @@ generated_at       timestamptz
 
 - 시리즈 번호
 - 제목
+- slug
+- 요약
+- 발행일
 - CCTV 프로그램명
 - 원문 제목
-- 원문 URL
-- 뉴스 주제
-- 핵심 단어·문장 구조 요약
-- 동일 원문 URL 및 동일 주제 중복 금지
+- 개별 원문 URL
+- 학습 주제
+- 학습 포인트
 
 중국어 학습 컨텍스트에는 브리핑 ID를 생성하지 않는다.
 
-비뉴스 recent context는 `published_on DESC NULLS LAST, updated_at DESC`로 정렬한다. exact title, slug, focus keyword, 중국어 `original_url` 중복 검사는 `draft`, `ready`, `published`, `archived` 전체 데이터에서 수행한다. 동일 중국어 `original_url`은 저장을 차단한다.
+조회는 기존 owner-scoped RLS 경계를 그대로 사용하며 owner ID나 임의 사용자 ID를 입력받지 않는다. 명시적 projection과 카테고리별 DB-side limit을 적용하고 `published_on DESC NULLS LAST`, `updated_at DESC`, `id ASC`의 완전한 순서로 정렬한다. 결과가 limit보다 적으면 실제 항목만 사용하고 빈 결과는 `기존 글이 없습니다.`로 표시한다. 요약이 비어 있으면 요약 줄만 생략한다.
+
+출력은 허용된 필드만 일반 텍스트로 직렬화한다. `owner_id`, 내부 UUID·정렬 시각, WordPress HTML·URL, 이미지 metadata, 인증·credential·secret, 생성 프롬프트와 뉴스 추적 데이터는 포함하지 않는다. CCTV 원문 전문·자막·번역은 조회하거나 복제하지 않는다. 이 기능은 DB 쓰기, 외부 네트워크·AI 호출, 자동·fuzzy·AI 중복 판정, 최종 글 생성 지시, 프롬프트 템플릿·모드, 저장되는 limit 설정을 추가하지 않는다. 사용자가 결과를 검토하고 클립보드로 복사하는 것까지가 Phase 5I 범위다.
 
 ---
 

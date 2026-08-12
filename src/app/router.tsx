@@ -53,6 +53,8 @@ const lazyBriefingPromptHistoryPage: LazyRoute = () =>
   import('../pages/BriefingPromptHistoryPage').then(({ BriefingPromptHistoryPage: Component }) => ({ Component }))
 const lazyBriefingPromptRunDetailPage: LazyRoute = () =>
   import('../pages/BriefingPromptRunDetailPage').then(({ BriefingPromptRunDetailPage: Component }) => ({ Component }))
+const lazyNonNewsContextsPage: LazyRoute = () =>
+  import('../pages/NonNewsContextsPage').then(({ NonNewsContextsPage: Component }) => ({ Component }))
 const lazyImportPage: LazyRoute = () =>
   import('../pages/ImportPage').then(({ ImportPage: Component }) => ({ Component }))
 const lazyImportHistoryPage: LazyRoute = () =>
@@ -136,6 +138,7 @@ export const routes: RouteObject[] = [
           lazyPage('/briefing-prompts', lazyBriefingPromptsPage),
           lazyPage('/briefing-prompts/history', lazyBriefingPromptHistoryPage),
           lazyPage('/briefing-prompts/history/:runId', lazyBriefingPromptRunDetailPage),
+          lazyPage('/non-news-contexts', lazyNonNewsContextsPage),
           {
             path: '*',
             element: <NotFoundPage />,

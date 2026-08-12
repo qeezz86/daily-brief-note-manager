@@ -41,6 +41,7 @@ const lazyPageExpectations = [
   ['/briefing-prompts', 'BriefingPromptsPage'],
   ['/briefing-prompts/history', 'BriefingPromptHistoryPage'],
   ['/briefing-prompts/history/:runId', 'BriefingPromptRunDetailPage'],
+  ['/non-news-contexts', 'NonNewsContextsPage'],
   ['/imports', 'ImportPage'],
   ['/imports/new', 'ImportPage'],
   ['/imports/history', 'ImportHistoryPage'],
@@ -118,13 +119,23 @@ describe('route inventory and lazy modules', () => {
     const dynamicPageImports = [...routerSource.matchAll(/import\('\.\.\/pages\/([^']+)'\)/g)]
       .map((match) => match[1])
 
-    expect(dynamicPageImports).toHaveLength(29)
-    expect(new Set(dynamicPageImports)).toHaveLength(29)
+    expect(dynamicPageImports).toHaveLength(30)
+    expect(new Set(dynamicPageImports)).toHaveLength(30)
     expect(routerSource).not.toMatch(/import\('\.\.\/pages'\)/)
     expect(routerSource).not.toMatch(/import\(`\.\.\/pages/)
     expect(routerSource).not.toMatch(/from '\.\.\/pages\/(?!NotFoundPage)/)
     expect(routerSource).toContain("from '../features/auth/AuthRouteGuards'")
     expect(routerSource).toContain("from '../layouts/AppLayout'")
+  })
+
+  it('registers the non-news context route inside the protected application layout', () => {
+    const route = pageRoute('/non-news-contexts')
+    expect(protectedRoute?.element).toBeDefined()
+    expect(layoutRoute?.element).toBeDefined()
+    expect(route).toMatchObject({ path: '/non-news-contexts' })
+    expect(route?.lazy).toBeTypeOf('function')
+    expect(route?.loader).toBeUndefined()
+    expect(route?.action).toBeUndefined()
   })
 })
 
