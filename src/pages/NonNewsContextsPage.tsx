@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useActiveCategoriesQuery } from '../features/categories/categories.queries'
 import { buildNonNewsContext } from '../features/nonNewsContexts/buildNonNewsContext'
 import { NonNewsContextPreview } from '../features/nonNewsContexts/NonNewsContextPreview'
 import {
@@ -9,16 +10,30 @@ import {
 } from '../features/nonNewsContexts/nonNewsContexts.constants'
 import { useNonNewsContextQuery } from '../features/nonNewsContexts/nonNewsContexts.queries'
 import type { SupportedNonNewsCategoryId } from '../features/nonNewsContexts/nonNewsContexts.types'
+import { NonNewsPromptComposer } from '../features/nonNewsPrompts/NonNewsPromptComposer'
 import { supabase, type DatabaseClient } from '../shared/supabase/client'
 
 export function NonNewsContextsPageContent({ client = supabase }: { client?: DatabaseClient | null }) {
   const [categoryId, setCategoryId] = useState<SupportedNonNewsCategoryId>(DEFAULT_NON_NEWS_CATEGORY_ID)
   const category = getNonNewsCategoryDefinition(categoryId)
   const contextQuery = useNonNewsContextQuery(client, categoryId)
+  const categoriesQuery = useActiveCategoriesQuery(client)
   const result = useMemo(
     () => contextQuery.data ? buildNonNewsContext(categoryId, contextQuery.data) : null,
     [categoryId, contextQuery.data],
   )
+  const categorySettings = categoriesQuery.data?.find((item) => item.id === categoryId) ?? null
+  const composerUnavailableReason = contextQuery.isPending || contextQuery.isFetching
+    ? 'Phase 5I 컨텍스트를 불러오는 동안 작성 프롬프트를 생성할 수 없습니다.'
+    : contextQuery.isError
+      ? 'Phase 5I 컨텍스트 오류를 해결한 뒤 작성 프롬프트를 생성해 주세요.'
+      : categoriesQuery.isPending || categoriesQuery.isFetching
+        ? '활성 카테고리 설정을 불러오는 동안 작성 프롬프트를 생성할 수 없습니다.'
+        : categoriesQuery.isError
+          ? '활성 카테고리 설정을 불러오지 못해 작성 프롬프트를 생성할 수 없습니다.'
+          : !categorySettings
+            ? '선택한 비뉴스 카테고리의 활성 설정을 찾을 수 없습니다.'
+            : null
 
   function changeCategory(value: string) {
     if (isSupportedNonNewsCategoryId(value)) setCategoryId(value)
@@ -66,6 +81,12 @@ export function NonNewsContextsPageContent({ client = supabase }: { client?: Dat
       ? <div className="content-state" role="status">선택한 카테고리에 기존 글이 없습니다.</div>
       : null}
     {result ? <NonNewsContextPreview result={result} /> : null}
+    <NonNewsPromptComposer
+      category={categoryId}
+      context={result}
+      categorySettings={categorySettings}
+      unavailableReason={composerUnavailableReason}
+    />
   </section>
 }
 

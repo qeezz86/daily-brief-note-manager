@@ -1269,6 +1269,46 @@ Phase 5I는 보호 경로 `/non-news-contexts`에서 같은 DB의 기존 글을 
 
 출력은 허용된 필드만 일반 텍스트로 직렬화한다. `owner_id`, 내부 UUID·정렬 시각, WordPress HTML·URL, 이미지 metadata, 인증·credential·secret, 생성 프롬프트와 뉴스 추적 데이터는 포함하지 않는다. CCTV 원문 전문·자막·번역은 조회하거나 복제하지 않는다. 이 기능은 DB 쓰기, 외부 네트워크·AI 호출, 자동·fuzzy·AI 중복 판정, 최종 글 생성 지시, 프롬프트 템플릿·모드, 저장되는 limit 설정을 추가하지 않는다. 사용자가 결과를 검토하고 클립보드로 복사하는 것까지가 Phase 5I 범위다.
 
+### 11.4 Phase 5J 비뉴스 새 글 작성 프롬프트
+
+Phase 5J는 `/non-news-contexts` 화면에서 Phase 5I 컨텍스트 미리보기와 별도의 다음 단계로 `Non-News Authoring Prompt Composer`를 제공한다. 새 route나 navigation 항목은 추가하지 않는다. 지원 카테고리는 `ai-column`, `info-db`, `chinese-study`이며 템플릿 버전은 `non-news-authoring-prompt-v1`이다.
+
+입력은 페이지가 소유한 canonical category, 필수 `topic`, 선택 `angle_or_focus`, 선택 `additional_instruction`, 기존 Phase 5I context 결과, 기존 활성 category settings다. 사용자가 wrapper, 표시 ID 패턴, slug 패턴, content group을 바꿀 수 없으며 owner·auth·UUID·날짜·URL·시리즈 번호 입력이나 저장 control을 제공하지 않는다.
+
+프롬프트는 다음 경계와 섹션 순서를 고정한다.
+
+1. `[BEGIN_NON_NEWS_AUTHORING_PROMPT]`
+2. `[작업 및 카테고리]`
+3. `[새 글 브리프]`
+4. `[중복 방지 컨텍스트]`
+5. `[카테고리 필수 작성 규칙]`
+6. `[최종 출력 계약]`
+7. `[사용자 추가 지시]`
+8. `[우선순위 및 비재정의 규칙]`
+9. `[END_NON_NEWS_AUTHORING_PROMPT]`
+
+카테고리별 필수 작성 범위는 다음과 같다.
+
+- AI 칼럼: 입문 정의, 메커니즘, 비교, 실제 사례, 이점·한계, 보안·개인정보, 검증·사람 감독, 현재와 미래 구분, FAQ, 개별 출처, 이전 AI 칼럼 링크, 활성 category settings, SEO·출력·저작권 계약
+- 정보DB: 입문 정의 우선, 원리·구성 요소·비교·예시·오해, 중요한 한계와 주의, 시점 민감 정보 검증, 사실과 전망 구분, 핵심 포인트, FAQ, 개별 출처, 이전 정보DB 링크, 활성 category settings, SEO·출력 계약
+- 중국어 학습: CCTV 공식 개별 기사·영상 URL과 출처 확인 구조, 프로그램명·원문 제목·시각·확인 사실, 실제 원문 문장 3~5개, 성조 병음·한국어 해석·어휘·문장 구조, 독립 작성 응용 표현, 3문항 quiz, 응용문과 인용 구분, 이전 학습 링크와 저작권 note. 홈페이지·검색·목록 URL만 사용하거나 전문·전체 자막·전체 번역을 복제하거나 CCTV 표현을 만들지 않는다.
+
+중국어 학습의 제목·템플릿은 미해결 literal `[번호]`를 보존한다. composer는 시리즈 번호·브리핑 ID·표시 ID를 생성, 추정, 증가, 조회하지 않으며 기존 글 수·날짜·slug·DB 상태로 번호를 유도하지 않는다. slug는 활성 category setting의 placeholder를 그대로 표시한다.
+
+최종 출력은 대표 제목, 대안 제목 4개, meta 설명, URL slug, focus keyword, SEO tag 5~8개, 하나의 연속 HTML code block, 대표 이미지 prompt, image ALT, 발행 전 checklist의 논리적 10개 결과를 정확히 이 순서로 요구한다. HTML은 활성 wrapper와 `<h1>`, 최종 닫는 wrapper를 포함하고 image prompt를 HTML 안에 넣지 않는다. v1은 구조화 import block을 필수로 추가하지 않는다.
+
+우선순위는 (1) 안전·노출·저작권, (2) category 작성 규칙, (3) 출력 계약과 활성 category settings, (4) Phase 5I context 원문, (5) topic과 angle/focus, (6) 추가 사용자 지시 순서다. 추가 지시는 독자·어조·강조점·예시·분야·용어·키워드·깊이·길이·연구 질문·더 엄격한 출처 선호를 보완할 수 있지만 1~3단계를 재정의할 수 없다.
+
+추가 지시는 줄바꿈·줄 trim·수평 공백을 정규화한 전체 값에 versioned Korean/English 정규식 table을 결정적으로 적용한다. hierarchy 우회, 필수 section/10개 출력 변경, category setting 대체, 중국어 번호·ID 생성, 보호 정보 노출, raw HTML/context body 삽입, 전문·전체 자막·전체 번역 복제나 출처 조작, image upload/storage 또는 HTML 내부 image prompt, DB/server/WordPress write·publish, 외부 API/model 실행 중 하나라도 탐지되면 전체 추가 지시를 거부하고 안전해 보이는 일부도 보존하지 않는다.
+
+builder는 clock·random·DB·network·browser global·AI/API·logging·mutation이 없는 순수 동기 함수이며 같은 정규화 입력에 byte-identical text를 만든다. validator v1은 builder를 호출하지 않는 독립 순수 함수로 category, topic, version, settings/content group, 경계·section 순서, Phase 5I context byte match, actual/max count, 필수 category 규칙, 10개 출력 순서, 우선순위, 추가 지시 충돌과 보호 필드를 검사해 `valid`, `warning`, `invalid`를 반환한다. 보호 필드는 사용자·data section에서 검사해 고정 HTML 작성 규칙을 오탐하지 않는다.
+
+컨텍스트가 0개면 `기존 글이 없습니다.`와 `0개 / 최대 N개`를 그대로 포함하고 `warning`으로 생성·복사를 허용한다. limit보다 적으면 반환된 항목을 전부 순서대로 사용하고 경고·padding·가공을 하지 않으며, 정확히 limit이면 전부 사용한다. Phase 5I 조회·allowlist·정렬·요약 생략 의미는 변경하지 않는다.
+
+category, topic, angle/focus, additional instruction, 활성 wrapper·표시 ID·slug·content group, Phase 5I text·actual/max count, template version 중 하나가 변경되면 마지막 preview를 유지하되 접근 가능한 stale 상태를 표시하고 copy를 차단한다. 자동 재생성하지 않으며 명시적 재생성이 필요하다. copy는 current preview가 stale하지 않고 validator error가 0이며 status가 `valid` 또는 `warning`일 때만 가능하고 표시 textarea의 정확한 byte를 기존 clipboard helper에 전달한다. 실패는 화면에 표시한다.
+
+생성 prompt와 validation 결과는 저장하지 않는다. Phase 5J는 migration·RPC·RLS·DB query/write, 외부 AI/API, WordPress write/publish, image upload/storage를 추가하지 않으며 Phase 5I와 news prompt, Phase 5G·5H import 동작을 변경하지 않는다.
+
 ---
 
 ## 12. 화면 설계

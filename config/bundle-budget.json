@@ -51,11 +51,11 @@
       "gzip": { "absolute": 76800, "percentHeadroom": 0.15, "minimumHeadroom": 4096 }
     },
     "totalJs": {
-      "raw": { "absolute": 1280000, "percentHeadroom": 0.12, "minimumHeadroom": 32768 }
+      "raw": { "absolute": 1331200, "percentHeadroom": 0.176, "minimumHeadroom": 32768 }
     },
     "pwaPrecache": {
       "entries": { "absolute": 90, "minimumHeadroom": 7 },
-      "raw": { "absolute": 1314699, "percentHeadroom": 0.1270845121135744, "minimumHeadroom": 32768 }
+      "raw": { "absolute": 1376423, "percentHeadroom": 0.18, "minimumHeadroom": 32768 }
     }
   }
 }
