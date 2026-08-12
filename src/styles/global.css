@@ -81,6 +81,20 @@
 .prompt-retention-notice { margin-top: 1.25rem; padding: 1rem 1.25rem; border: 1px solid #d7c783; border-radius: .5rem; background: #fffbea; color: #55490f; }
 .prompt-retention-notice p { margin: 0; line-height: 1.6; }
 .prompt-retention-notice p + p { margin-top: .35rem; }
+.non-news-composer { min-width: 0; margin-top: 2rem; padding-top: 2rem; border-top: 2px solid #c8d1ce; }
+.non-news-composer__heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+.non-news-composer__heading h2 { margin: 0; }
+.non-news-composer__heading p:last-child { margin-bottom: 0; color: #68736f; line-height: 1.6; }
+.non-news-composer__form { display: grid; min-width: 0; margin-top: 1.25rem; padding: 1.25rem; border: 1px solid #d9dfdc; border-radius: .5rem; gap: 1rem; background: #fff; }
+.non-news-composer__form textarea { min-height: 7rem; resize: vertical; line-height: 1.55; }
+.non-news-composer__actions { display: flex; justify-content: flex-end; }
+.non-news-composer__actions .primary-button { min-height: 44px; margin-top: 0; }
+.non-news-composer .prompt-panel h3 { margin: 0; font-size: 1rem; }
+.non-news-composer__issues, .non-news-composer__warnings { margin: 1rem 0 0; padding-left: 1.25rem; line-height: 1.55; }
+.non-news-composer__issues { color: #7a2420; }
+.non-news-composer__warnings { color: #6d560e; }
+.non-news-composer > .form-alert { margin-top: 1rem; }
+.non-news-composer > .form-alert ul { margin-bottom: 0; }
 
 .import-page { display: grid; gap: 1.25rem; }
 .import-page > .content-page__heading { margin-bottom: 0; }
@@ -1642,6 +1656,9 @@ a {
   .prompt-validation__summary div { min-width: 0; }
   .prompt-counts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .prompt-preview { min-height: 24rem; }
+  .non-news-composer__heading { align-items: stretch; flex-direction: column; }
+  .non-news-composer__actions .primary-button { width: 100%; }
+  .non-news-composer__form { padding: 1rem; }
   .import-panel__heading, .import-item-list summary { align-items: stretch; flex-direction: column; }
   .import-summary__counts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .import-filters { grid-template-columns: 1fr; }

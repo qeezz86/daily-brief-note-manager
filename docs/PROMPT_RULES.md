@@ -395,6 +395,51 @@ Phase 5I의 `/non-news-contexts`는 뉴스 외 카테고리의 기존 글 정보
 
 출력 allowlist 밖의 owner·auth·session·내부 UUID·HTML body·WordPress URL·source import type·이미지 metadata·created/updated/published timestamp·credential·secret·감사 metadata·생성 프롬프트·뉴스 추적·source 전문은 포함하지 않는다. 중국어 원문 전문·전체 자막·전체 번역을 조회하거나 네트워크로 보완하지 않는다. 결과는 inert text로 미리보고 기존 clipboard helper로 복사할 수 있지만 DB·서버·외부 네트워크에는 쓰지 않는다. Phase 5I는 자동 중복 차단, fuzzy/AI 유사도 판정, 최종 글 프롬프트·템플릿·모드, 저장되는 설정을 제공하지 않는다.
 
+### 9.4 Phase 5J 비뉴스 작성 프롬프트 계약
+
+Phase 5J composer는 Phase 5I context를 조회하거나 재구성하지 않고 반환된 `text`, `actualCount`, `maxCount`를 그대로 소비한다. 지원 category는 `ai-column`, `info-db`, `chinese-study`, 고정 template은 `non-news-authoring-prompt-v1`이다. 필수 topic과 선택 angle/focus·additional instruction을 입력받고 활성 category settings의 wrapper, display-ID pattern, slug pattern, content group을 read-only로 사용한다.
+
+section은 다음 순서다.
+
+```text
+[BEGIN_NON_NEWS_AUTHORING_PROMPT]
+[작업 및 카테고리]
+[새 글 브리프]
+[중복 방지 컨텍스트]
+[카테고리 필수 작성 규칙]
+[최종 출력 계약]
+[사용자 추가 지시]
+[우선순위 및 비재정의 규칙]
+[END_NON_NEWS_AUTHORING_PROMPT]
+```
+
+AI 칼럼은 beginner definition, mechanism, comparison, practical examples, benefits, limitations, security, privacy, verification, human oversight, current/future distinction, FAQ, individual sources, 이전 AI 칼럼 link, active settings, canonical SEO/output과 copyright를 모두 요구한다. 정보DB는 beginner definition first, principles, components, comparison, examples, misconceptions, material cautions, time-sensitive verification, fact/forecast distinction, key points, FAQ, individual sources, 이전 정보DB link, active settings와 canonical SEO/output을 요구한다. 중국어 학습은 CCTV 공식 개별 article/video URL, program·original title·time·checked fact, 실제 문장 3~5개, tone-marked pinyin, Korean interpretation, vocabulary, structure, 독립 응용 표현, 3문항 quiz, 응용문/quote 구분, source-check, 이전 학습 link, copyright note와 canonical SEO/output을 요구한다. 중국어 원문 전문·전체 transcript·전체 번역, homepage/search/list-only URL, fabricated CCTV expression은 금지한다.
+
+중국어 제목·template의 series literal은 `[번호]`다. 번호·briefing ID·display ID를 생성·추정·증가·조회하지 않고 category setting의 slug placeholder를 그대로 사용한다.
+
+최종 논리 출력은 정확히 다음 10개 순서다.
+
+1. SEO 입력용 대표 제목
+2. SEO 대안 제목 4개
+3. 메타 설명
+4. URL 슬러그
+5. 포커스 키워드
+6. SEO 태그 5~8개
+7. WordPress 본문용 단일 연속 HTML code block: 활성 wrapper, `<h1>`, 최종 닫는 wrapper, HTML 내부 image prompt 금지
+8. 대표 이미지 프롬프트
+9. 이미지 ALT 문구
+10. 발행 전 체크리스트
+
+v1은 structured-import block을 필수로 요구하지 않는다. 고정 우선순위는 안전·노출·저작권 → category 작성 규칙 → 출력 계약·활성 category settings → 정확한 Phase 5I context → topic·angle/focus → additional instruction이다. 추가 지시는 마지막 단계이며 앞의 1~3단계를 바꿀 수 없다.
+
+additional instruction은 line ending 정규화, line trim, horizontal whitespace 축소 후 전체를 평가한다. versioned Korean/English action-and-target pattern table은 다음 class 순서로 오류를 수집한다: hierarchy bypass, mandatory section/output 변경, wrapper/display-ID/slug 대체, Chinese number/ID 생성, protected auth/UUID/credential 노출, raw HTML/context body 삽입, full article/transcript/translation 복제 또는 source fabrication, image upload/storage·HTML 내부 prompt, DB/server/WordPress write·publish, external API/model execution. 하나라도 match하면 전체 additional instruction을 거부한다. 독자·가독성·어조·강조·비필수 subtopic 제외·예시·산업·use case·용어·keyword·깊이·길이·연구 질문·더 엄격한 source 선호는 고정 규칙과 호환될 때 허용한다.
+
+builder는 순수 동기·결정적 함수이며 clock, randomness, DB/network, clipboard/browser global, AI/API, logging, mutation을 사용하지 않는다. validator v1은 builder logic과 독립적으로 category/topic/version, settings/content-group, ordered boundaries/sections, Phase 5I context byte match, actual/max count, mandatory rules, exact output order, precedence, additional-instruction conflict, protected user/data fields와 non-empty prompt를 검사한다. 결과는 `valid | warning | invalid`와 deterministic errors, warnings, checks, metrics다.
+
+0개 context는 `기존 글이 없습니다.`와 정확한 `0개 / 최대 N개`를 포함하며 warning으로 허용한다. limit 미만은 반환 항목을 전부 순서대로 사용하고 padding·가공·단순 부족 warning을 하지 않는다. limit 도달 시에도 전부 사용한다.
+
+category, topic, angle/focus, additional instruction, wrapper/display-ID/slug/content-group setting, context text·actual/max count, template version 변경은 마지막 preview를 stale로 만든다. preview는 유지하지만 copy는 막고 명시적 regenerate가 필요하다. copy는 current, non-stale, error 0, `valid` 또는 `warning`인 textarea의 정확한 text만 허용하며 실패를 표시한다. prompt는 저장하지 않고 DB·server·external AI/API·WordPress write를 호출하지 않는다. Phase 5I query 의미는 변경하지 않는다.
+
 ## 10. 생성 기록
 
 프롬프트 생성 기록은 `generated_prompts`에 저장한다.

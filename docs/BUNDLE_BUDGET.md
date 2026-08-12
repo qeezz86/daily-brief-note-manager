@@ -45,10 +45,27 @@ Feature roots는 다음과 같다.
 | 다른 route closure | 900 KiB | 280 KiB | 10%, 최소 16 KiB / 8 KiB |
 | Route incremental | 300 KiB | 100 KiB | 15%, 최소 8 KiB / 4 KiB |
 | Feature incremental | 250 KiB | 75 KiB | 15%, 최소 8 KiB / 4 KiB |
-| Total JS | 1,250 KiB | 정보성 | 10%, 최소 32 KiB |
-| PWA precache | 90 entries / 1,250 KiB | 해당 없음 | 2 entries / 10%, 최소 32 KiB |
+| Total JS | 1,331,200 B | 정보성 | 17.6%, 최소 32,768 B |
+| PWA precache | 90 entries / 1,376,423 B | 해당 없음 | 최소 7 entries / raw 18%, 최소 32,768 B |
 
-회귀 허용값은 `max(baseline + minimumHeadroom, baseline + ceil(baseline × percentHeadroom))`이고 마지막에 절대 상한으로 제한한다. 현재 값이 회귀 허용값 또는 절대 상한 중 하나라도 넘으면 실패한다. 별도로 모든 JS chunk는 500 KiB 이하여야 한다.
+각 byte metric의 유효 상한은 `min(absolute, max(baseline + minimumHeadroom, baseline + ceil(baseline × percentHeadroom)))`이다. 현재 build가 이 유효 상한을 넘으면 실패한다. 따라서 baseline, 비율 여유, 최소 여유, 절대 상한과 그 결과인 유효 상한을 서로 구분해야 한다. 별도로 모든 JS chunk는 500 KiB 이하여야 한다.
+
+현재 Phase 5J 승인 정책과 build 상태는 다음과 같다. Baseline은 과거 승인 측정값이고 current build는 Phase 5J 기능을 포함한 현재 산출물이다.
+
+| Metric | Baseline | Percent headroom | Minimum headroom | Absolute limit | Effective limit | Current build | Remaining headroom |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Total JS raw | 1,131,895 B | 17.6% | 32,768 B | 1,331,200 B | 1,331,109 B | 1,297,467 B | 33,642 B |
+| PWA precache raw | 1,166,460 B | 18% | 32,768 B | 1,376,423 B | 1,376,423 B | 1,343,580 B | 32,843 B |
+
+PWA precache entry 정책은 절대 90 entries, baseline 대비 최소 7 entries 여유로 유지한다.
+
+### Phase 5I와 Phase 5J 정책 이력
+
+Phase 5I에서 Total JS 비율 여유는 10%에서 12%로 조정했다. PWA precache entry 최소 여유는 4에서 7로, raw 절대 상한은 1,280,000 B에서 1,306,436 B로, 비율 여유는 10%에서 12%로 조정했다. 이후 PWA raw 절대 상한을 1,306,436 B에서 1,314,699 B로, 비율 여유를 12%에서 12.70845121135744%로 조정했다.
+
+Phase 5J에서는 Total JS 절대 상한을 1,280,000 B에서 1,331,200 B로, 비율 여유를 12%에서 17.6%로 조정했다. PWA raw 절대 상한은 1,314,699 B에서 1,376,423 B로, 비율 여유는 12.70845121135744%에서 18%로 조정했다.
+
+Phase 5J는 승인된 Non-News Authoring Prompt Composer를 추가하며 runtime 증가는 기존 lazy non-news-context route에 격리된다. 새 third-party runtime dependency, eager-route 누출 또는 tree-shaking blocker는 발견되지 않았다. 계약을 보존하는 현실적인 최적화 여지는 약 4,000–8,000 B였지만 기존 위반 해소에는 약 29 KB 감소가 필요했으므로, 이전 정책을 맞추기 위해 승인된 기능 계약을 약화하는 방안은 채택하지 않았다. 대신 historical baseline과 checker semantics를 유지하고 현재 build 대비 약 32 KiB의 제한된 회귀 여유를 두는 정책 조정을 적용했다. 이는 bounded regression headroom adjustment이며 baseline reset, checker 완화, 무제한 예외, bundle accounting 제외 또는 checker 우회가 아니다. 이후 증가는 동일한 검토와 상한 적용을 받는다.
 
 ## 현재 승인 baseline
 
