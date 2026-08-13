@@ -1778,6 +1778,35 @@ a {
 .wordpress-html-source { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; padding: 14px; border: 1px solid #d9dfdc; border-radius: 7px; }
 .wordpress-html-save-actions { display: grid; gap: 12px; }
 .wordpress-html-save-actions button { min-height: 44px; justify-self: start; }
+.non-news-response-workflow { display: grid; min-width: 0; gap: 18px; }
+.non-news-response-input > label { display: block; margin: 14px 0 8px; font-weight: 700; }
+.non-news-response-raw, .non-news-response-html { width: 100%; min-width: 0; box-sizing: border-box; resize: vertical; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; overflow-wrap: anywhere; }
+.non-news-response-raw { min-height: 20rem; max-height: 70dvh; font-size: .875rem; }
+.non-news-response-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.non-news-response-grid label, .non-news-response-fields label, .non-news-response-source label { display: grid; min-width: 0; gap: 6px; font-weight: 700; }
+.non-news-response-grid input, .non-news-response-grid select, .non-news-response-fields input, .non-news-response-fields textarea, .non-news-response-source input, .non-news-response-source textarea { width: 100%; min-width: 0; min-height: 44px; box-sizing: border-box; padding: .65rem .75rem; border: 1px solid #bfc9c5; border-radius: .4rem; background: #fff; color: inherit; }
+.non-news-response-fields, .non-news-response-source { display: grid; min-width: 0; gap: 14px; margin: 16px 0 0; padding: 14px; border: 1px solid #d9dfdc; border-radius: 7px; }
+.non-news-response-fields legend, .non-news-response-source legend { padding: 0 6px; font-weight: 800; }
+.non-news-response-actions { display: flex; align-items: center; gap: 12px; margin-top: 14px; flex-wrap: wrap; }
+.non-news-response-actions button { min-height: 44px; margin-top: 0; }
+.non-news-response-state { align-self: flex-start; max-width: 19rem; padding: 8px 10px; border: 1px solid #bfc9c5; border-radius: 6px; background: #f4f7f5; overflow-wrap: anywhere; }
+.non-news-response-state--valid { border-color: #9bc9b6; color: #17634e; background: #eff8f4; }
+.non-news-response-state--warning, .non-news-response-state--stale { border-color: #d7c783; color: #6d560e; background: #fffbea; }
+.non-news-response-state--invalid { border-color: #e4b5b1; color: #9a342d; background: #fff4f3; }
+.non-news-response-warnings { margin-top: 16px; padding: 14px 16px; border: 1px solid #d7c783; border-radius: 7px; background: #fffbea; }
+.non-news-response-warnings h3 { margin-top: 0; }
+.non-news-response-warnings ul { margin-bottom: 0; padding-left: 20px; }
+.non-news-response-sources { min-width: 0; margin-top: 20px; }
+.non-news-response-source { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.non-news-response-source label:nth-of-type(5), .non-news-response-source button { grid-column: 1 / -1; }
+.non-news-response-validation-actions, .non-news-response-save { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: 16px; }
+.non-news-response-validation-actions .primary-button, .non-news-response-save .primary-button { flex: 0 0 auto; margin-top: 0; }
+.non-news-response-confirmation { min-width: 0; border-color: #6da58f; }
+.non-news-response-confirmation dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.non-news-response-confirmation dl div { min-width: 0; padding: 10px; border-radius: 6px; background: #f4f7f5; }
+.non-news-response-confirmation dt { color: #65716d; font-size: .8rem; font-weight: 700; }
+.non-news-response-confirmation dd { margin: 4px 0 0; overflow-wrap: anywhere; font-weight: 700; }
+.non-news-response-workflow code, .non-news-response-workflow li, .non-news-response-workflow p, .non-news-response-workflow input, .non-news-response-workflow textarea { overflow-wrap: anywhere; word-break: break-word; }
 
 @media (max-width: 540px) {
   .import-mode-selector { display: grid; }
@@ -1789,4 +1818,10 @@ a {
   .wordpress-html-raw { min-height: 22rem; font-size: 1rem; }
   .wordpress-html-form-grid, .wordpress-html-source { grid-template-columns: 1fr; }
   .wordpress-html-save-actions button { width: 100%; justify-self: stretch; justify-content: center; }
+  .non-news-response-raw { min-height: 24rem; font-size: 1rem; }
+  .non-news-response-grid, .non-news-response-source, .non-news-response-confirmation dl { grid-template-columns: minmax(0, 1fr); }
+  .non-news-response-source label:nth-of-type(5), .non-news-response-source button { grid-column: auto; }
+  .non-news-response-actions, .non-news-response-validation-actions, .non-news-response-save { align-items: stretch; flex-direction: column; }
+  .non-news-response-actions button, .non-news-response-validation-actions .primary-button, .non-news-response-save .primary-button { width: 100%; justify-content: center; }
+  .non-news-response-state { max-width: none; }
 }

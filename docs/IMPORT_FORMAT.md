@@ -572,6 +572,33 @@ AI·정보DB·중국어 학습에서는 최근 컨텍스트 개수와 관계없�
 
 중국어 학습의 동일 `original_url`은 경고만 표시하지 않고 저장을 차단한다.
 
+### 12.1 Phase 5K 비뉴스 사람용 응답 Import
+
+`/imports`의 `non-news-response` mode는 활성 `ai-column`, `info-db`, `chinese-study`를 사용자가 직접 선택한 뒤 Phase 5J의 사람용 응답을 붙여넣는 별도 workflow다. Phase 5G 구조화 block parser나 Phase 5H WordPress HTML parser를 확장하지 않는다. parser는 다음 독립 heading 열 개를 정확히 이 순서로만 인식한다.
+
+```text
+1. SEO 입력용 대표 제목
+2. SEO 대안 제목 4개
+3. 메타 설명
+4. URL 슬러그
+5. 포커스 키워드
+6. SEO 태그 5~8개
+7. 워드프레스 본문용 HTML — 하나의 연속된 HTML 코드 블록, 올바른 wrapper, <h1>, 최종 닫는 wrapper, HTML 내부 이미지 프롬프트 금지
+8. 대표 이미지 프롬프트
+9. 이미지 ALT 문구
+10. 발행 전 체크리스트
+```
+
+숫자 prefix는 필수이고 heading 내부 문구·공백은 그대로여야 하며 `#`, 뒤 colon, alias, 번역, fuzzy·semantic 복구는 없다. UTF-8 BOM 제거, CRLF→LF, 문서와 heading의 바깥 공백 trim만 적용한다. 대안 제목은 네 개, tag는 5~8개, checklist는 하나 이상의 비어 있지 않은 `- ` 목록 항목이다. section 7은 정확히 하나의 소문자 `html` fenced block이며 block 주변 text, 다른 language label, 추가 block은 invalid다.
+
+모든 카테고리에 1 이상의 시리즈 번호를 직접 입력한다. AI·정보DB 식별자는 현재 활성 display-ID/slug pattern으로만 계산한다. 중국어 raw 제목과 `<h1>`의 `[번호]`는 입력 번호로 해소하고 `display_id`는 만들지 않는다. 해소되지 않은 `[번호]`, `###`는 저장을 차단한다. 선택 setting과 wrapper를 교차 검사하며 카테고리를 응답 내용에서 추론하지 않는다.
+
+WordPress HTML은 `DOMParser`로만 구조를 읽고 화면에는 escaped textarea text로 표시한다. top-level wrapper 하나, `<h1>` 하나, 안전한 element·attribute·URL scheme, HTML 밖의 image prompt를 검사한다. `#sources`와 중국어 `#source-check`에서 source 후보를 오프라인으로 추출하며 URL을 요청하거나 비어 있는 정보를 만들어내지 않는다. source 후보를 포함한 모든 review 필드는 사용자가 편집할 수 있다.
+
+수정이나 활성 setting 변경은 preview를 유지한 채 stale로 만들고 warning 승인과 exact duplicate 결과를 초기화한다. 명시적 재검증 후 slug, category+series number와 해당하는 중국어 original URL을 기존 DB projection으로 조회한다. `complete`·clear만 저장 후보이며 최종 확인 직전에 다시 조회한다. `partial`, `unavailable`, duplicate는 clear로 취급하지 않는다.
+
+최종 확인은 category, `<h1>` 제목, slug, `draft`, 한 건 write 의도를 표시한다. 기존 `save_chatgpt_paste_post` RPC에 현재 allowlisted content/SEO/image/source/HTML만 전달하며 raw response와 checklist, protected/server-owned field는 전달하지 않는다. 외부 AI·source fetch·WordPress write·자동 publish는 없고 DB migration도 없다.
+
 ## 13. 백업과 복구
 
 ### 13.1 JSON
@@ -602,8 +629,7 @@ CSV는 검토 및 내보내기 전용이다. 관계 데이터를 포함한 전�
 
 ## 14. 확인 필요 사항
 
-1. 비구조화 응답의 태그 목록에서 구분 문자가 태그 자체에 포함될 때의 escape 또는 금지 규칙이 없다.
-2. 비구조화 응답의 표준 제목 문자열 목록과 각 section 경계 규칙이 명시되지 않았다.
-3. 내부 링크 `<a>`의 구체적인 URL 허용 범위와 오류·경고 구분이 명시되지 않았다.
-4. JSON `update`가 기존 하위 관계를 교체하는지 병합하는지, 내부 UUID를 보존할지 재매핑할지 확정이 필요하다.
-5. 백업 JSON의 관계 복원 순서가 아직 정해지지 않았다.
+1. 일반 legacy 비구조화 응답의 태그 목록에서 구분 문자가 태그 자체에 포함될 때의 escape 또는 금지 규칙은 아직 없다. Phase 5K는 줄 단위 `- ` 목록으로 경계를 고정한다.
+2. 내부 링크 `<a>`의 구체적인 URL 허용 범위와 오류·경고 구분은 Phase 5K active-scheme 차단 밖에서 추가 확정이 필요하다.
+3. JSON `update`가 기존 하위 관계를 교체하는지 병합하는지, 내부 UUID를 보존할지 재매핑할지 확정이 필요하다.
+4. 백업 JSON의 관계 복원 순서가 아직 정해지지 않았다.

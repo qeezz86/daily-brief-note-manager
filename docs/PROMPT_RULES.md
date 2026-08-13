@@ -440,6 +440,14 @@ builder는 순수 동기·결정적 함수이며 clock, randomness, DB/network, 
 
 category, topic, angle/focus, additional instruction, wrapper/display-ID/slug/content-group setting, context text·actual/max count, template version 변경은 마지막 preview를 stale로 만든다. preview는 유지하지만 copy는 막고 명시적 regenerate가 필요하다. copy는 current, non-stale, error 0, `valid` 또는 `warning`인 textarea의 정확한 text만 허용하며 실패를 표시한다. prompt는 저장하지 않고 DB·server·external AI/API·WordPress write를 호출하지 않는다. Phase 5I query 의미는 변경하지 않는다.
 
+### 9.5 Phase 5K 사람용 응답 handoff
+
+Phase 5K `non-news-response` import는 Phase 5J의 논리적 10개 결과를 다음 exact heading으로 전달받는다: `1. SEO 입력용 대표 제목`, `2. SEO 대안 제목 4개`, `3. 메타 설명`, `4. URL 슬러그`, `5. 포커스 키워드`, `6. SEO 태그 5~8개`, `7. 워드프레스 본문용 HTML — 하나의 연속된 HTML 코드 블록, 올바른 wrapper, <h1>, 최종 닫는 wrapper, HTML 내부 이미지 프롬프트 금지`, `8. 대표 이미지 프롬프트`, `9. 이미지 ALT 문구`, `10. 발행 전 체크리스트`. 순서·문구·숫자 prefix는 고정이며 alias, 번역, fuzzy/AI 복구는 없다.
+
+작성 단계는 번호를 만들지 않는다. import review에서 활성 `ai-column`, `info-db`, `chinese-study`를 직접 선택하고 모든 카테고리의 1 이상 series number를 직접 입력한다. AI·정보DB display ID와 slug는 활성 pattern으로만 해소하고 중국어 `[번호]`는 대표 제목과 `<h1>`에서 해소한다. 중국어 display/briefing ID는 만들지 않는다.
+
+응답은 편집 가능한 inert preview로 전환한 뒤 DOMParser HTML 안전성, wrapper, 단일 `<h1>`, SEO, image prompt 위치, source와 protected field를 결정적으로 검증한다. 관련 edit·setting 변경은 stale 상태와 warning 승인·duplicate 결과 초기화를 일으킨다. current validation 뒤와 최종 save 직전에 exact duplicate를 검사하며 complete·clear만 진행한다. 최종 category/title/slug/draft 확인 후 기존 ChatGPT-paste draft 저장 경계의 allowlist만 사용한다. raw response와 checklist는 저장하지 않고 외부 AI, source fetch, WordPress write, migration은 없다. Phase 5G/5H/5I/5J 의미는 변경하지 않는다.
+
 ## 10. 생성 기록
 
 프롬프트 생성 기록은 `generated_prompts`에 저장한다.
@@ -481,4 +489,4 @@ Phase 3B-4의 새 snapshot은 선택 필드 `promptValidationVersion = 1`과 저
 1. “후속 작성 인정 조건”을 저장하는 전용 DB 필드가 PRODUCT_SPEC 데이터 모델에 없다. 어떤 필드나 계산 규칙에서 가져올지 결정이 필요하다.
 2. 간단·표준·상세 모드별 개별 길이 제한은 정의되지 않았다.
 3. 길이 제한 시 문자열 자르기 기준과 생략 표시 형식이 정의되지 않았다.
-4. AI·정보DB·중국어 학습 컨텍스트의 모드와 최종 템플릿은 정의되지 않았다.
+4. AI·정보DB·중국어 학습의 `non-news-authoring-prompt-v1`과 Phase 5K exact 10-section handoff는 확정되었다. 이후 template version 변경은 새 version 계약으로만 추가한다.
