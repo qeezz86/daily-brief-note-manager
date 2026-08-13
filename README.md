@@ -162,7 +162,7 @@ npx supabase gen types typescript --local > src/shared/supabase/database.types.t
 
 `/briefing-prompts`에서는 활성 뉴스 카테고리와 최근 글 수 `5`·`10`·`15`(기본 `5`)를 선택할 수 있습니다. 읽기 전용 `get_news_briefing_prompt_context` RPC가 현재 사용자 데이터에서 기준일 이전의 발행 게시물을 요청 수까지, 해당 뉴스 업데이트, `active`·`monitoring`·`reopened` 주제, pending 후속 항목과 최근 종료 주제 최대 20개를 결정적 순서로 집계합니다. 글이 요청 수보다 적으면 모두 사용하고 요청 수와 실제 사용 수를 구분해 표시합니다. 최근 글 수는 생성 모드와 독립적으로 유지됩니다. 종료 조회 기간은 기본 90일, 최대 180일입니다. context schema version은 1이며 WordPress HTML 전문, 이미지 프롬프트, 사용자 이메일과 원문 기사 전문은 포함하지 않습니다. 미리보기 설정이 바뀌면 stale로 표시되어 재생성 전에는 저장할 수 없습니다.
 
-Phase 5I의 보호 경로 `/non-news-contexts`는 AI 칼럼 20개, 정보DB 30개, 중국어 학습 20개의 중복 방지용 historical context를 생성합니다. 현재 인증 사용자의 RLS 범위에서 선택 카테고리의 `ready`·`published` 글만 `published_on DESC NULLS LAST`, `updated_at DESC`, `id ASC`로 제한 조회하고, 카테고리별 허용 필드만 결정적 일반 텍스트로 표시·복사합니다. WordPress HTML, owner·인증 정보, 비밀값과 내부 정렬 식별자는 출력하지 않습니다. 이 화면은 DB 저장, 외부 AI·CCTV·WordPress 호출, 자동 중복 판정, 최종 글 프롬프트·템플릿·모드 또는 영구 limit 설정을 제공하지 않습니다.
+Phase 5I의 보호 경로 `/non-news-contexts`는 AI 칼럼 20개, 정보DB 30개, 중국어 학습 20개의 중복 방지용 historical context를 생성합니다. 현재 인증 사용자의 RLS 범위에서 선택 카테고리의 `ready`·`published` 글만 `published_on DESC NULLS LAST`, `updated_at DESC`, `id ASC`로 제한 조회하고, 카테고리별 허용 필드만 결정적 일반 텍스트로 표시·복사합니다. WordPress HTML, owner·인증 정보, 비밀값과 내부 정렬 식별자는 출력하지 않습니다. Phase 5I context builder 자체는 DB 저장, 외부 AI·CCTV·WordPress 호출, 자동 중복 판정 또는 영구 limit 설정을 제공하지 않으며, 같은 화면의 별도 Phase 5J composer가 이 결과를 고정 비뉴스 작성 template에 전달합니다.
 
 `/briefing-prompts/history`와 상세 경로에서는 저장 당시 설정, 요청 최근 글 수, 실제 사용 수, 정확한 프롬프트와 context snapshot을 조회·복사하고 고정 상태를 변경합니다. 새 snapshot에는 `promptTemplateVersion`을 선택 필드로 기록하고 상세 화면에서 적용 버전을 표시합니다. 버전이 없던 과거 이력도 안전하게 표시하며, 현재 category rules나 뉴스 데이터로 과거 prompt text와 count를 다시 생성·추론하지 않습니다. 프롬프트와 snapshot은 저장 후 수정할 수 없고 현재 뉴스 데이터가 바뀌어도 과거 이력은 변하지 않습니다. 사용자·카테고리별 미고정 최근 30개를 보존하며 고정 이력은 한도와 자동 정리에서 제외됩니다. 오래된 이력을 고정 해제하면 같은 카테고리의 retention이 다시 적용됩니다. 쓰기는 전용 RPC만 사용하며 외부 AI API는 호출하지 않습니다.
 
@@ -221,4 +221,12 @@ supabase/
 
 보호 경로 `/non-news-contexts`는 AI 칼럼 20개, 정보DB 30개, 중국어 학습 20개의 historical context를 생성합니다. 현재 인증 사용자의 RLS 범위에서 선택 카테고리의 `ready`·`published` 글만 `published_on DESC NULLS LAST`, `updated_at DESC`, `id ASC`로 제한 조회하고, 카테고리별 허용 필드만 결정적 일반 텍스트로 표시·복사합니다.
 
-WordPress HTML, owner·인증 정보, 비밀값과 내부 정렬 식별자는 출력하지 않습니다. 이 화면은 DB 저장, 외부 AI·CCTV·WordPress 호출, 자동 중복 판정, 최종 글 프롬프트·템플릿·모드 또는 영구 limit 설정을 제공하지 않습니다.
+WordPress HTML, owner·인증 정보, 비밀값과 내부 정렬 식별자는 출력하지 않습니다. Phase 5I context 기능 자체는 DB 저장, 외부 AI·CCTV·WordPress 호출, 자동 중복 판정 또는 영구 limit 설정을 제공하지 않습니다. Phase 5J의 별도 `non-news-authoring-prompt-v1` composer는 같은 화면에서 context를 받아 정확한 10개 결과를 요구하는 작성 prompt를 만들지만 외부 AI를 호출하거나 prompt를 저장하지 않습니다.
+
+## Phase 5K 비뉴스 일반 응답 가져오기
+
+`/imports`의 `비뉴스 일반 응답 붙여넣기` mode는 Phase 5J가 요구한 사람용 10-section 응답을 `ai-column`, `info-db`, `chinese-study` 초안 후보로 가져옵니다. 번호와 문구가 정확한 열 개 heading, `- ` 목록, 소문자 `html` fenced block 하나만 수용하며 alias·fuzzy·AI 복구는 하지 않습니다. 카테고리와 1 이상의 시리즈 번호는 사용자가 직접 선택·입력합니다. AI·정보DB 식별자는 활성 category pattern으로 해소하고 중국어 `[번호]`는 저장 전 제목과 `<h1>`에서 해소하며 중국어 표시 ID나 브리핑 ID는 만들지 않습니다.
+
+분석 결과의 SEO, HTML, image prompt·ALT, checklist와 HTML에서 오프라인 추출한 source를 편집할 수 있습니다. HTML은 DOMParser로 inert 검사하며 pasted node를 mount하지 않습니다. 관련 edit나 category setting 변경은 preview를 유지한 채 stale로 만들고 warning 확인과 duplicate 결과를 초기화합니다. 명시적 재검증 뒤 exact slug, category+series number, 중국어 original URL 중복 검사가 `complete`·clear일 때만 최종 확인을 열며 저장 직전에 다시 검사합니다.
+
+최종 확인은 category, `<h1>` 제목, slug, application `draft`, 한 건 write 의도를 보여 줍니다. 기존 `saveChatGptPastePost` RPC 경계와 allowlisted content/SEO/image/source/HTML payload만 사용합니다. raw response, checklist, owner·auth·내부 UUID·status·provenance는 전송하지 않습니다. 외부 AI·source URL fetch·WordPress write·자동 publish·image upload/storage는 없으며 Phase 5K에는 migration, RLS, dependency, route 또는 navigation 변경이 없습니다. Phase 5G 구조화 paste, Phase 5H WordPress HTML import, Phase 5I context와 Phase 5J composer는 그대로 유지됩니다.

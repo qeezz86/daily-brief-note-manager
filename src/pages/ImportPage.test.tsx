@@ -245,10 +245,11 @@ describe('ImportPageContent', () => {
     expect(screen.queryByRole('button', { name: '결과 복사' })).not.toBeInTheDocument()
   })
 
-  it('기존 JSON, ChatGPT, WordPress HTML을 접근 가능한 additive mode로 제공하고 JSON을 기본 유지한다', () => {
+  it('기존 JSON, ChatGPT, WordPress HTML과 새 비뉴스 응답을 접근 가능한 additive mode로 제공하고 JSON을 기본 유지한다', () => {
     renderPage()
     expect(screen.getByRole('radio', { name: '기존 JSON Import' })).toBeChecked()
     expect(screen.getByRole('radio', { name: 'ChatGPT 구조화 붙여넣기' })).not.toBeChecked()
+    expect(screen.getByRole('radio', { name: '비뉴스 일반 응답 붙여넣기' })).not.toBeChecked()
     expect(screen.getByRole('radio', { name: 'WordPress HTML 붙여넣기' })).not.toBeChecked()
     expect(screen.getByRole('group', { name: '가져오기 방식' })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'ChatGPT 구조화 응답 붙여넣기' })).not.toBeInTheDocument()
@@ -263,6 +264,19 @@ describe('ImportPageContent', () => {
     expect(saveChatGptPastePostMock).not.toHaveBeenCalled()
   })
 
+  it('비뉴스 일반 응답 mode를 기존 /imports 경계에서 lazy 렌더링하고 전환만으로 저장하지 않는다', async () => {
+    renderPage()
+    expect(screen.queryByLabelText('비뉴스 canonical 10-section 응답 plain text')).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('radio', { name: '비뉴스 일반 응답 붙여넣기' }))
+    expect(await screen.findByRole('heading', { name: '비뉴스 일반 응답 붙여넣기' })).toBeInTheDocument()
+    expect(screen.getByLabelText('카테고리')).toBeInTheDocument()
+    expect(screen.getByLabelText('시리즈 번호')).toBeInTheDocument()
+    expect(screen.getByLabelText('비뉴스 canonical 10-section 응답 plain text')).toBeInTheDocument()
+    expect(prepareImportJobMock).not.toHaveBeenCalled()
+    expect(saveChatGptPastePostMock).not.toHaveBeenCalled()
+    expect(saveWordPressManualPostMock).not.toHaveBeenCalled()
+  })
+
   it('WordPress workflow를 mode 선택 시에만 lazy 렌더링하고 전환만으로 저장하지 않는다', async () => {
     renderPage()
     expect(screen.queryByLabelText('WordPress HTML 원문')).not.toBeInTheDocument()
@@ -274,7 +288,7 @@ describe('ImportPageContent', () => {
     expect(saveWordPressManualPostMock).not.toHaveBeenCalled()
   })
 
-  it('세 mode의 UI state와 persistence 경계를 서로 격리한다', async () => {
+  it('네 mode의 UI state와 persistence 경계를 서로 격리한다', async () => {
     const user = userEvent.setup()
     renderPage()
     await user.click(screen.getByRole('radio', { name: 'WordPress HTML 붙여넣기' }))
@@ -285,6 +299,9 @@ describe('ImportPageContent', () => {
     await user.click(screen.getByRole('radio', { name: '기존 JSON Import' }))
     expect(screen.getByLabelText('JSON 파일')).toBeInTheDocument()
     expect(screen.queryByLabelText('구조화 ChatGPT 응답 plain text')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('radio', { name: '비뉴스 일반 응답 붙여넣기' }))
+    expect(await screen.findByLabelText('비뉴스 canonical 10-section 응답 plain text')).toBeInTheDocument()
+    expect(screen.queryByLabelText('JSON 파일')).not.toBeInTheDocument()
     expect(prepareImportJobMock).not.toHaveBeenCalled()
     expect(saveChatGptPastePostMock).not.toHaveBeenCalled()
     expect(saveWordPressManualPostMock).not.toHaveBeenCalled()

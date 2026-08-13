@@ -1309,6 +1309,24 @@ category, topic, angle/focus, additional instruction, 활성 wrapper·표시 ID�
 
 생성 prompt와 validation 결과는 저장하지 않는다. Phase 5J는 migration·RPC·RLS·DB query/write, 외부 AI/API, WordPress write/publish, image upload/storage를 추가하지 않으며 Phase 5I와 news prompt, Phase 5G·5H import 동작을 변경하지 않는다.
 
+### 11.5 Phase 5K 비뉴스 일반 응답 가져오기
+
+Phase 5K는 기존 `/imports`에 `non-news-response`(`비뉴스 일반 응답 붙여넣기`) mode를 추가한다. 새 route나 navigation은 만들지 않으며 활성 `ai-column`, `info-db`, `chinese-study`만 사용자가 명시적으로 선택할 수 있다. 응답 제목·slug·HTML·wrapper·문맥에서 카테고리를 추론하지 않고 선택한 활성 category setting의 content group, wrapper, display-ID pattern과 slug pattern을 권한으로 사용한다.
+
+Phase 5J가 요구한 사람용 10-section 응답은 정확한 번호·문구·순서로만 수용한다. BOM, CRLF와 문서·제목 바깥 공백만 정규화하며 alias, 번역, Markdown heading, fuzzy/AI 복구, preamble·epilogue, 누락·중복·순서 변경을 허용하지 않는다. 대안 제목은 정확히 네 개의 `- ` 항목, 태그는 5~8개의 `- ` 항목, checklist는 하나 이상의 `- ` 항목이어야 한다. HTML은 소문자 `html` label의 fenced code block 하나만 허용하고 section 내부의 주변 prose나 추가 code block을 차단한다.
+
+모든 지원 카테고리는 저장 전 사용자가 1 이상의 `series_no`를 직접 입력해야 한다. 다음 번호를 DB·게시물 수·날짜·제목·slug에서 조회하거나 추정하지 않는다. AI 칼럼과 정보DB의 표시 ID·slug는 활성 pattern과 입력 번호로만 해소한다. 중국어 학습 raw 응답의 literal `[번호]`는 허용하지만 대표 제목과 유일한 `<h1>`에서 직접 입력 번호로 해소하고 slug pattern을 적용한다. 저장 payload에는 `[번호]`, `###`가 남을 수 없고 중국어 `display_id`는 `null`이며 브리핑 ID를 만들지 않는다.
+
+분석 뒤 category, series number, 대표·대안 제목, meta, slug, focus keyword, tags, WordPress HTML, image prompt·ALT, checklist와 HTML에서 오프라인 추출한 source 후보를 편집할 수 있다. HTML은 `DOMParser`로 inert 검사하고 live DOM에 mount하거나 `dangerouslySetInnerHTML`을 사용하지 않는다. `script`, active embed/form/style 계열 요소, event/style/srcdoc·submission 속성과 `javascript:`, `data:`, `vbscript:` scheme을 차단한다. wrapper는 선택한 setting과 일치해야 하고 `<h1>`은 정확히 하나이며 정규화한 그 text가 저장 콘텐츠 제목이 된다. SEO 대표 제목은 별도 값이다. image prompt가 HTML 안에 있으면 차단한다.
+
+검증 상태는 `valid`, `warning`, `invalid`뿐이다. 경고는 명시적 확인 후에만 저장할 수 있고 관련 값이나 활성 setting이 바뀌면 확인을 초기화한다. 수정 시 마지막 preview는 유지하지만 stale로 표시하고 중복 결과와 저장 자격을 무효화하며 명시적 재검증을 요구한다. 현재 검증 후 slug, category+series number, 중국어 원문 URL의 exact duplicate를 기존 infrastructure로 조회한다. `complete`이며 clear인 결과만 허용하고 저장 직전에 최종 값으로 다시 조회한다. `partial`, `unavailable`, 새 중복은 저장하지 않으며 overwrite·fuzzy·AI 중복 판정은 없다.
+
+최종 확인에는 category, 유일한 `<h1>`에서 얻은 제목, slug, application `draft`, 한 번의 write 의도를 표시한다. 저장은 기존 `saveChatGptPastePost`/`save_chatgpt_paste_post` 경계를 그대로 사용해 content, SEO, image prompt·ALT, sources, HTML allowlist만 보낸다. raw 응답과 checklist, owner·auth·내부 UUID·status·provenance·credential은 payload에 포함하지 않는다. server가 owner, draft, `chatgpt_paste` provenance와 transaction을 계속 강제한다. 한 번에 하나의 save만 허용하고 불명확한 결과를 자동 재시도하지 않으며 backend 상세 오류는 노출하지 않는다.
+
+Phase 5K는 외부 AI·source URL fetch·WordPress write·image upload/storage·background sync를 추가하지 않는다. DB schema, migration, RPC, RLS, generated type, dependency, package·lockfile, route, navigation 또는 PWA configuration을 변경하지 않으며 Phase 5G 구조화 paste, Phase 5H WordPress HTML import, Phase 5I context와 Phase 5J composer 의미를 유지한다.
+
+원래 feature 구현 범위에는 선제적이거나 자의적인 bundle budget 상향이 없었다. 완성된 Phase 5K 구현이 동결된 Phase 5J bundle/PWA threshold를 초과한 뒤 별도 evidence review에서 의도된 lazy non-news response import 기능 증가이며 의미 있게 제거할 수 있는 source bloat, PWA configuration 결함 또는 baseline/tooling 결함이 아님을 확인했다. 그 검증 근거로 `config/bundle-budget.json`의 threshold만 명시적으로 승인된 bounded 범위에서 조정했다. `config/bundle-baseline.json`과 hybrid budget algorithm은 변경하지 않았고 dependency, package·lockfile 또는 PWA configuration 변경도 없었다. 이 사후 정책 조정은 제품 동작 계약을 변경하거나 근거 없는 사전 budget 조정·algorithm 변경을 허용하지 않는다.
+
 ---
 
 ## 12. 화면 설계

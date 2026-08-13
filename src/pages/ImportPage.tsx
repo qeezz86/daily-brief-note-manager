@@ -25,6 +25,12 @@ const WordPressHtmlImportWorkflow = lazy(() =>
   })),
 )
 
+const NonNewsResponseImportWorkflow = lazy(() =>
+  import('../features/imports/NonNewsResponseImportWorkflow').then((module) => ({
+    default: module.NonNewsResponseImportWorkflow,
+  })),
+)
+
 const emptyDuplicateReferenceData = { posts: [], chineseUrls: [], newsTopics: [], existingTagKeys: [] }
 
 function record(value: unknown): Record<string, unknown> | null { return value !== null && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : null }
@@ -53,7 +59,7 @@ export function ImportPageContent({
   const [moduleLoadError, setModuleLoadError] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [copyMessage, setCopyMessage] = useState<string | null>(null)
-  const [importMode, setImportMode] = useState<'json' | 'chatgpt-paste' | 'wordpress-html'>('json')
+  const [importMode, setImportMode] = useState<'json' | 'chatgpt-paste' | 'non-news-response' | 'wordpress-html'>('json')
   const mountedRef = useRef(true)
   const resultText = useMemo(() => result ? JSON.stringify(result, null, 2) : '', [result])
   const categories = useMemo(() => categoriesQuery.data ?? [], [categoriesQuery.data])
@@ -157,6 +163,7 @@ export function ImportPageContent({
       <legend>가져오기 방식</legend>
       <label><input type="radio" name="import-mode" value="json" checked={importMode === 'json'} onChange={() => setImportMode('json')} /> 기존 JSON Import</label>
       <label><input type="radio" name="import-mode" value="chatgpt-paste" checked={importMode === 'chatgpt-paste'} onChange={() => setImportMode('chatgpt-paste')} /> ChatGPT 구조화 붙여넣기</label>
+      <label><input type="radio" name="import-mode" value="non-news-response" checked={importMode === 'non-news-response'} onChange={() => setImportMode('non-news-response')} /> 비뉴스 일반 응답 붙여넣기</label>
       <label><input type="radio" name="import-mode" value="wordpress-html" checked={importMode === 'wordpress-html'} onChange={() => setImportMode('wordpress-html')} /> WordPress HTML 붙여넣기</label>
     </fieldset>
     {importMode === 'json' ? <>
@@ -175,6 +182,10 @@ export function ImportPageContent({
       </> : null}
     </> : importMode === 'chatgpt-paste' ? <Suspense fallback={<div className="content-state" role="status">ChatGPT 붙여넣기 도구를 불러오는 중입니다.</div>}>
       <ChatGptPasteWorkflow client={client} />
+    </Suspense> : importMode === 'non-news-response' ? <Suspense fallback={<div className="content-state" role="status">비뉴스 응답 가져오기 도구를 불러오는 중입니다.</div>}>
+      {categoriesQuery.isPending ? <div className="content-state" role="status">비뉴스 카테고리 설정을 불러오고 있습니다.</div> : null}
+      {categoriesQuery.isError ? <div className="content-state content-state--error" role="alert">비뉴스 카테고리 설정을 불러오지 못했습니다.</div> : null}
+      <NonNewsResponseImportWorkflow client={client} categories={categories} />
     </Suspense> : <Suspense fallback={<div className="content-state" role="status">WordPress HTML 가져오기 도구를 불러오는 중입니다.</div>}>
       <WordPressHtmlImportWorkflow client={client} categories={categories} />
     </Suspense>}

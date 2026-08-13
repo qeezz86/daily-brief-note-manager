@@ -45,19 +45,19 @@ Feature roots는 다음과 같다.
 | 다른 route closure | 900 KiB | 280 KiB | 10%, 최소 16 KiB / 8 KiB |
 | Route incremental | 300 KiB | 100 KiB | 15%, 최소 8 KiB / 4 KiB |
 | Feature incremental | 250 KiB | 75 KiB | 15%, 최소 8 KiB / 4 KiB |
-| Total JS | 1,331,200 B | 정보성 | 17.6%, 최소 32,768 B |
-| PWA precache | 90 entries / 1,376,423 B | 해당 없음 | 최소 7 entries / raw 18%, 최소 32,768 B |
+| Total JS | 1,364,992 B | 정보성 | 20.6%, 최소 32,768 B |
+| PWA precache | 91 entries / 1,414,916 B | 해당 없음 | 최소 10 entries / raw 21.3%, 최소 32,768 B |
 
 각 byte metric의 유효 상한은 `min(absolute, max(baseline + minimumHeadroom, baseline + ceil(baseline × percentHeadroom)))`이다. 현재 build가 이 유효 상한을 넘으면 실패한다. 따라서 baseline, 비율 여유, 최소 여유, 절대 상한과 그 결과인 유효 상한을 서로 구분해야 한다. 별도로 모든 JS chunk는 500 KiB 이하여야 한다.
 
-현재 Phase 5J 승인 정책과 build 상태는 다음과 같다. Baseline은 과거 승인 측정값이고 current build는 Phase 5J 기능을 포함한 현재 산출물이다.
+Phase 5K 조정 정책과 최종 검증 build 상태는 다음과 같다. Baseline은 과거 승인 측정값이고 current build는 Phase 5K 기능과 최종 Playwright communication remediation을 포함해 재빌드·검증한 산출물이다. bounded 정책 조정은 이후 전체 validation에서 성공적으로 검증되었다.
 
 | Metric | Baseline | Percent headroom | Minimum headroom | Absolute limit | Effective limit | Current build | Remaining headroom |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| Total JS raw | 1,131,895 B | 17.6% | 32,768 B | 1,331,200 B | 1,331,109 B | 1,297,467 B | 33,642 B |
-| PWA precache raw | 1,166,460 B | 18% | 32,768 B | 1,376,423 B | 1,376,423 B | 1,343,580 B | 32,843 B |
+| Total JS raw | 1,131,895 B | 20.6% | 32,768 B | 1,364,992 B | 1,364,992 B | 1,331,657 B | 33,335 B |
+| PWA precache raw | 1,166,460 B | 21.3% | 32,768 B | 1,414,916 B | 1,414,916 B | 1,381,613 B | 33,303 B |
 
-PWA precache entry 정책은 절대 90 entries, baseline 대비 최소 7 entries 여유로 유지한다.
+PWA precache entry 정책은 절대 91 entries, baseline 대비 최소 10 entries 여유다. 유효 상한은 91 entries이며 현재 Phase 5K manifest도 91 entries이므로 discretionary post-build entry headroom은 0이다.
 
 ### Phase 5I와 Phase 5J 정책 이력
 
@@ -66,6 +66,18 @@ Phase 5I에서 Total JS 비율 여유는 10%에서 12%로 조정했다. PWA prec
 Phase 5J에서는 Total JS 절대 상한을 1,280,000 B에서 1,331,200 B로, 비율 여유를 12%에서 17.6%로 조정했다. PWA raw 절대 상한은 1,314,699 B에서 1,376,423 B로, 비율 여유는 12.70845121135744%에서 18%로 조정했다.
 
 Phase 5J는 승인된 Non-News Authoring Prompt Composer를 추가하며 runtime 증가는 기존 lazy non-news-context route에 격리된다. 새 third-party runtime dependency, eager-route 누출 또는 tree-shaking blocker는 발견되지 않았다. 계약을 보존하는 현실적인 최적화 여지는 약 4,000–8,000 B였지만 기존 위반 해소에는 약 29 KB 감소가 필요했으므로, 이전 정책을 맞추기 위해 승인된 기능 계약을 약화하는 방안은 채택하지 않았다. 대신 historical baseline과 checker semantics를 유지하고 현재 build 대비 약 32 KiB의 제한된 회귀 여유를 두는 정책 조정을 적용했다. 이는 bounded regression headroom adjustment이며 baseline reset, checker 완화, 무제한 예외, bundle accounting 제외 또는 checker 우회가 아니다. 이후 증가는 동일한 검토와 상한 적용을 받는다.
+
+### Phase 5K 정책 조정
+
+Phase 5K의 milestone은 `5K-C1 Non-News Human-Readable Response Import`이고 feature identifier는 `non-news-response-import`다. 새 lazy non-news response import workflow의 의도된 기능 증가가 조정 사유다.
+
+정책 증거 검토 시점의 중간 측정은 Phase 5J Total JS raw 1,297,467 B에서 Phase 5K 1,331,560 B로 34,093 B 증가한 상태였다. 새 workflow chunk `assets/NonNewsResponseImportWorkflow-A87JbnsG.js`가 raw 32,613 B이며, 나머지 JS graph/shell delta는 1,480 B였다. 같은 시점의 PWA precache raw는 Phase 5J 1,343,580 B에서 Phase 5K 1,381,516 B로 37,936 B 증가했고, 이 가운데 JS contribution은 34,093 B, CSS contribution은 3,843 B였다. 이 1,331,560 B와 1,381,516 B는 최종 Playwright communication remediation과 재빌드 전의 증거 검토 측정값이며 최종 검증값이 아니다. PWA entry 수는 당시와 최종 모두 91이다.
+
+Evidence review는 legitimate feature growth를 `True`로, avoidable implementation bloat, PWA configuration defect, baseline/tooling defect와 meaningful low-risk optimization available을 모두 `False`로 판정했다. Baseline reset은 필요하지 않다.
+
+이에 따라 Total JS raw 정책은 absolute 1,364,992 B, percent headroom 20.6%, minimum headroom 32,768 B로 조정했다. effective allowance는 1,364,992 B이며 최종 검증값 1,331,657 B의 headroom은 33,335 B다. PWA precache raw 정책은 absolute 1,414,916 B, percent headroom 21.3%, minimum headroom 32,768 B로 조정했으며, effective allowance는 1,414,916 B이고 최종 검증값 1,381,613 B의 headroom은 33,303 B다. PWA precache entry 정책은 absolute 91, minimum headroom 10으로 조정했으며 effective allowance와 최종 검증값은 모두 91 entries라 post-build discretionary headroom은 0 entries다.
+
+Historical baseline과 hybrid budget algorithm은 변경하지 않았다. Source optimization은 필요하지 않았고 production behavior를 약화하지 않았다. Dependency, package, lockfile 변경도 필요하지 않았으며 PWA configuration도 그대로다. 이 조정은 bounded Phase 5I/5J budget policy convention을 따른다. 조정 후 최종 bundle/PWA validation은 `PASSED`이며 violations 0, warnings 0이다. WordPress production readiness와 Playwright도 최종 validation authority에서 모두 통과했다.
 
 ## 현재 승인 baseline
 
