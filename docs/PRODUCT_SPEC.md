@@ -1327,6 +1327,24 @@ Phase 5K는 외부 AI·source URL fetch·WordPress write·image upload/storage·
 
 원래 feature 구현 범위에는 선제적이거나 자의적인 bundle budget 상향이 없었다. 완성된 Phase 5K 구현이 동결된 Phase 5J bundle/PWA threshold를 초과한 뒤 별도 evidence review에서 의도된 lazy non-news response import 기능 증가이며 의미 있게 제거할 수 있는 source bloat, PWA configuration 결함 또는 baseline/tooling 결함이 아님을 확인했다. 그 검증 근거로 `config/bundle-budget.json`의 threshold만 명시적으로 승인된 bounded 범위에서 조정했다. `config/bundle-baseline.json`과 hybrid budget algorithm은 변경하지 않았고 dependency, package·lockfile 또는 PWA configuration 변경도 없었다. 이 사후 정책 조정은 제품 동작 계약을 변경하거나 근거 없는 사전 budget 조정·algorithm 변경을 허용하지 않는다.
 
+### 11.6 Phase 5L 뉴스 사람용 응답 가져오기
+
+Phase 5L는 기존 `/imports`에 lazy-loaded `news-response`(`뉴스 일반 응답 붙여넣기`) mode를 추가한다. 새 route와 전역 navigation은 만들지 않고, 활성 상태이며 `content_group=news`인 category만 선택할 수 있다. 사용자는 category와 Asia/Seoul 의미의 `YYYY-MM-DD` 브리핑 날짜를 직접 지정한다. 현재 날짜나 pasted ID를 추론하지 않으며, display ID와 authoritative slug는 선택 category의 비어 있지 않은 `display_id_pattern`·`slug_pattern` 안의 대소문자가 정확한 `YYYY-MM-DD`를 명시 날짜로 치환해 결정한다. 편집한 slug가 authoritative 값과 다르면 저장을 차단한다.
+
+parser는 다음 heading을 문구·숫자·순서까지 정확히 한 번씩만 허용한다: `1. SEO 입력용 대표 제목`, `2. SEO 대안 제목 4개`, `3. 메타 설명`, `4. URL 슬러그`, `5. 포커스 키워드`, `6. SEO 태그 5~8개`, `7. 워드프레스 본문용 HTML`, `8. 대표 이미지 프롬프트`, `9. 이미지 ALT 문구`, `10. 발행 전 체크리스트`. 선두 BOM 하나와 line ending, 문서·heading의 바깥 공백만 정규화한다. alias·번역·fuzzy/AI 복구, preamble·epilogue, 알 수 없는 번호 heading, 누락·중복·순서 변경은 invalid다. 대안 제목은 정확히 네 개, tag는 5~8개, checklist는 하나 이상의 비어 있지 않은 `- ` 항목이다. HTML section은 주변 prose가 없는 소문자 `html` fenced block 정확히 하나다.
+
+review는 대표·대안 제목, meta, slug, focus keyword, tags, HTML text, image prompt·ALT, checklist와 source 행을 편집할 수 있지만 pasted HTML을 mount하거나 `dangerouslySetInnerHTML`로 렌더링하지 않는다. 검증은 DOMParser로 top-level wrapper `DIV` 하나와 최종 닫힘, runtime wrapper class의 order-insensitive exact set, `<h1>` 하나, 공백 정규화 후 대표 제목과 `<h1>` 일치, executable element·attribute·active scheme 차단을 확인한다. image prompt는 HTML 밖에 있어야 한다. SEO는 대표 제목, 대안 네 개, meta·focus keyword, tag 5~8개와 중복·카테고리·brand 정책을 적용하고 meta 120~160 Unicode code point 이탈은 warning이다.
+
+source는 현재 review HTML의 `#sources`에서만 오프라인 추출한다. 기관·제목·절대 HTTP(S) URL·확인 포인트가 필수이고 게시/업데이트 시각은 선택적인 parseable datetime이다. fragment와 trailing slash를 정규화한 중복 행은 invalid이며 root homepage 또는 기존 query 정책이 식별하는 검색 URL은 경고한다. URL을 fetch하거나 source 내용을 합성하지 않는다. checklist와 raw response는 저장하지 않는다.
+
+authoritative 후보 변경과 runtime category 설정 변경은 유지된 preview를 stale로 표시하고 validation, duplicate 결과, warning 승인과 최종 확인을 revision 단위로 무효화한다. 명시적 재검증 뒤 slug, category+briefing date, display ID와 `trim → Unicode whitespace collapse → toLocaleLowerCase('en-US')` normalized exact title을 독립적으로 조회한다. `complete`이며 모두 clear인 결과만 진행하고 최종 save 직전에 같은 authority를 다시 확인한다. `partial`, `unavailable`, exact match는 차단하며 fuzzy·similarity, overwrite·upsert는 없다.
+
+최종 확인은 category, 브리핑 날짜, 최종 대표 제목, derived display ID, slug, `draft`와 한 번의 write 의도를 표시한다. 기존 `saveChatGptPastePost`/`save_chatgpt_paste_post` 경계로 content·SEO·image prompt/ALT·reviewed sources·HTML allowlist만 보내며 server가 owner, status, provenance와 내부 ID를 계속 소유한다. 동시에 하나의 save만 허용하고 성공 revision의 반복 저장을 차단한다. 실패 결과는 backend 상세를 redaction한 고정 안내를 표시하고 자동 재시도하지 않으며 후보를 유지한 채 사용자가 최종 확인을 다시 열어 수동 재시도할 수 있다. 성공하면 `/content/{createdPostId}`로 이동한다.
+
+Phase 5L는 news topic 생성·매칭, news update·previous link·follow-up·closure/reopen persistence, tracking inference와 `NEWS_TRACKING_JSON`을 구현하지 않는다. 외부 AI/source fetch, WordPress write/publish, bulk import, category editor, image upload/storage, DB migration·RPC·RLS·generated type, package/lock, bundle policy, PWA configuration도 변경하지 않는다.
+
+기능 구현 후 별도 bundle evidence review를 수행했다. Phase 5L가 의도적으로 추가한 lazy news-response workflow의 필수 PWA entry는 `NewsResponseImportWorkflow`와 `responseImportHtml`이며 측정된 순 JS/PWA 증가는 33,954 B다. 기존 정책 한도를 해소할 만큼 충분한 회귀 위험이 낮은 source bloat는 확인되지 않아 hard-limit threshold만 제한적으로 조정했다. Baseline과 checker logic은 그대로이며 route, dependency/package/lock, PWA configuration, chunk/vendor policy와 제품 동작에는 변화가 없다.
+
 ---
 
 ## 12. 화면 설계

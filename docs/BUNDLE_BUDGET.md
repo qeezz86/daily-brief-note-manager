@@ -45,8 +45,8 @@ Feature roots는 다음과 같다.
 | 다른 route closure | 900 KiB | 280 KiB | 10%, 최소 16 KiB / 8 KiB |
 | Route incremental | 300 KiB | 100 KiB | 15%, 최소 8 KiB / 4 KiB |
 | Feature incremental | 250 KiB | 75 KiB | 15%, 최소 8 KiB / 4 KiB |
-| Total JS | 1,364,992 B | 정보성 | 20.6%, 최소 32,768 B |
-| PWA precache | 91 entries / 1,414,916 B | 해당 없음 | 최소 10 entries / raw 21.3%, 최소 32,768 B |
+| Total JS | 1,398,784 B | 정보성 | 23.6%, 최소 32,768 B |
+| PWA precache | 93 entries / 1,448,744 B | 해당 없음 | 최소 12 entries / raw 24.2%, 최소 32,768 B |
 
 각 byte metric의 유효 상한은 `min(absolute, max(baseline + minimumHeadroom, baseline + ceil(baseline × percentHeadroom)))`이다. 현재 build가 이 유효 상한을 넘으면 실패한다. 따라서 baseline, 비율 여유, 최소 여유, 절대 상한과 그 결과인 유효 상한을 서로 구분해야 한다. 별도로 모든 JS chunk는 500 KiB 이하여야 한다.
 
@@ -78,6 +78,19 @@ Evidence review는 legitimate feature growth를 `True`로, avoidable implementat
 이에 따라 Total JS raw 정책은 absolute 1,364,992 B, percent headroom 20.6%, minimum headroom 32,768 B로 조정했다. effective allowance는 1,364,992 B이며 최종 검증값 1,331,657 B의 headroom은 33,335 B다. PWA precache raw 정책은 absolute 1,414,916 B, percent headroom 21.3%, minimum headroom 32,768 B로 조정했으며, effective allowance는 1,414,916 B이고 최종 검증값 1,381,613 B의 headroom은 33,303 B다. PWA precache entry 정책은 absolute 91, minimum headroom 10으로 조정했으며 effective allowance와 최종 검증값은 모두 91 entries라 post-build discretionary headroom은 0 entries다.
 
 Historical baseline과 hybrid budget algorithm은 변경하지 않았다. Source optimization은 필요하지 않았고 production behavior를 약화하지 않았다. Dependency, package, lockfile 변경도 필요하지 않았으며 PWA configuration도 그대로다. 이 조정은 bounded Phase 5I/5J budget policy convention을 따른다. 조정 후 최종 bundle/PWA validation은 `PASSED`이며 violations 0, warnings 0이다. WordPress production readiness와 Playwright도 최종 validation authority에서 모두 통과했다.
+
+### Phase 5L 정책 조정
+
+Phase 5L의 milestone은 `5L-C1 News Human-Readable Response Import`다. 별도 bundle evidence review에서 기존 `/imports` route를 재사용하는 lazy news-response workflow의 측정값은 Total JS raw 1,365,611 B, PWA precache raw 1,415,567 B, PWA precache 93 entries였다. Phase 5L의 순 JS/PWA 증가는 33,954 B이며, `NewsResponseImportWorkflow` +31,718 B, `responseImportHtml` +2,860 B, `ImportPage` +1,022 B, `importDuplicates.repository` +569 B와 기존 `NonNewsResponseImportWorkflow` -2,215 B offset으로 구성된다. `NewsResponseImportWorkflow`와 `responseImportHtml`이라는 두 개의 필수 lazy PWA entry가 추가되었지만 새 route는 없다.
+
+| Metric | Baseline | Percent headroom | Minimum headroom | Absolute limit | Current measured | Remaining headroom |
+|---|---:|---:|---:|---:|---:|---:|
+| Total JS raw | 1,131,895 B | 23.6% | 32,768 B | 1,398,784 B | 1,365,611 B | 33,173 B |
+| PWA precache raw | 1,166,460 B | 24.2% | 32,768 B | 1,448,744 B | 1,415,567 B | 33,177 B |
+
+Total JS raw 정책은 absolute 1,398,784 B, percentHeadroom 0.236, minimumHeadroom 32,768 B이고 PWA precache raw 정책은 absolute 1,448,744 B, percentHeadroom 0.242, minimumHeadroom 32,768 B다. PWA precache entry 정책은 absolute 93, minimumHeadroom 12이며 현재 측정값도 93 entries이므로 discretionary headroom은 0이다. 계약을 보존하면서 기존 한도를 해소할 만큼 충분한 안전한 source 축소 근거가 없어 Phase 5J/5K의 bounded-threshold convention에 따라 hard limit만 조정했다. Historical baseline과 bundle checker semantics는 변경하지 않았다.
+
+이 조정은 제품 동작 확장이 아닌 정책 threshold 조정이다. 새 dependency, package/lock 변경, PWA configuration 변경 또는 vendor/chunk policy 변경은 없으며, `npm run bundle:check`는 이후 Gate에서 다시 실행해야 한다.
 
 ## 현재 승인 baseline
 

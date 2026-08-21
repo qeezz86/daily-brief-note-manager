@@ -173,6 +173,8 @@ export type ImportDuplicateReferenceData = Omit<ImportReferenceData, 'categories
 
 export interface ImportDuplicateCandidates {
   slugs: string[]
+  displayIds?: string[]
+  normalizedTitles?: string[]
   wordpressUrls: string[]
   briefingDates: string[]
   seriesNumbers: number[]
