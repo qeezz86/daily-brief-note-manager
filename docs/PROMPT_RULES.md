@@ -448,6 +448,18 @@ Phase 5K `non-news-response` import는 Phase 5J의 논리적 10개 결과를 다
 
 응답은 편집 가능한 inert preview로 전환한 뒤 DOMParser HTML 안전성, wrapper, 단일 `<h1>`, SEO, image prompt 위치, source와 protected field를 결정적으로 검증한다. 관련 edit·setting 변경은 stale 상태와 warning 승인·duplicate 결과 초기화를 일으킨다. current validation 뒤와 최종 save 직전에 exact duplicate를 검사하며 complete·clear만 진행한다. 최종 category/title/slug/draft 확인 후 기존 ChatGPT-paste draft 저장 경계의 allowlist만 사용한다. raw response와 checklist는 저장하지 않고 외부 AI, source fetch, WordPress write, migration은 없다. Phase 5G/5H/5I/5J 의미는 변경하지 않는다.
 
+### 9.6 Phase 5L 뉴스 사람용 응답 handoff
+
+뉴스 프롬프트의 사람용 결과를 `/imports`의 `news-response` mode로 전달할 때 heading은 정확히 `1. SEO 입력용 대표 제목`, `2. SEO 대안 제목 4개`, `3. 메타 설명`, `4. URL 슬러그`, `5. 포커스 키워드`, `6. SEO 태그 5~8개`, `7. 워드프레스 본문용 HTML`, `8. 대표 이미지 프롬프트`, `9. 이미지 ALT 문구`, `10. 발행 전 체크리스트` 순서다. 번호·문구·spacing을 바꾸거나 Markdown heading, preamble·epilogue, alias·번역을 추가하지 않는다. 대안 제목은 정확히 네 개, tag는 5~8개, checklist는 하나 이상의 `- ` 목록이며 HTML은 소문자 `html` fenced block 정확히 하나다.
+
+응답에 display ID를 붙여넣더라도 import authority가 되지 않는다. 사용자는 활성 news category와 Asia/Seoul date-only 브리핑 날짜를 직접 선택하고 import가 runtime display-ID/slug pattern의 literal `YYYY-MM-DD`로 두 값을 결정한다. 응답의 slug는 그 authoritative slug와 정확히 같아야 한다. 대표 제목은 저장 제목이며 normalized `<h1>`과 일치해야 한다.
+
+review는 pasted HTML을 실행하지 않고 DOMParser로 wrapper·h1·security를 검사한다. source는 reviewed HTML `#sources`에서만 추출하며 외부 fetch나 source synthesis가 없다. image prompt와 ALT는 별도 section에 두고 image prompt를 WordPress HTML에 포함하지 않는다. checklist와 raw response는 draft payload에 들어가지 않는다.
+
+관련 수정과 category setting 변경은 이전 authority를 stale로 만든다. 명시적 validation 뒤 slug, category+date, display ID와 normalized exact title의 complete·clear duplicate result, revision-bound warning 승인과 최종 확인이 필요하고 save 직전에 다시 조회한다. 저장은 기존 draft-only ChatGPT paste 경계로 한 번만 시도한다. 자동 retry, overwrite/upsert, fuzzy parser/duplicate, WordPress publish, 외부 AI/source call은 없다.
+
+이 handoff는 article text의 `신규`, `후속`, `업데이트`, `종료` 같은 표현을 tracking 신호로 해석하지 않는다. news topic·update·previous update·follow-up·closure/reopen을 만들거나 저장하지 않고 `NEWS_TRACKING_JSON`도 받거나 지속하지 않는다. DB/RPC/RLS/generated type, package, bundle policy와 PWA configuration은 변경하지 않는다.
+
 ## 10. 생성 기록
 
 프롬프트 생성 기록은 `generated_prompts`에 저장한다.

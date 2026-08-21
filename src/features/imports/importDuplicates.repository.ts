@@ -75,6 +75,8 @@ export function collectImportDuplicateCandidates(input: unknown): ImportDuplicat
 
   return {
     slugs: uniqueTrimmedStrings(records.map((post) => post.slug)),
+    displayIds: uniqueTrimmedStrings(records.map((post) => post.displayId)),
+    normalizedTitles: uniqueTrimmedStrings(records.map((post) => post.title), normalizeExactImportTitle),
     wordpressUrls: uniqueTrimmedStrings(records.map((post) => post.wordpressUrl)),
     briefingDates: uniqueTrimmedStrings(records.map((post) => post.briefingDate)),
     seriesNumbers: [...new Set(records
@@ -91,6 +93,18 @@ export function collectImportDuplicateCandidates(input: unknown): ImportDuplicat
       (value) => value.trim().toLocaleLowerCase('en-US'),
     ),
   }
+}
+
+// This is intentionally identical to briefing prompt exact-headline normalization.
+export function normalizeExactImportTitle(value: string) {
+  return value.trim().replace(/\s+/gu, ' ').toLocaleLowerCase('en-US')
+}
+
+export function escapedTitlePrefilter(value: string) {
+  return `%${normalizeExactImportTitle(value)
+    .split(' ')
+    .map((part) => part.replace(/[\\%_",()]/gu, (character) => `\\${character}`))
+    .join('%')}%`
 }
 
 export async function queryImportCandidatesInChunks<TValue, TRow>(
@@ -156,6 +170,15 @@ export async function getImportDuplicateReferenceData(
     const result = await client.from('posts').select(postProjection).in('slug', chunk)
     return result as unknown as ChunkQueryResponse<PostRow>
   })
+  const displayIdRows = await queryImportCandidatesInChunks(candidates.displayIds ?? [], async (chunk) => {
+    const result = await client.from('posts').select(postProjection).in('display_id', chunk)
+    return result as unknown as ChunkQueryResponse<PostRow>
+  })
+  const titleRows = await queryImportCandidatesInChunks(candidates.normalizedTitles ?? [], async (chunk) => {
+    const filters = chunk.map((title) => `title.ilike."${escapedTitlePrefilter(title)}"`).join(',')
+    const result = await client.from('posts').select(postProjection).or(filters)
+    return result as unknown as ChunkQueryResponse<PostRow>
+  })
   const wordpressRows = await queryImportCandidatesInChunks(candidates.wordpressUrls, async (chunk) => {
     const result = await client.from('posts').select(postProjection).in('wordpress_url', chunk)
     return result as unknown as ChunkQueryResponse<PostRow>
@@ -177,11 +200,13 @@ export async function getImportDuplicateReferenceData(
     return result as unknown as ChunkQueryResponse<NewsTopicRow>
   })
 
-  const chunkResults = [slugRows, wordpressRows, newsRows, seriesRows, chineseRows, topicRows]
+  const chunkResults = [slugRows, displayIdRows, titleRows, wordpressRows, newsRows, seriesRows, chineseRows, topicRows]
   const successfulChunks = chunkResults.reduce((total, result) => total + result.successfulChunks, 0)
   const failedChunks = chunkResults.reduce((total, result) => total + result.failedChunks, 0)
   const posts = mergeRowsDeterministically([
     ...slugRows.rows,
+    ...displayIdRows.rows,
+    ...titleRows.rows.filter((row) => (candidates.normalizedTitles ?? []).includes(normalizeExactImportTitle(row.title))),
     ...wordpressRows.rows,
     ...newsRows.rows,
     ...seriesRows.rows,

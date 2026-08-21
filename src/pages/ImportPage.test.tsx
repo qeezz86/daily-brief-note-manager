@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import type { DatabaseClient } from '../shared/supabase/client'
 import * as importAnalysisModule from '../features/imports/importAnalysis.module'
 import { importCategories, validImportBundle } from '../features/imports/imports.fixtures'
@@ -36,8 +36,10 @@ const validPasteText = `[CONTENT_META_JSON]\n{"contentGroup":"news","category":"
 
 function renderPage(loadAnalysisModule: () => Promise<typeof importAnalysisModule> = () => Promise.resolve(importAnalysisModule)) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  return { ...render(<QueryClientProvider client={queryClient}><MemoryRouter><ImportPageContent client={client} userId="owner" loadAnalysisModule={loadAnalysisModule} /></MemoryRouter></QueryClientProvider>), queryClient }
+  return { ...render(<QueryClientProvider client={queryClient}><MemoryRouter initialEntries={['/imports']}><Routes><Route path="/imports" element={<><ImportPageContent client={client} userId="owner" loadAnalysisModule={loadAnalysisModule} /><LocationProbe /></>} /></Routes></MemoryRouter></QueryClientProvider>), queryClient }
 }
+
+function LocationProbe() { return <output data-testid="import-location">{useLocation().pathname}</output> }
 
 async function switchToTextAndValidate(text = validText) {
   const user = userEvent.setup()
@@ -77,7 +79,7 @@ describe('ImportPageContent', () => {
     expect(loadAnalysisModule).not.toHaveBeenCalled()
 
     const validation = switchToTextAndValidate()
-    expect(await screen.findByRole('status')).toHaveTextContent('가져오기 분석 도구를 불러오는 중입니다.')
+    expect(await screen.findByText('가져오기 분석 도구를 불러오는 중입니다.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '검증 중' })).toBeDisabled()
     await act(async () => { resolve(importAnalysisModule) })
     await validation
@@ -245,15 +247,39 @@ describe('ImportPageContent', () => {
     expect(screen.queryByRole('button', { name: '결과 복사' })).not.toBeInTheDocument()
   })
 
-  it('기존 JSON, ChatGPT, WordPress HTML과 새 비뉴스 응답을 접근 가능한 additive mode로 제공하고 JSON을 기본 유지한다', () => {
+  it('기존 mode와 새 뉴스·비뉴스 응답을 접근 가능한 additive mode로 제공하고 JSON을 기본 유지한다', () => {
     renderPage()
     expect(screen.getByRole('radio', { name: '기존 JSON Import' })).toBeChecked()
     expect(screen.getByRole('radio', { name: 'ChatGPT 구조화 붙여넣기' })).not.toBeChecked()
+    expect(screen.getByRole('radio', { name: '뉴스 일반 응답 붙여넣기' })).not.toBeChecked()
     expect(screen.getByRole('radio', { name: '비뉴스 일반 응답 붙여넣기' })).not.toBeChecked()
     expect(screen.getByRole('radio', { name: 'WordPress HTML 붙여넣기' })).not.toBeChecked()
     expect(screen.getByRole('group', { name: '가져오기 방식' })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'ChatGPT 구조화 응답 붙여넣기' })).not.toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'WordPress HTML 붙여넣기' })).not.toBeInTheDocument()
+  })
+
+  it('뉴스 일반 응답 mode를 기존 /imports 경계에서 lazy 렌더링하고 전환만으로 저장하지 않는다', async () => {
+    renderPage()
+    expect(screen.queryByLabelText('뉴스 canonical 10-section 응답 plain text')).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('radio', { name: '뉴스 일반 응답 붙여넣기' }))
+    expect(await screen.findByRole('heading', { name: '뉴스 일반 응답 붙여넣기' })).toBeInTheDocument()
+    expect(screen.getByLabelText('뉴스 카테고리')).toBeInTheDocument()
+    expect(screen.getByLabelText('브리핑 날짜')).toHaveAttribute('type', 'date')
+    expect(screen.getByLabelText('뉴스 canonical 10-section 응답 plain text')).toBeInTheDocument()
+    expect(prepareImportJobMock).not.toHaveBeenCalled()
+    expect(saveChatGptPastePostMock).not.toHaveBeenCalled()
+    expect(saveWordPressManualPostMock).not.toHaveBeenCalled()
+  })
+
+  it('resolves the news-response lazy boundary at the existing /imports route', async () => {
+    renderPage()
+    expect(screen.getByTestId('import-location')).toHaveTextContent('/imports')
+    expect(screen.getByRole('heading', { name: '콘텐츠 가져오기' })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('radio', { name: '뉴스 일반 응답 붙여넣기' }))
+    expect(await screen.findByRole('heading', { name: '뉴스 일반 응답 붙여넣기' })).toBeInTheDocument()
+    expect(screen.getByTestId('import-location')).toHaveTextContent('/imports')
+    expect(screen.getByLabelText('뉴스 canonical 10-section 응답 plain text')).toBeInTheDocument()
   })
 
   it('붙여넣기 mode 전환만으로 persistence를 호출하지 않는다', async () => {
@@ -288,7 +314,7 @@ describe('ImportPageContent', () => {
     expect(saveWordPressManualPostMock).not.toHaveBeenCalled()
   })
 
-  it('네 mode의 UI state와 persistence 경계를 서로 격리한다', async () => {
+  it('다섯 mode의 UI state와 persistence 경계를 서로 격리한다', async () => {
     const user = userEvent.setup()
     renderPage()
     await user.click(screen.getByRole('radio', { name: 'WordPress HTML 붙여넣기' }))
@@ -302,6 +328,9 @@ describe('ImportPageContent', () => {
     await user.click(screen.getByRole('radio', { name: '비뉴스 일반 응답 붙여넣기' }))
     expect(await screen.findByLabelText('비뉴스 canonical 10-section 응답 plain text')).toBeInTheDocument()
     expect(screen.queryByLabelText('JSON 파일')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('radio', { name: '뉴스 일반 응답 붙여넣기' }))
+    expect(await screen.findByLabelText('뉴스 canonical 10-section 응답 plain text')).toBeInTheDocument()
+    expect(screen.queryByLabelText('비뉴스 canonical 10-section 응답 plain text')).not.toBeInTheDocument()
     expect(prepareImportJobMock).not.toHaveBeenCalled()
     expect(saveChatGptPastePostMock).not.toHaveBeenCalled()
     expect(saveWordPressManualPostMock).not.toHaveBeenCalled()

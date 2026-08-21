@@ -599,6 +599,35 @@ WordPress HTML은 `DOMParser`로만 구조를 읽고 화면에는 escaped textar
 
 최종 확인은 category, `<h1>` 제목, slug, `draft`, 한 건 write 의도를 표시한다. 기존 `save_chatgpt_paste_post` RPC에 현재 allowlisted content/SEO/image/source/HTML만 전달하며 raw response와 checklist, protected/server-owned field는 전달하지 않는다. 외부 AI·source fetch·WordPress write·자동 publish는 없고 DB migration도 없다.
 
+### 12.2 Phase 5L 뉴스 사람용 응답 Import
+
+`/imports`의 별도 `news-response` mode는 활성 `content_group=news` category와 명시적인 `YYYY-MM-DD` 브리핑 날짜를 먼저 선택하고 다음 heading 열 개를 exact parser로 처리한다.
+
+```text
+1. SEO 입력용 대표 제목
+2. SEO 대안 제목 4개
+3. 메타 설명
+4. URL 슬러그
+5. 포커스 키워드
+6. SEO 태그 5~8개
+7. 워드프레스 본문용 HTML
+8. 대표 이미지 프롬프트
+9. 이미지 ALT 문구
+10. 발행 전 체크리스트
+```
+
+heading은 바깥 space/tab만 trim한 뒤 완전히 같아야 하며 각 heading이 정확히 한 번 canonical 순서로 나타나야 한다. 선두 UTF-8 BOM 하나와 CRLF/bare CR→LF만 정규화한다. preamble, epilogue, unknown numbered heading, alias, 번역, fuzzy/AI fallback은 없다. scalar title·meta·slug·focus keyword·ALT는 한 줄이고 image prompt는 여러 줄일 수 있다. 대안 제목은 네 개, tag는 5~8개, checklist는 하나 이상의 정확한 `- ` 항목이다. list 내부 빈 줄과 빈 item은 invalid다. HTML은 소문자 `html` fence 하나뿐이며 fence 밖 prose, 추가 fence 또는 다른 language/case label은 invalid다.
+
+display ID와 authoritative slug는 category setting의 case-sensitive literal `YYYY-MM-DD`를 사용자가 고른 날짜로 `applyCategoryPattern`하여 만든다. pattern 누락·미해소, 잘못된 date-only 값, disabled/non-news category는 invalid다. pasted display ID와 현재 날짜는 authority가 아니다. review slug는 편집 가능하지만 derived slug와 exact match해야 한다.
+
+review는 HTML을 textarea의 inert text로만 제공한다. DOMParser 검증은 top-level wrapper div 하나, 최종 `</div>`, runtime wrapper class exact set, `<h1>` 하나와 normalized representative title 일치, blocked element(`script`, `iframe`, `object`, `embed`, `form`, `style`, `link`, `meta`, `base`), event/style/srcdoc/submission attribute와 `javascript:`, `data:`, `vbscript:` URL을 검사한다. image prompt 문자열이나 marker가 HTML에 있으면 invalid다. SEO와 checklist validation을 통과해야 하며 meta 120~160 code point와 near-duplicate/source URL 정책은 warning으로 남긴다.
+
+source 후보는 현재 HTML의 `#sources` anchor에서만 추출한다. 기관·제목·absolute HTTP(S) URL·확인 포인트가 필요하고 선택 시각은 parseable해야 한다. review에서 편집한 URL은 계속 현재 `#sources` 안에 있어야 하며 normalized URL 중복은 차단한다. `#source-check`나 HTML 밖 JSON/text, 외부 fetch로 source를 보완하지 않는다.
+
+raw response, category, date, review field, source row 또는 observable category setting이 바뀌면 candidate revision이 증가하고 이전 validation·duplicate·warning acknowledgement·confirmation은 stale이다. current validation 뒤와 save 직전에 slug, category+date, display ID, normalized exact title을 조회하며 모든 chunk가 성공한 `complete`·clear만 허용한다. title normalization은 outer trim, Unicode whitespace를 ASCII space 하나로 collapse, `toLocaleLowerCase('en-US')` 순서다. fuzzy/similarity나 overwrite/upsert는 없다.
+
+저장은 기존 `save_chatgpt_paste_post`에 news content, SEO, image prompt/ALT, reviewed sources와 `html_body`만 전달한다. checklist, raw response, parser/validation state, warning acknowledgement, tracking, owner/auth/session/internal UUID/status/provenance/credential override는 전달하지 않는다. 저장 직전 duplicate recheck 뒤 한 번만 write하며 자동 retry는 없다. ambiguous failure는 후보를 유지하고 명시적 manual retry만 허용한다. topic/update/follow-up/previous-link/closure/reopen/`NEWS_TRACKING_JSON` persistence, 외부 source/AI, WordPress write, migration/RPC/RLS 변경은 범위 밖이다.
+
 ## 13. 백업과 복구
 
 ### 13.1 JSON
