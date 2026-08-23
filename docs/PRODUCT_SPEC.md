@@ -1345,6 +1345,14 @@ Phase 5L는 news topic 생성·매칭, news update·previous link·follow-up·cl
 
 기능 구현 후 별도 bundle evidence review를 수행했다. Phase 5L가 의도적으로 추가한 lazy news-response workflow의 필수 PWA entry는 `NewsResponseImportWorkflow`와 `responseImportHtml`이며 측정된 순 JS/PWA 증가는 33,954 B다. 기존 정책 한도를 해소할 만큼 충분한 회귀 위험이 낮은 source bloat는 확인되지 않아 hard-limit threshold만 제한적으로 조정했다. Baseline과 checker logic은 그대로이며 route, dependency/package/lock, PWA configuration, chunk/vendor policy와 제품 동작에는 변화가 없다.
 
+### 11.7 Phase 5M 뉴스 추적 수동 연결
+
+Phase 5M의 NEWS_TRACKING 준비 상태는 저장 필드가 아니라 Content Detail에서 runtime category와 연결된 `news_updates` 수로 계산하는 파생 값이다. news가 아닌 콘텐츠는 `NOT_APPLICABLE`, news이면서 연결된 업데이트가 없으면 `NOT_RECORDED`, 하나 이상이면 `RECORDED`다. 연결 조회가 진행 중이거나 실패한 동안에는 `NOT_RECORDED`로 판단하지 않으며 게시물 상세는 계속 확인할 수 있다.
+
+`NOT_RECORDED`인 뉴스 게시물은 기존 뉴스 주제 목록, 뉴스 주제 신규 생성, 해당 게시물의 뉴스 항목 추가 화면으로 이동하는 명시적 수동 연결 동작을 제공한다. `RECORDED`인 게시물은 기존 연결 수와 뉴스 항목·주제·사실·출처·순서 및 상세·수정 동작을 그대로 표시한다. 뉴스 주제, 업데이트, 후속 항목과 기존 RPC가 유일한 추적 쓰기 권한이며 Content Detail에는 새 저장 경계를 추가하지 않는다.
+
+이 파생 상태를 DB에 저장하거나 기사 본문에서 추론하지 않는다. WordPress 연동, 외부 뉴스 조회, background monitoring, cron, webhook, notification 또는 자동 추적을 추가하지 않는다. Phase 5L의 응답 parser·validator·duplicate authority·save payload·성공 후 `/content/{createdPostId}` 이동·확인 및 재시도 계약은 변경하지 않는다.
+
 ---
 
 ## 12. 화면 설계

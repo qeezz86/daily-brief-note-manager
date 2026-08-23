@@ -22,6 +22,7 @@ import {
 import { supabase, type DatabaseClient } from '../shared/supabase/client'
 import { usePostNewsUpdatesQuery, useReorderNewsUpdatesMutation } from '../features/newsUpdates/newsUpdates.queries'
 import { newsUpdateTypeLabels, type NewsUpdateType } from '../features/newsUpdates/newsUpdates.types'
+import { deriveNewsTrackingReadiness } from '../features/newsUpdates/newsTrackingReadiness'
 
 interface ContentDetailPageContentProps {
   client?: DatabaseClient | null
@@ -37,17 +38,21 @@ export function ContentDetailPageContent({
   const [actionMessage, setActionMessage] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
   const postQuery = usePostQuery(client, userId, postId)
-  const seoQuery = useSeoDataQuery(client, userId, postId)
   const categoriesQuery = useActiveCategoriesQuery(client)
+  const post = postQuery.data
+  const category = categoriesQuery.data?.find(
+    (item) => item.id === post?.category_id,
+  )
+  const isNewsPost = category?.content_group === 'news'
+  const seoQuery = useSeoDataQuery(client, userId, postId)
   const tagsQuery = usePostTagsQuery(client, userId, postId)
   const sourcesQuery = usePostSourcesQuery(client, userId, postId)
   const chineseMetadataQuery = useChineseMetadataQuery(client, userId, postId)
   const aiMetadataQuery = useAiMetadataQuery(client, userId, postId)
   const infoDbMetadataQuery = useInfoDbMetadataQuery(client, userId, postId)
   const archiveMutation = useArchivePostMutation(client, userId, postId)
-  const newsUpdatesQuery = usePostNewsUpdatesQuery(client, userId, postId)
+  const newsUpdatesQuery = usePostNewsUpdatesQuery(isNewsPost ? client : null, userId, postId)
   const reorderMutation = useReorderNewsUpdatesMutation(client, userId, postId)
-  const post = postQuery.data
   const seoData = seoQuery.data
   const alternativeTitles = Array.isArray(seoData?.alternative_titles)
     ? seoData.alternative_titles.filter((value): value is string => typeof value === 'string')
@@ -58,9 +63,9 @@ export function ContentDetailPageContent({
     seoData.meta_description.trim() &&
     alternativeTitles.length === 4,
   )
-  const category = categoriesQuery.data?.find(
-    (item) => item.id === post?.category_id,
-  )
+  const newsTrackingReadiness = isNewsPost && (newsUpdatesQuery.isPending || newsUpdatesQuery.isError)
+    ? null
+    : deriveNewsTrackingReadiness(category?.content_group, newsUpdatesQuery.data?.length ?? 0)
   const difficultyLabel = (value: string | null | undefined) => {
     if (value === 'beginner') return '입문'
     if (value === 'intermediate') return '중급'
@@ -97,7 +102,7 @@ export function ContentDetailPageContent({
     try { await reorderMutation.mutateAsync(ids) } catch (cause) { setActionError(cause instanceof Error ? cause.message : '뉴스 항목 순서를 저장할 수 없습니다.') }
   }
 
-  if (postQuery.isPending || seoQuery.isPending || categoriesQuery.isPending || tagsQuery.isPending || sourcesQuery.isPending || chineseMetadataQuery.isPending || aiMetadataQuery.isPending || infoDbMetadataQuery.isPending || newsUpdatesQuery.isPending) {
+  if (postQuery.isPending || seoQuery.isPending || categoriesQuery.isPending || tagsQuery.isPending || sourcesQuery.isPending || chineseMetadataQuery.isPending || aiMetadataQuery.isPending || infoDbMetadataQuery.isPending) {
     return (
       <div className="content-state" role="status">
         <span className="loading-indicator" aria-hidden="true" />
@@ -106,7 +111,7 @@ export function ContentDetailPageContent({
     )
   }
 
-  if (postQuery.isError || seoQuery.isError || categoriesQuery.isError || tagsQuery.isError || sourcesQuery.isError || chineseMetadataQuery.isError || aiMetadataQuery.isError || infoDbMetadataQuery.isError || newsUpdatesQuery.isError) {
+  if (postQuery.isError || seoQuery.isError || categoriesQuery.isError || tagsQuery.isError || sourcesQuery.isError || chineseMetadataQuery.isError || aiMetadataQuery.isError || infoDbMetadataQuery.isError) {
     return (
       <div className="content-state content-state--error" role="alert">
         <h1>콘텐츠를 불러오지 못했습니다</h1>
@@ -166,7 +171,61 @@ export function ContentDetailPageContent({
         <p>{post.summary}</p>
       </section>
 
-      {category?.content_group === 'news' ? <section className="content-detail__section" aria-labelledby="news-items-title"><div className="page-heading-with-actions"><h2 id="news-items-title">뉴스 항목 ({newsUpdatesQuery.data?.length ?? 0}개)</h2><Link className="primary-link primary-link--inline" to={`/content/${post.id}/news-updates/new`}>뉴스 항목 추가</Link></div>{newsUpdatesQuery.data?.length ? <ol className="news-update-list">{newsUpdatesQuery.data.map((item, index, items) => <li key={item.id}><div><strong>{item.item_order}. {item.headline}</strong><span className="status-badge">{newsUpdateTypeLabels[item.update_type as NewsUpdateType] ?? item.update_type}</span></div><p><Link to={`/news-topics/${item.topic.id}`}>{item.topic.canonical_title}</Link></p><p>{item.fact_summary}</p>{item.change_summary ? <p><strong>변화:</strong> {item.change_summary}</p> : null}<p className="field-help">연결 출처 {item.sources.length}개</p><div className="detail-actions"><Link to={`/news-updates/${item.id}`}>상세 보기</Link><Link to={`/news-updates/${item.id}/edit`}>수정</Link><button type="button" disabled={index === 0 || reorderMutation.isPending} onClick={() => void moveUpdate(index, -1)}>위로 이동</button><button type="button" disabled={index === items.length - 1 || reorderMutation.isPending} onClick={() => void moveUpdate(index, 1)}>아래로 이동</button></div></li>)}</ol> : <p className="field-help">등록된 뉴스 항목이 없습니다.</p>}</section> : null}
+      {isNewsPost ? (
+        <section className="content-detail__section" aria-labelledby="news-tracking-title">
+          <h2 id="news-tracking-title">뉴스 추적</h2>
+          {newsUpdatesQuery.isPending ? (
+            <div role="status">
+              <p>뉴스 추적 정보를 확인하고 있습니다.</p>
+            </div>
+          ) : null}
+          {newsUpdatesQuery.isError ? (
+            <div className="form-alert" role="alert">
+              뉴스 추적 정보를 불러오지 못했습니다. 게시물 상세 정보는 계속 확인할 수 있습니다. 잠시 후 다시 시도해 주세요.
+            </div>
+          ) : null}
+          {newsTrackingReadiness === 'NOT_RECORDED' ? (
+            <>
+              <p><strong>추적 상태: 미기록</strong></p>
+              <p>이 뉴스 게시물에는 연결된 뉴스 항목이 없어 추적이 아직 기록되지 않았습니다.</p>
+              <p className="field-help">뉴스 추적은 기사 내용에서 자동으로 추론하거나 저장하지 않습니다. 기존 주제를 선택하거나 새 주제를 만든 뒤 뉴스 항목을 직접 추가해 주세요.</p>
+              <div className="detail-actions">
+                <Link className="secondary-link" to="/news-topics">기존 뉴스 주제 보기</Link>
+                <Link className="secondary-link" to="/news-topics/new">새 뉴스 주제 만들기</Link>
+                <Link className="primary-link primary-link--inline" to={`/content/${post.id}/news-updates/new`}>뉴스 항목 추가</Link>
+              </div>
+            </>
+          ) : null}
+          {newsTrackingReadiness === 'RECORDED' ? (
+            <>
+              <div className="page-heading-with-actions">
+                <p><strong>추적 상태: 기록됨 · 연결된 뉴스 항목 {newsUpdatesQuery.data?.length ?? 0}개</strong></p>
+                <Link className="primary-link primary-link--inline" to={`/content/${post.id}/news-updates/new`}>뉴스 항목 추가</Link>
+              </div>
+              <ol className="news-update-list">
+                {(newsUpdatesQuery.data ?? []).map((item, index, items) => (
+                  <li key={item.id}>
+                    <div>
+                      <strong>{item.item_order}. {item.headline}</strong>
+                      <span className="status-badge">{newsUpdateTypeLabels[item.update_type as NewsUpdateType] ?? item.update_type}</span>
+                    </div>
+                    <p><Link to={`/news-topics/${item.topic.id}`}>{item.topic.canonical_title}</Link></p>
+                    <p>{item.fact_summary}</p>
+                    {item.change_summary ? <p><strong>변화:</strong> {item.change_summary}</p> : null}
+                    <p className="field-help">연결 출처 {item.sources.length}개</p>
+                    <div className="detail-actions">
+                      <Link to={`/news-updates/${item.id}`}>상세 보기</Link>
+                      <Link to={`/news-updates/${item.id}/edit`}>수정</Link>
+                      <button type="button" disabled={index === 0 || reorderMutation.isPending} onClick={() => void moveUpdate(index, -1)}>위로 이동</button>
+                      <button type="button" disabled={index === items.length - 1 || reorderMutation.isPending} onClick={() => void moveUpdate(index, 1)}>아래로 이동</button>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            </>
+          ) : null}
+        </section>
+      ) : null}
 
       <section className="content-detail__section" aria-labelledby="completion-title">
         <h2 id="completion-title">콘텐츠 완성 상태</h2>

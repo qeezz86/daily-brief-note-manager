@@ -1,10 +1,11 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
 
 import type { Category } from '../features/categories/categories.types'
+import type { NewsUpdate } from '../features/newsUpdates/newsUpdates.types'
 import type { PostDetail } from '../features/posts/posts.types'
 import type { AiMetadata, ChineseMetadata, InfoDbMetadata, PostSource, PostTag } from '../features/posts/posts.types'
 import type { DatabaseClient } from '../shared/supabase/client'
@@ -41,7 +42,69 @@ const post: PostDetail = {
   updated_at: '2026-07-10T02:00:00Z',
 }
 
-function createClient(postResult: PostDetail | null, tags: PostTag[] = [], sources: PostSource[] = [], chineseMetadata: ChineseMetadata | null = null, aiMetadata: AiMetadata | null = null, infoDbMetadata: InfoDbMetadata | null = null, activeCategory = category) {
+const newsCategory: Category = {
+  ...category,
+  id: 'economy',
+  content_group: 'news',
+  name: '경제',
+  display_id_pattern: '#YYYY-MM-DD-ECO',
+  slug_pattern: 'economy-briefing-YYYY-MM-DD',
+  wrapper_class: 'daily-brief-note news-briefing economy',
+}
+
+const newsPost: PostDetail = {
+  ...post,
+  category_id: newsCategory.id,
+  display_id: '#2026-07-10-ECO',
+  series_no: null,
+  briefing_date: '2026-07-10',
+  title: '경제 뉴스 브리핑',
+  summary: '경제 뉴스 요약',
+  slug: 'economy-briefing-2026-07-10',
+}
+
+const linkedNewsUpdate: NewsUpdate = {
+  id: 'update-1',
+  post_id: newsPost.id,
+  topic_id: 'topic-1',
+  item_order: 1,
+  update_type: 'follow_up',
+  headline: '기준금리 후속 발표',
+  fact_summary: '한국은행이 기준금리 방향을 발표했습니다.',
+  importance_summary: null,
+  impact_summary: null,
+  change_summary: '직전 전망보다 인하 시점이 늦어졌습니다.',
+  previous_update_id: 'update-0',
+  created_at: '2026-07-10T01:00:00Z',
+  updated_at: '2026-07-10T02:00:00Z',
+  post: {
+    id: newsPost.id,
+    title: newsPost.title,
+    display_id: newsPost.display_id,
+    briefing_date: newsPost.briefing_date,
+  },
+  topic: {
+    id: 'topic-1',
+    canonical_title: '한국 기준금리 전망',
+    category_id: newsCategory.id,
+    status: 'active',
+  },
+  sources: [{
+    id: 'source-1',
+    source_name: '한국은행',
+    source_title: '통화정책방향',
+    source_url: 'https://example.com/bok',
+    checked_point: '금리 방향',
+  }],
+}
+
+interface TrackingResult {
+  updates?: NewsUpdate[]
+  error?: { message: string } | null
+  pending?: boolean
+}
+
+function createClient(postResult: PostDetail | null, tags: PostTag[] = [], sources: PostSource[] = [], chineseMetadata: ChineseMetadata | null = null, aiMetadata: AiMetadata | null = null, infoDbMetadata: InfoDbMetadata | null = null, activeCategory = category, tracking: TrackingResult = {}) {
   const categoryBuilder = {
     select: vi.fn(),
     eq: vi.fn(),
@@ -93,31 +156,44 @@ function createClient(postResult: PostDetail | null, tags: PostTag[] = [], sourc
   const newsUpdatesBuilder = { select: vi.fn(), eq: vi.fn(), order: vi.fn() }
   newsUpdatesBuilder.select.mockReturnValue(newsUpdatesBuilder)
   newsUpdatesBuilder.eq.mockReturnValue(newsUpdatesBuilder)
-  newsUpdatesBuilder.order.mockResolvedValue({ data: [], error: null })
+  if (tracking.pending) {
+    newsUpdatesBuilder.order.mockReturnValue(new Promise(() => undefined))
+  } else {
+    newsUpdatesBuilder.order.mockResolvedValue({
+      data: tracking.updates ?? [],
+      error: tracking.error ?? null,
+    })
+  }
+
+  const from = vi.fn((table: string) =>
+    table === 'categories'
+      ? categoryBuilder
+      : table === 'seo_data'
+        ? seoBuilder
+        : table === 'post_tags'
+          ? tagBuilder
+          : table === 'sources'
+            ? sourceBuilder
+            : table === 'chinese_metadata'
+              ? chineseMetadataBuilder
+              : table === 'ai_metadata'
+                ? aiMetadataBuilder
+                : table === 'info_db_metadata'
+                  ? infoDbMetadataBuilder
+                  : table === 'news_updates'
+                    ? newsUpdatesBuilder
+                    : postBuilder,
+  )
+  const rpc = vi.fn()
 
   return {
     client: {
-      from: vi.fn((table: string) =>
-        table === 'categories'
-          ? categoryBuilder
-          : table === 'seo_data'
-            ? seoBuilder
-            : table === 'post_tags'
-              ? tagBuilder
-              : table === 'sources'
-                ? sourceBuilder
-                : table === 'chinese_metadata'
-                  ? chineseMetadataBuilder
-                  : table === 'ai_metadata'
-                    ? aiMetadataBuilder
-                    : table === 'info_db_metadata'
-                      ? infoDbMetadataBuilder
-                      : table === 'news_updates'
-                        ? newsUpdatesBuilder
-                  : postBuilder,
-      ),
+      from,
+      rpc,
     } as unknown as DatabaseClient,
     postBuilder,
+    from,
+    rpc,
   }
 }
 
@@ -140,6 +216,67 @@ function renderDetail(client: DatabaseClient) {
 }
 
 describe('ContentDetailPage', () => {
+  it('suppresses the tracking handoff and linked-update read for non-news content', async () => {
+    const { client, from } = createClient(post)
+    renderDetail(client)
+
+    expect(await screen.findByRole('heading', { name: post.title })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: '뉴스 추적' })).not.toBeInTheDocument()
+    expect(from).not.toHaveBeenCalledWith('news_updates')
+  })
+
+  it('keeps news details readable while tracking is loading without reporting a missing record', async () => {
+    const { client } = createClient(newsPost, [], [], null, null, null, newsCategory, { pending: true })
+    renderDetail(client)
+
+    expect(await screen.findByRole('heading', { name: newsPost.title })).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('뉴스 추적 정보를 확인하고 있습니다.')
+    expect(screen.queryByText('추적 상태: 미기록')).not.toBeInTheDocument()
+  })
+
+  it('shows a section-local safe tracking error without hiding the post or claiming tracking is absent', async () => {
+    const { client } = createClient(newsPost, [], [], null, null, null, newsCategory, {
+      error: { message: 'owner_id=private backend detail' },
+    })
+    renderDetail(client)
+
+    expect(await screen.findByRole('heading', { name: newsPost.title })).toBeInTheDocument()
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('뉴스 추적 정보를 불러오지 못했습니다.')
+    expect(alert).not.toHaveTextContent('owner_id')
+    expect(screen.queryByText('추적 상태: 미기록')).not.toBeInTheDocument()
+  })
+
+  it('shows manual guidance and exact existing destinations for a news post with no linked updates', async () => {
+    const { client, rpc } = createClient(newsPost, [], [], null, null, null, newsCategory)
+    renderDetail(client)
+
+    expect(await screen.findByText('추적 상태: 미기록')).toBeInTheDocument()
+    expect(screen.getByText(/자동으로 추론하거나 저장하지 않습니다/)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: '기존 뉴스 주제 보기' })).toHaveAttribute('href', '/news-topics')
+    expect(screen.getByRole('link', { name: '새 뉴스 주제 만들기' })).toHaveAttribute('href', '/news-topics/new')
+    expect(screen.getByRole('link', { name: '뉴스 항목 추가' })).toHaveAttribute('href', `/content/${newsPost.id}/news-updates/new`)
+    expect(rpc).not.toHaveBeenCalled()
+  })
+
+  it('shows recorded state and preserves linked update, topic, fact, source, and navigation details', async () => {
+    const { client, rpc } = createClient(newsPost, [], [], null, null, null, newsCategory, {
+      updates: [linkedNewsUpdate],
+    })
+    renderDetail(client)
+
+    expect(await screen.findByText('추적 상태: 기록됨 · 연결된 뉴스 항목 1개')).toBeInTheDocument()
+    expect(screen.getByText('1. 기준금리 후속 발표')).toBeInTheDocument()
+    expect(screen.getByText('후속')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: '한국 기준금리 전망' })).toHaveAttribute('href', '/news-topics/topic-1')
+    expect(screen.getByText('한국은행이 기준금리 방향을 발표했습니다.')).toBeInTheDocument()
+    expect(screen.getByText('연결 출처 1개')).toBeInTheDocument()
+    const updateItem = screen.getByRole('listitem')
+    expect(within(updateItem).getByRole('link', { name: '상세 보기' })).toHaveAttribute('href', '/news-updates/update-1')
+    expect(within(updateItem).getByRole('link', { name: '수정' })).toHaveAttribute('href', '/news-updates/update-1/edit')
+    expect(rpc).not.toHaveBeenCalled()
+  })
+
   it('renders detail fields and uses only the Chinese series number', async () => {
     const { client } = createClient(post)
     renderDetail(client)
