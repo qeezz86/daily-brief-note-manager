@@ -9,6 +9,7 @@ const orderedCheckNames = [
   'server-only credentials',
   'draft-only write',
   'forbidden writes',
+  'post-status read-only',
   'migration contract',
   'runbook',
   'package commands',
@@ -31,6 +32,7 @@ const allowedWordPressPaths = new Set([
   'wp-json/wp/v2/categories',
   'wp-json/wp/v2/tags',
   'wp-json/wp/v2/posts',
+  'wp-json/wp/v2/posts/${postId}',
   'wp-json/wp/v2/${taxonomy}',
 ])
 
@@ -161,6 +163,32 @@ export async function checkWordPressProductionReadiness(options = {}) {
   if ((draftClient.match(/method\s*:\s*["']POST["']/g) ?? []).length !== 1) draftIssues.push('draft client must contain exactly one POST implementation')
   checks.push(result('draft-only write', draftIssues))
   checks.push(result('forbidden writes', forbiddenWriteIssues))
+
+  const postStatusIssues = []
+  const postStatusFiles = [
+    'supabase/functions/wordpress-post-status/wordpressPostStatusClient.ts',
+    'supabase/functions/wordpress-post-status/requestSchema.ts',
+    'supabase/functions/wordpress-post-status/schemas.ts',
+    'supabase/functions/wordpress-post-status/handler.ts',
+    'src/features/wordpress/wordpressPostStatus.service.ts',
+    'src/features/wordpress/wordpressPostStatus.queries.ts',
+  ]
+  for (const file of postStatusFiles) if (!await exists(path.join(root, file))) postStatusIssues.push(`missing ${file}`)
+  if (postStatusIssues.length === 0) {
+    const [postStatusClient, postStatusRequest, postStatusSchema, postStatusHandler, postStatusService, postStatusQuery] = await Promise.all(postStatusFiles.map((file) => read(root, file)))
+    if (!/method\s*:\s*['"]GET['"]/.test(postStatusClient) || /method\s*:\s*['"](?:POST|PUT|PATCH|DELETE)['"]/.test(postStatusClient)) postStatusIssues.push('post-status client must use GET only')
+    if (!/redirect\s*:\s*['"]manual['"]/.test(postStatusClient)) postStatusIssues.push('post-status client must use manual redirect')
+    if (!/timeoutMs\s*\?\?\s*8_000/.test(postStatusClient)) postStatusIssues.push('post-status client must use 8000 ms timeout')
+    if (!/maxResponseBytes\s*\?\?\s*1_048_576/.test(postStatusClient)) postStatusIssues.push('post-status client must use 1048576-byte response limit')
+    if (!/wp-json\/wp\/v2\/posts\/\$\{postId\}/.test(postStatusClient)) postStatusIssues.push('post-status client fixed trusted-ID endpoint missing')
+    if (!/parseRemoteSnapshot\(payload, postId, options\.baseUrl\.origin\)/.test(postStatusClient) || !/Number\(item\.id\) !== expectedId/.test(postStatusSchema)) postStatusIssues.push('post-status remote ID equality check missing')
+    if (!/wordpressPostStatuses = \['draft', 'pending', 'private', 'publish', 'future', 'trash'\]/.test(postStatusSchema)) postStatusIssues.push('post-status allowlist is not exact')
+    if (!/const keys = Object\.keys\(input\)/.test(postStatusRequest) || !/\['action', 'contentId', 'attemptId'\]/.test(postStatusRequest)) postStatusIssues.push('browser post-status request fields are not exact')
+    if (!/body: \{ action: 'check-post-status', contentId: input\.contentId, attemptId: input\.attemptId \}/.test(postStatusService)) postStatusIssues.push('browser post-status request includes an unsupported field')
+    if (!/retry: false/.test(postStatusQuery)) postStatusIssues.push('post-status retry must be disabled')
+    if (!/loadSyncableAttempt\(/.test(postStatusHandler) || !/getPost\(stored\.wordpressPostId\)/.test(postStatusHandler)) postStatusIssues.push('post-status trusted attempt ID flow missing')
+  }
+  checks.push(result('post-status read-only', postStatusIssues))
 
   const migrationContractIssues = []
   const migrationSources = await Promise.all(checklist.requiredMigrations.map(async (name) => {

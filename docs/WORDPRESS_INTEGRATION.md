@@ -112,3 +112,9 @@ npm run check:wordpress-production-readiness
 ```
 
 원격 migration, Function/secret/frontend 배포, 실제 read-only 진단과 승인된 단일 draft smoke의 순서는 `docs/WORDPRESS_PRODUCTION_DEPLOYMENT_RUNBOOK.md`를 따른다. R1에서는 이 원격 명령과 실제 WordPress 요청을 실행하지 않는다.
+
+## Phase 5N-C1 explicit post-state reconciliation
+
+`wordpress-post-status`는 owner-scoped succeeded `create_draft` attempt의 positive stored post ID만 신뢰한다. Browser는 action, content ID, attempt ID만 전달하고 WordPress ID, remote URL/query, endpoint 또는 credential을 전달할 수 없다. Function은 server-configured canonical HTTPS site에서 exact ID의 `GET /wp-json/wp/v2/posts/{id}?context=edit&_fields=id,slug,status,link,modified_gmt,date_gmt`만 실행한다.
+
+허용 상태는 `draft`, `pending`, `private`, `publish`, `future`, `trash`이고, redirect는 manual, timeout은 8초, response 상한은 1 MiB다. exact remote ID와 HTTPS origin을 다시 검증한다. 결과는 `IN_SYNC` 또는 안전한 manual-reconciliation state와 상태·slug·link delta만 반환한다. 이 check는 explicit click 이후에만 수행하며 DB/attempt persistence, WordPress write, retry, polling, background refresh를 하지 않는다. remote modified time은 정보용이며 `REMOTE_MODIFIED`를 추론하지 않는다.

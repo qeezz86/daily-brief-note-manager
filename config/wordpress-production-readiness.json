@@ -9,7 +9,8 @@
   "requiredFunctions": [
     "wordpress-diagnostics",
     "wordpress-publication-preview",
-    "wordpress-draft-create"
+    "wordpress-draft-create",
+    "wordpress-post-status"
   ],
   "platformProvidedEnvironment": [
     "SUPABASE_URL",

@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { useState, type ComponentType } from 'react'
 import { Link, useParams } from 'react-router-dom'
 
 import { useAuth } from '../features/auth/useAuth'
@@ -23,20 +24,51 @@ import { supabase, type DatabaseClient } from '../shared/supabase/client'
 import { usePostNewsUpdatesQuery, useReorderNewsUpdatesMutation } from '../features/newsUpdates/newsUpdates.queries'
 import { newsUpdateTypeLabels, type NewsUpdateType } from '../features/newsUpdates/newsUpdates.types'
 import { deriveNewsTrackingReadiness } from '../features/newsUpdates/newsTrackingReadiness'
+import type { WordPressPostStatusAttempt } from '../features/wordpress/WordPressPostStatusPanel'
+
+type WordPressPostStatusDeferredModule = typeof import('../features/wordpress/WordPressPostStatusDeferred')
+type WordPressPostStatusDeferredLoader = () => Promise<WordPressPostStatusDeferredModule>
+
+const loadWordPressPostStatusDeferred = () => import('../features/wordpress/WordPressPostStatusDeferred')
 
 interface ContentDetailPageContentProps {
   client?: DatabaseClient | null
   userId: string
   postId: string
+  loadWordPressPostStatusDeferred?: WordPressPostStatusDeferredLoader
+}
+
+function useWordPressPostStatusAttemptsQuery(client: DatabaseClient | null, userId: string, contentId: string) {
+  return useQuery({
+    queryKey: ['wordpress', 'draft-attempts', userId, contentId],
+    queryFn: async () => {
+      if (!client) throw new Error('Supabase 연결이 설정되지 않았습니다.')
+      const result = await client.from('wordpress_publication_attempts').select(
+        'id,operation,status,wordpress_post_id,wordpress_post_status,wordpress_post_slug,wordpress_post_link',
+      ).eq('content_id', contentId).order('created_at', { ascending: false })
+      if (result.error) throw new Error('WordPress 초안 이력을 불러오지 못했습니다.')
+      return result.data
+    },
+    enabled: Boolean(client && userId && contentId),
+    retry: false,
+  })
 }
 
 export function ContentDetailPageContent({
   client = supabase,
   userId,
   postId,
+  loadWordPressPostStatusDeferred: loadDeferredFeature = loadWordPressPostStatusDeferred,
 }: ContentDetailPageContentProps) {
   const [actionMessage, setActionMessage] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
+  const [postStatusLoadState, setPostStatusLoadState] = useState<'idle' | 'loading-module' | 'executing-existing-flow' | 'module-load-error'>('idle')
+  const [postStatusLoadError, setPostStatusLoadError] = useState<string | null>(null)
+  const [WordPressPostStatusDeferred, setWordPressPostStatusDeferred] = useState<ComponentType<{
+    client: DatabaseClient | null
+    contentId: string
+    attempts: WordPressPostStatusAttempt[]
+  }> | null>(null)
   const postQuery = usePostQuery(client, userId, postId)
   const categoriesQuery = useActiveCategoriesQuery(client)
   const post = postQuery.data
@@ -53,6 +85,13 @@ export function ContentDetailPageContent({
   const archiveMutation = useArchivePostMutation(client, userId, postId)
   const newsUpdatesQuery = usePostNewsUpdatesQuery(isNewsPost ? client : null, userId, postId)
   const reorderMutation = useReorderNewsUpdatesMutation(client, userId, postId)
+  const wordpressAttemptsQuery = useWordPressPostStatusAttemptsQuery(client, userId, postId)
+  const wordpressStatusAttempt = (wordpressAttemptsQuery.data ?? []).find(
+    (item) => item.operation === 'create_draft'
+      && item.status === 'succeeded'
+      && typeof item.wordpress_post_id === 'number'
+      && item.wordpress_post_id > 0,
+  )
   const seoData = seoQuery.data
   const alternativeTitles = Array.isArray(seoData?.alternative_titles)
     ? seoData.alternative_titles.filter((value): value is string => typeof value === 'string')
@@ -100,6 +139,20 @@ export function ContentDetailPageContent({
     ;[ids[index], ids[target]] = [ids[target], ids[index]]
     setActionError(null)
     try { await reorderMutation.mutateAsync(ids) } catch (cause) { setActionError(cause instanceof Error ? cause.message : '뉴스 항목 순서를 저장할 수 없습니다.') }
+  }
+
+  async function handleWordPressStatusCheck() {
+    if (!wordpressStatusAttempt || postStatusLoadState === 'loading-module' || WordPressPostStatusDeferred) return
+    setPostStatusLoadError(null)
+    setPostStatusLoadState('loading-module')
+    try {
+      const module = await loadDeferredFeature()
+      setWordPressPostStatusDeferred(() => module.WordPressPostStatusDeferred)
+      setPostStatusLoadState('executing-existing-flow')
+    } catch {
+      setPostStatusLoadState('module-load-error')
+      setPostStatusLoadError('WordPress 상태 확인 기능을 불러오지 못했습니다. 네트워크 연결을 확인한 뒤 다시 시도해 주세요.')
+    }
   }
 
   if (postQuery.isPending || seoQuery.isPending || categoriesQuery.isPending || tagsQuery.isPending || sourcesQuery.isPending || chineseMetadataQuery.isPending || aiMetadataQuery.isPending || infoDbMetadataQuery.isPending) {
@@ -320,6 +373,24 @@ export function ContentDetailPageContent({
           </ol>
         ) : <p className="field-help">미등록</p>}
       </section>
+
+      {wordpressStatusAttempt && !WordPressPostStatusDeferred ? (
+        <section className="content-detail__section" aria-labelledby="wordpress-post-status-title">
+          <h2 id="wordpress-post-status-title">WordPress 게시물 상태</h2>
+          <p>저장된 초안 정보: Post ID {wordpressStatusAttempt.wordpress_post_id}, 상태 {wordpressStatusAttempt.wordpress_post_status ?? '미확인'}</p>
+          <button className="primary-button" type="button" onClick={() => void handleWordPressStatusCheck()} disabled={postStatusLoadState === 'loading-module'}>
+            {postStatusLoadState === 'loading-module' ? 'WordPress 상태 확인 기능을 불러오는 중' : 'WordPress 상태 확인'}
+          </button>
+          {postStatusLoadError ? <p className="form-alert" role="alert">{postStatusLoadError}</p> : null}
+        </section>
+      ) : null}
+      {WordPressPostStatusDeferred ? (
+        <WordPressPostStatusDeferred
+          client={client}
+          contentId={post.id}
+          attempts={wordpressAttemptsQuery.data ?? []}
+        />
+      ) : null}
 
       {actionError ? <p className="form-alert" role="alert">{actionError}</p> : null}
       {actionMessage ? <p className="form-success" role="status">{actionMessage}</p> : null}

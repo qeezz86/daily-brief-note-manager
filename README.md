@@ -119,6 +119,10 @@ Phase 5C는 별도 `wordpress-draft-create` Edge Function과 `wordpress_publicat
 
 Production readiness는 `config/wordpress-production-readiness.json`과 `npm run check:wordpress-production-readiness`로 migration, Function entry, explicit JWT 정책, server-only credential, fixed draft endpoint, 금지 write, migration contract와 필수 문서를 로컬에서 검사합니다. 이 명령은 Supabase/WordPress network call, link, deploy, migration push 또는 secret 변경을 수행하지 않습니다. 전용 WordPress 사용자의 core 최소 capability는 `edit_posts`이며 draft에는 `publish_posts`, media에는 `upload_files`, taxonomy 생성·수정에는 `manage_categories`가 필요하지 않습니다. plugin/custom role이 계약을 바꾸면 실사이트 read-only preflight에서 중단합니다.
 
+## Phase 5N-C1 WordPress 게시물 상태 확인
+
+콘텐츠 상세에서 owner-scoped succeeded `create_draft` attempt와 저장된 positive WordPress post ID가 있을 때만 **WordPress 상태 확인**을 직접 실행할 수 있습니다. 브라우저는 content ID와 attempt ID만 보내며, Function은 서버 설정과 trusted exact ID로 GET-only 상태 확인을 수행합니다. 결과는 `IN_SYNC`, 상태·slug·link 변화 또는 안전한 수동 확인 안내로 표시할 뿐 DB, attempt, 콘텐츠 또는 WordPress를 변경하지 않습니다. 자동 retry·polling·background synchronization은 없습니다. [상세 계약](docs/WORDPRESS_POST_SYNC.md)과 C3 production hardening/runtime verification은 production release 전에 별도로 완료되어야 합니다.
+
 ## Supabase Auth 설정
 
 Supabase Dashboard의 Authentication URL Configuration에 개발 주소를 등록합니다.
