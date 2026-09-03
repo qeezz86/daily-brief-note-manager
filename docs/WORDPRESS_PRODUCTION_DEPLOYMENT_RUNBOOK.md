@@ -305,6 +305,10 @@ Dashboard에서 이름과 존재만 확인하고 값을 출력하지 않는다. 
 
 ## 11. Function 배포 순서
 
+### 11.1 Phase 5N-C1 post-status prerequisite
+
+`wordpress-post-status`는 `verify_jwt=true`로 등록하며 기존 WordPress server-only secret과 exact allowed-user/CORS 경계를 사용한다. 배포 전 static readiness check가 trusted ID, browser-field exclusion, GET-only method, manual redirect, 8초 timeout, 1 MiB response cap, status allowlist, remote-ID validation, retry disablement와 no-persistence boundary를 통과해야 한다. C3 production hardening과 runtime verification이 완료되기 전에는 이 Function의 production release 또는 완료를 주장하지 않는다.
+
 모든 Function은 `supabase/config.toml`에서 `verify_jwt = true`다. `--no-verify-jwt`를 절대 사용하지 않는다. Function 내부 `getUser()`와 allowed UUID 검사도 유지한다.
 
 ```powershell

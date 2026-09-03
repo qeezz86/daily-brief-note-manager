@@ -34,6 +34,14 @@ async function fixture() {
   ]
   files.push(...checklist.requiredFunctions.map((functionName) => `supabase/functions/${functionName}/index.ts`))
   files.push('supabase/functions/wordpress-draft-create/wordpressDraftClient.ts')
+  files.push(
+    'supabase/functions/wordpress-post-status/wordpressPostStatusClient.ts',
+    'supabase/functions/wordpress-post-status/requestSchema.ts',
+    'supabase/functions/wordpress-post-status/schemas.ts',
+    'supabase/functions/wordpress-post-status/handler.ts',
+    'src/features/wordpress/wordpressPostStatus.service.ts',
+    'src/features/wordpress/wordpressPostStatus.queries.ts',
+  )
   for (const relativePath of files) await copy(relativePath, root)
   return { root, checklist }
 }
@@ -58,7 +66,7 @@ describe('WordPress production readiness checker', () => {
     expect(first).toEqual(second)
     expect(first.checks.map((item) => item.name)).toEqual([
       'migrations', 'functions', 'JWT policy', 'server-only credentials', 'draft-only write',
-      'forbidden writes', 'migration contract', 'runbook', 'package commands', 'secret scan',
+      'forbidden writes', 'post-status read-only', 'migration contract', 'runbook', 'package commands', 'secret scan',
     ])
   })
 
@@ -107,6 +115,13 @@ describe('WordPress production readiness checker', () => {
     const file = 'supabase/functions/wordpress-draft-create/wordpressDraftClient.ts'
     await fs.appendFile(path.join(root, file), "\nconst unsafe = new URL('wp-json/wp/v2/arbitrary', new URL('https://example.com'))\n")
     expect(check(await checkWordPressProductionReadiness({ root }), 'draft-only write').pass).toBe(false)
+  })
+
+  it('detects a non-GET WordPress post-status client', async () => {
+    const { root } = await fixture()
+    const file = path.join(root, 'supabase/functions/wordpress-post-status/wordpressPostStatusClient.ts')
+    await fs.writeFile(file, (await fs.readFile(file, 'utf8')).replace("method: 'GET'", "method: 'POST'"))
+    expect(check(await checkWordPressProductionReadiness({ root }), 'post-status read-only').pass).toBe(false)
   })
 
   it('detects a publish status', async () => {

@@ -9,6 +9,8 @@ import type { NewsUpdate } from '../features/newsUpdates/newsUpdates.types'
 import type { PostDetail } from '../features/posts/posts.types'
 import type { AiMetadata, ChineseMetadata, InfoDbMetadata, PostSource, PostTag } from '../features/posts/posts.types'
 import type { DatabaseClient } from '../shared/supabase/client'
+import type { WordPressPostStatusAttempt } from '../features/wordpress/WordPressPostStatusPanel'
+import type { WordPressPublicationAttempt } from '../features/wordpress/wordpressDraftCreate.schema'
 import { ContentDetailPageContent } from './ContentDetailPage'
 
 const category: Category = {
@@ -104,7 +106,7 @@ interface TrackingResult {
   pending?: boolean
 }
 
-function createClient(postResult: PostDetail | null, tags: PostTag[] = [], sources: PostSource[] = [], chineseMetadata: ChineseMetadata | null = null, aiMetadata: AiMetadata | null = null, infoDbMetadata: InfoDbMetadata | null = null, activeCategory = category, tracking: TrackingResult = {}) {
+function createClient(postResult: PostDetail | null, tags: PostTag[] = [], sources: PostSource[] = [], chineseMetadata: ChineseMetadata | null = null, aiMetadata: AiMetadata | null = null, infoDbMetadata: InfoDbMetadata | null = null, activeCategory = category, tracking: TrackingResult = {}, attempts: WordPressPostStatusAttempt[] = []) {
   const categoryBuilder = {
     select: vi.fn(),
     eq: vi.fn(),
@@ -154,6 +156,10 @@ function createClient(postResult: PostDetail | null, tags: PostTag[] = [], sourc
   infoDbMetadataBuilder.eq.mockReturnValue(infoDbMetadataBuilder)
   infoDbMetadataBuilder.maybeSingle.mockResolvedValue({ data: infoDbMetadata, error: null })
   const newsUpdatesBuilder = { select: vi.fn(), eq: vi.fn(), order: vi.fn() }
+  const attemptsBuilder = { select: vi.fn(), eq: vi.fn(), order: vi.fn() }
+  attemptsBuilder.select.mockReturnValue(attemptsBuilder)
+  attemptsBuilder.eq.mockReturnValue(attemptsBuilder)
+  attemptsBuilder.order.mockResolvedValue({ data: attempts, error: null })
   newsUpdatesBuilder.select.mockReturnValue(newsUpdatesBuilder)
   newsUpdatesBuilder.eq.mockReturnValue(newsUpdatesBuilder)
   if (tracking.pending) {
@@ -182,22 +188,28 @@ function createClient(postResult: PostDetail | null, tags: PostTag[] = [], sourc
                   ? infoDbMetadataBuilder
                   : table === 'news_updates'
                     ? newsUpdatesBuilder
-                    : postBuilder,
+                    : table === 'wordpress_publication_attempts'
+                      ? attemptsBuilder
+                      : postBuilder,
   )
   const rpc = vi.fn()
+  const invoke = vi.fn()
 
   return {
     client: {
       from,
       rpc,
+      functions: { invoke },
     } as unknown as DatabaseClient,
     postBuilder,
+    attemptsBuilder,
     from,
     rpc,
+    invoke,
   }
 }
 
-function renderDetail(client: DatabaseClient) {
+function renderDetail(client: DatabaseClient, loadWordPressPostStatusDeferred?: () => Promise<typeof import('../features/wordpress/WordPressPostStatusDeferred')>) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   })
@@ -209,6 +221,7 @@ function renderDetail(client: DatabaseClient) {
           client={client}
           userId="owner-a"
           postId="post-1"
+          loadWordPressPostStatusDeferred={loadWordPressPostStatusDeferred}
         />
       </MemoryRouter>
     </QueryClientProvider>,
@@ -275,6 +288,56 @@ describe('ContentDetailPage', () => {
     expect(within(updateItem).getByRole('link', { name: '상세 보기' })).toHaveAttribute('href', '/news-updates/update-1')
     expect(within(updateItem).getByRole('link', { name: '수정' })).toHaveAttribute('href', '/news-updates/update-1/edit')
     expect(rpc).not.toHaveBeenCalled()
+  })
+
+  it('renders an eligible post-status panel without a Function call before the explicit action', async () => {
+    const attempt: WordPressPublicationAttempt = {
+      id: '40000000-0000-4000-8000-000000000001', operation: 'create_draft', status: 'succeeded',
+      started_at: null, completed_at: '2026-08-24T00:00:00Z', created_at: '2026-08-24T00:00:00Z',
+      wordpress_post_id: 901, wordpress_post_status: 'draft', wordpress_post_slug: 'saved-slug',
+      wordpress_post_link: 'https://wordpress.example.com/?p=901', error_code: null, actual_payload_fingerprint: null,
+    }
+    const { client, invoke, attemptsBuilder } = createClient(post, [], [], null, null, null, category, {}, [attempt])
+    renderDetail(client)
+
+    expect(await screen.findByRole('heading', { name: 'WordPress 게시물 상태' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'WordPress 상태 확인' })).toBeInTheDocument()
+    expect(invoke).not.toHaveBeenCalled()
+    expect(attemptsBuilder.select).toHaveBeenCalledWith('id,operation,status,wordpress_post_id,wordpress_post_status,wordpress_post_slug,wordpress_post_link')
+  })
+
+  it('renders a bounded module-load error and makes no Function call when the deferred feature cannot load', async () => {
+    const attempt: WordPressPublicationAttempt = {
+      id: '40000000-0000-4000-8000-000000000003', operation: 'create_draft', status: 'succeeded',
+      started_at: null, completed_at: '2026-08-24T00:00:00Z', created_at: '2026-08-24T00:00:00Z',
+      wordpress_post_id: 901, wordpress_post_status: 'draft', wordpress_post_slug: 'saved-slug',
+      wordpress_post_link: 'https://wordpress.example.com/?p=901', error_code: null, actual_payload_fingerprint: null,
+    }
+    const browserUser = userEvent.setup()
+    const loadDeferred = vi.fn(async () => { throw new Error('offline') })
+    const { client, invoke } = createClient(post, [], [], null, null, null, category, {}, [attempt])
+    renderDetail(client, loadDeferred)
+
+    await browserUser.click(await screen.findByRole('button', { name: 'WordPress 상태 확인' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('WordPress 상태 확인 기능을 불러오지 못했습니다.')
+    expect(loadDeferred).toHaveBeenCalledTimes(1)
+    expect(invoke).not.toHaveBeenCalled()
+  })
+
+  it('does not render post-status controls for an ineligible attempt', async () => {
+    const attempt: WordPressPublicationAttempt = {
+      id: '40000000-0000-4000-8000-000000000002', operation: 'create_draft', status: 'succeeded',
+      started_at: null, completed_at: '2026-08-24T00:00:00Z', created_at: '2026-08-24T00:00:00Z',
+      wordpress_post_id: null, wordpress_post_status: null, wordpress_post_slug: null,
+      wordpress_post_link: null, error_code: null, actual_payload_fingerprint: null,
+    }
+    const { client, invoke } = createClient(post, [], [], null, null, null, category, {}, [attempt])
+    renderDetail(client)
+
+    await screen.findByRole('heading', { name: post.title })
+    expect(screen.queryByRole('heading', { name: 'WordPress 게시물 상태' })).not.toBeInTheDocument()
+    expect(invoke).not.toHaveBeenCalled()
   })
 
   it('renders detail fields and uses only the Chinese series number', async () => {

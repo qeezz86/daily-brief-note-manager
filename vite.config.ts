@@ -9,6 +9,9 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      workbox: {
+        globIgnores: ['assets/WordPressPostStatusDeferred-*.js'],
+      },
       manifest: {
         name: 'Daily Brief Note Content Manager',
         short_name: 'Daily Brief Note',

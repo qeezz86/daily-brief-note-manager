@@ -2121,3 +2121,11 @@ Phase 2부터는 해당 Phase의 완료 조건만 별도 프롬프트로 전달�
 - 허용 write는 `POST /wp-json/wp/v2/posts` 1회이며 status는 서버 literal `draft`다. publish·update·delete·media·taxonomy write는 지원하지 않는다.
 - DB-backed idempotency, same-content execution lock과 attempt audit를 사용한다. 불명확한 결과는 `uncertain` terminal 상태로 남기고 자동 재시도하지 않는다.
 - attempt는 외부 side effect 이력이므로 Backup/Restore portable content에서 제외한다.
+
+### 13.9 Phase 5N-C1 WordPress post-state reconciliation
+
+- 콘텐츠 상세의 명시적 사용자 동작으로만 owner-scoped succeeded `create_draft` attempt의 저장된 positive WordPress post ID를 확인한다.
+- 브라우저 요청은 `action=check-post-status`, content ID, attempt ID만 포함하며, Function이 server-only credential과 fixed site configuration으로 GET-only WordPress post endpoint를 호출한다.
+- 응답은 ephemeral preview다. `IN_SYNC`와 `STATUS_CHANGED`·`SLUG_CHANGED`·`LINK_CHANGED`를 표시할 수 있지만 attempt/content/동기화 상태를 저장하거나 자동으로 변경하지 않는다.
+- draft에서 publish로 바뀐 것은 관찰된 `STATUS_CHANGED`이며 remote modified timestamp만으로 `REMOTE_MODIFIED`를 추론하지 않는다.
+- publish/update/delete/media/taxonomy/meta write, 자동 retry, polling, background operation은 범위 밖이다. C3 runtime hardening/verification 전에는 production 완료로 주장하지 않는다.
