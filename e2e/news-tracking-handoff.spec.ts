@@ -134,10 +134,33 @@ interface BackendOptions {
   updates?: (typeof linkedUpdate)[]
 }
 
+interface BackendRequest {
+  method: string
+  pathname: string
+}
+
+const LOCAL_HISTORY_READ_PATHS = new Set([
+  '/rest/v1/import_job_items',
+  '/rest/v1/wordpress_publication_attempts',
+])
+
+function isLocalContentManagerHistoryRead(request: BackendRequest) {
+  return request.method === 'GET' && LOCAL_HISTORY_READ_PATHS.has(request.pathname)
+}
+
+function isRemoteWordPressOperation(request: BackendRequest) {
+  if (isLocalContentManagerHistoryRead(request)) return false
+
+  const pathname = request.pathname.toLowerCase()
+  return pathname.includes('wordpress')
+    || /^\/wp-json\/wp\/v2\/posts(?:\/|$)/u.test(pathname)
+    || /^\/wp\/v2\/posts(?:\/|$)/u.test(pathname)
+}
+
 async function installBackend(page: Page, options: BackendOptions = {}) {
   const selectedPost = options.post ?? newsPost
   const selectedCategory = selectedPost.category_id === newsCategory.id ? newsCategory : aiCategory
-  const requests: Array<{ method: string; pathname: string }> = []
+  const requests: BackendRequest[] = []
 
   await page.route(`${SUPABASE_ORIGIN}/**`, async (route) => {
     const request = route.request()
@@ -148,12 +171,12 @@ async function installBackend(page: Page, options: BackendOptions = {}) {
       return
     }
 
+    requests.push({ method: request.method(), pathname: url.pathname })
     if (!url.pathname.startsWith('/rest/v1/')) {
       await route.abort('blockedbyclient')
       return
     }
 
-    requests.push({ method: request.method(), pathname: url.pathname })
     const table = url.pathname.slice('/rest/v1/'.length)
     const rows = table === 'posts'
       ? [selectedPost]
@@ -215,7 +238,7 @@ test('E2E4 non-news post has no tracking handoff or NEWS_TRACKING-specific updat
   expect(backend.requests.filter((request) => request.pathname === '/rest/v1/news_updates')).toEqual([])
 })
 
-test('E2E5 handoff performs no tracking write, WordPress call, or external background request', async ({ page }) => {
+test('E2E5 handoff performs no tracking write, remote WordPress action, or external background request', async ({ page }) => {
   await installAuthenticatedSession(page)
   const externalRequests: string[] = []
   page.on('request', (request) => {
@@ -231,7 +254,7 @@ test('E2E5 handoff performs no tracking write, WordPress call, or external backg
 
   expect(backend.requests.filter((request) => request.method !== 'GET' && request.method !== 'HEAD')).toEqual([])
   expect(backend.requests.filter((request) => request.pathname.includes('/rpc/'))).toEqual([])
-  expect(backend.requests.filter((request) => request.pathname.toLowerCase().includes('wordpress'))).toEqual([])
+  expect(backend.requests.filter(isRemoteWordPressOperation)).toEqual([])
   expect(externalRequests).toEqual([])
 })
 

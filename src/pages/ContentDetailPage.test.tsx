@@ -1,7 +1,8 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router-dom'
+import { StrictMode } from 'react'
+import { MemoryRouter, useLocation, useNavigationType } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
 
 import type { Category } from '../features/categories/categories.types'
@@ -11,6 +12,7 @@ import type { AiMetadata, ChineseMetadata, InfoDbMetadata, PostSource, PostTag }
 import type { DatabaseClient } from '../shared/supabase/client'
 import type { WordPressPostStatusAttempt } from '../features/wordpress/WordPressPostStatusPanel'
 import type { WordPressPublicationAttempt } from '../features/wordpress/wordpressDraftCreate.schema'
+import * as contentDeleteDeferredModule from '../features/posts/ContentDeleteDeferred'
 import { ContentDetailPageContent } from './ContentDetailPage'
 
 const category: Category = {
@@ -156,7 +158,13 @@ function createClient(postResult: PostDetail | null, tags: PostTag[] = [], sourc
   infoDbMetadataBuilder.eq.mockReturnValue(infoDbMetadataBuilder)
   infoDbMetadataBuilder.maybeSingle.mockResolvedValue({ data: infoDbMetadata, error: null })
   const newsUpdatesBuilder = { select: vi.fn(), eq: vi.fn(), order: vi.fn() }
-  const attemptsBuilder = { select: vi.fn(), eq: vi.fn(), order: vi.fn() }
+  const importBuilder = { select: vi.fn(), eq: vi.fn(), limit: vi.fn().mockResolvedValue({ data: [], error: null }) }
+  importBuilder.select.mockReturnValue(importBuilder)
+  importBuilder.eq.mockReturnValue(importBuilder)
+  const deleteBuilder = { delete: vi.fn(), eq: vi.fn(), select: vi.fn().mockResolvedValue({ data: [{ id: 'post-1' }], error: null }) }
+  deleteBuilder.delete.mockReturnValue(deleteBuilder)
+  deleteBuilder.eq.mockReturnValue(deleteBuilder)
+  const attemptsBuilder = { select: vi.fn(), eq: vi.fn(), order: vi.fn(), limit: vi.fn().mockResolvedValue({ data: attempts.map((item) => ({ id: item.id })), error: null }) }
   attemptsBuilder.select.mockReturnValue(attemptsBuilder)
   attemptsBuilder.eq.mockReturnValue(attemptsBuilder)
   attemptsBuilder.order.mockResolvedValue({ data: attempts, error: null })
@@ -190,7 +198,7 @@ function createClient(postResult: PostDetail | null, tags: PostTag[] = [], sourc
                     ? newsUpdatesBuilder
                     : table === 'wordpress_publication_attempts'
                       ? attemptsBuilder
-                      : postBuilder,
+                      : table === 'import_job_items' ? importBuilder : { ...postBuilder, delete: deleteBuilder.delete },
   )
   const rpc = vi.fn()
   const invoke = vi.fn()
@@ -203,26 +211,49 @@ function createClient(postResult: PostDetail | null, tags: PostTag[] = [], sourc
     } as unknown as DatabaseClient,
     postBuilder,
     attemptsBuilder,
+    importBuilder,
+    deleteBuilder,
     from,
     rpc,
     invoke,
   }
 }
 
-function renderDetail(client: DatabaseClient, loadWordPressPostStatusDeferred?: () => Promise<typeof import('../features/wordpress/WordPressPostStatusDeferred')>) {
+function NavigationProbe() {
+  const location = useLocation()
+  const navigationType = useNavigationType()
+  return <div data-testid="navigation">{JSON.stringify({ pathname: location.pathname, state: location.state, navigationType })}</div>
+}
+
+interface RenderDetailOptions {
+  loadWordPressPostStatusDeferred?: () => Promise<typeof import('../features/wordpress/WordPressPostStatusDeferred')>
+  loadContentDeleteDeferred?: () => Promise<typeof contentDeleteDeferredModule>
+  initialPost?: PostDetail
+  strictMode?: boolean
+}
+
+function renderDetail(client: DatabaseClient, options: RenderDetailOptions = {}) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   })
+  if (options.initialPost) {
+    queryClient.setQueryData(['posts', 'detail', 'owner-a', 'post-1'], options.initialPost)
+  }
+
+  const contentDetail = (
+    <ContentDetailPageContent
+      client={client}
+      userId="owner-a"
+      postId="post-1"
+      loadWordPressPostStatusDeferred={options.loadWordPressPostStatusDeferred}
+      loadContentDeleteDeferred={options.loadContentDeleteDeferred ?? (() => Promise.resolve(contentDeleteDeferredModule))}
+    />
+  )
 
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter>
-        <ContentDetailPageContent
-          client={client}
-          userId="owner-a"
-          postId="post-1"
-          loadWordPressPostStatusDeferred={loadWordPressPostStatusDeferred}
-        />
+      <MemoryRouter initialEntries={['/content/post-1']}><NavigationProbe />
+        {options.strictMode ? <StrictMode>{contentDetail}</StrictMode> : contentDetail}
       </MemoryRouter>
     </QueryClientProvider>,
   )
@@ -316,7 +347,7 @@ describe('ContentDetailPage', () => {
     const browserUser = userEvent.setup()
     const loadDeferred = vi.fn(async () => { throw new Error('offline') })
     const { client, invoke } = createClient(post, [], [], null, null, null, category, {}, [attempt])
-    renderDetail(client, loadDeferred)
+    renderDetail(client, { loadWordPressPostStatusDeferred: loadDeferred })
 
     await browserUser.click(await screen.findByRole('button', { name: 'WordPress 상태 확인' }))
 
@@ -368,7 +399,7 @@ describe('ContentDetailPage', () => {
   it('archives after explicit confirmation and then hides duplicate archive action', async () => {
     const browserUser = userEvent.setup()
     const archivedPost = { ...post, content_status: 'archived' }
-    const { client, postBuilder } = createClient(post)
+    const { client, postBuilder, deleteBuilder } = createClient(post)
     postBuilder.maybeSingle
       .mockResolvedValueOnce({ data: post, error: null })
       .mockResolvedValueOnce({ data: archivedPost, error: null })
@@ -382,6 +413,7 @@ describe('ContentDetailPage', () => {
     expect(await screen.findByText('콘텐츠를 보관 처리했습니다.')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '보관 처리' })).not.toBeInTheDocument()
     expect(postBuilder.update).toHaveBeenCalledWith({ content_status: 'archived' })
+    expect(deleteBuilder.delete).not.toHaveBeenCalled()
   })
 
   it('renders tags and ordered source metadata with a safe external link', async () => {
@@ -437,5 +469,188 @@ describe('ContentDetailPage', () => {
     expect(await screen.findByRole('heading', { name: '정보DB 정보' })).toBeInTheDocument()
     expect(screen.getByText('legacy')).toBeInTheDocument()
     expect(screen.getAllByText('미등록').length).toBeGreaterThan(0)
+  })
+})
+
+describe('Content Detail permanent local deletion', () => {
+  async function ready(db: ReturnType<typeof createClient>) {
+    renderDetail(db.client)
+    await screen.findByRole('heading', { name: /CCTV 뉴스/ })
+    await waitFor(() => expect(screen.getByRole('button', { name: '삭제' })).toBeEnabled())
+    return screen.getByRole('button', { name: '삭제' })
+  }
+
+  it('fails closed while the delete module is loading', async () => {
+    const db = createClient(post)
+    const loadDelete = vi.fn(() => new Promise<typeof contentDeleteDeferredModule>(() => undefined))
+    renderDetail(db.client, { loadContentDeleteDeferred: loadDelete })
+    await screen.findByRole('heading', { name: post.title })
+    const status = await screen.findByText('삭제 기능을 불러오는 중입니다.')
+    expect(status).toHaveAttribute('role', 'status')
+    const button = screen.getByRole('button', { name: '삭제' })
+    expect(button).toBeDisabled()
+    expect(button).toHaveAttribute('aria-describedby', status.id)
+    expect(loadDelete).toHaveBeenCalledTimes(1)
+    expect(db.deleteBuilder.delete).not.toHaveBeenCalled()
+  })
+
+  it('reattaches the StrictMode replay to the same in-flight delete module load', async () => {
+    const db = createClient(post)
+    let resolveDelete!: (module: typeof contentDeleteDeferredModule) => void
+    const deleteModulePromise = new Promise<typeof contentDeleteDeferredModule>((resolve) => {
+      resolveDelete = resolve
+    })
+    const loadDelete = vi.fn(() => deleteModulePromise)
+    renderDetail(db.client, {
+      initialPost: post,
+      loadContentDeleteDeferred: loadDelete,
+      strictMode: true,
+    })
+
+    await screen.findByRole('heading', { name: post.title })
+    const status = screen.getByText('삭제 기능을 불러오는 중입니다.')
+    const button = screen.getByRole('button', { name: '삭제' })
+    expect(status).toHaveAttribute('role', 'status')
+    expect(button).toBeDisabled()
+    expect(loadDelete).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      resolveDelete(contentDeleteDeferredModule)
+      await deleteModulePromise
+    })
+
+    await waitFor(() => expect(screen.queryByText('삭제 기능을 불러오는 중입니다.')).not.toBeInTheDocument())
+    expect(await screen.findByText('Content Manager의 로컬 콘텐츠를 영구 삭제할 수 있습니다.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '삭제' })).toBeEnabled()
+    expect(loadDelete).toHaveBeenCalledTimes(1)
+    expect(db.deleteBuilder.delete).not.toHaveBeenCalled()
+  })
+
+  it('fails closed after a delete module load error without hiding unrelated detail actions', async () => {
+    const db = createClient(post)
+    db.postBuilder.maybeSingle
+      .mockResolvedValueOnce({ data: post, error: null })
+      .mockResolvedValueOnce({ data: { ...post, content_status: 'archived' }, error: null })
+    const loadDelete = vi.fn(async () => { throw new Error('offline') })
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
+    try {
+      renderDetail(db.client, { loadContentDeleteDeferred: loadDelete })
+      await screen.findByRole('heading', { name: post.title })
+      const alert = await screen.findByRole('alert')
+      expect(alert).toHaveTextContent('삭제 기능을 불러오지 못했습니다.')
+      const button = screen.getByRole('button', { name: '삭제' })
+      expect(button).toBeDisabled()
+      expect(button).toHaveAttribute('aria-describedby', alert.id)
+      expect(screen.getByRole('link', { name: '수정' })).toHaveAttribute('href', `/content/${post.id}/edit`)
+      await userEvent.click(screen.getByRole('button', { name: '보관 처리' }))
+      expect(await screen.findByText('콘텐츠를 보관 처리했습니다.')).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: '보관 처리' })).not.toBeInTheDocument()
+      expect(loadDelete).toHaveBeenCalledTimes(1)
+      expect(db.deleteBuilder.delete).not.toHaveBeenCalled()
+    } finally { confirm.mockRestore() }
+  })
+
+  it('shows a disabled action while either history check is unfinished', async () => {
+    const db = createClient(post)
+    db.importBuilder.limit.mockReturnValue(new Promise(() => undefined))
+    renderDetail(db.client)
+    await screen.findByRole('heading', { name: post.title })
+    expect(screen.getByRole('button', { name: '삭제' })).toBeDisabled()
+    expect(screen.getByText('삭제 가능 여부를 확인하고 있습니다.')).toBeInTheDocument()
+  })
+
+  it.each([
+    [true, false, 'Import 이력 보존'],
+    [false, true, 'WordPress 발행 시도 이력 보존'],
+    [true, true, 'Import 이력과 WordPress 발행 시도 이력 보존'],
+  ] as const)('blocks protected history %#', async (hasImport, hasWordPress, message) => {
+    const db = createClient(post)
+    db.importBuilder.limit.mockResolvedValue({ data: hasImport ? [{ id: 'import' }] : [], error: null })
+    db.attemptsBuilder.limit.mockResolvedValue({ data: hasWordPress ? [{ id: 'failed-attempt' }] : [], error: null })
+    renderDetail(db.client)
+    await screen.findByText(new RegExp(message))
+    expect(screen.getByRole('button', { name: '삭제' })).toBeDisabled()
+    expect(db.deleteBuilder.delete).not.toHaveBeenCalled()
+  })
+
+  it.each(['import-query', 'wordpress-query', 'status-missing', 'status-error'])('fails closed: %s', async (failure) => {
+    const db = createClient(post)
+    if (failure === 'import-query') db.importBuilder.limit.mockResolvedValue({ data: null, error: { message: 'offline' } })
+    if (failure === 'wordpress-query') db.attemptsBuilder.limit.mockResolvedValue({ data: null, error: { message: 'offline' } })
+    if (failure === 'status-missing') db.attemptsBuilder.order.mockResolvedValue({ data: null, error: null })
+    if (failure === 'status-error') db.attemptsBuilder.order.mockResolvedValue({ data: null, error: { message: 'offline' } })
+    renderDetail(db.client)
+    await screen.findByText('삭제 가능 여부를 확인하지 못했습니다. 콘텐츠를 삭제할 수 없습니다.')
+    expect(screen.getByRole('button', { name: '삭제' })).toBeDisabled()
+    expect(db.deleteBuilder.delete).not.toHaveBeenCalled()
+  })
+
+  it('includes actual title and local-only warning, with zero mutation/navigation on cancel', async () => {
+    const db = createClient({ ...post, wordpress_url: 'https://example.test/post' })
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    try {
+      const button = await ready(db)
+      const previousChecks = db.importBuilder.limit.mock.calls.length
+      await userEvent.click(button)
+      expect(confirm).toHaveBeenCalledWith(expect.stringContaining(post.title))
+      expect(confirm).toHaveBeenCalledWith(expect.stringContaining('삭제한 콘텐츠는 복구할 수 없습니다.'))
+      expect(confirm).toHaveBeenCalledWith(expect.stringContaining('WordPress에 생성된 게시물은 삭제되지 않습니다.'))
+      expect(db.importBuilder.limit).toHaveBeenCalledTimes(previousChecks)
+      expect(db.deleteBuilder.delete).not.toHaveBeenCalled()
+      expect(db.invoke).not.toHaveBeenCalled()
+      expect(db.rpc).not.toHaveBeenCalled()
+      expect(screen.getByTestId('navigation')).toHaveTextContent('"pathname":"/content/post-1"')
+    } finally { confirm.mockRestore() }
+  })
+
+  it.each(['ready', 'archived'] as const)('deletes eligible %s content once and replaces the route', async (contentStatus) => {
+    const db = createClient({ ...post, content_status: contentStatus })
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
+    try {
+      const button = await ready(db)
+      if (contentStatus === 'archived') expect(screen.queryByRole('button', { name: '보관 처리' })).not.toBeInTheDocument()
+      await userEvent.click(button)
+      await waitFor(() => expect(screen.getByTestId('navigation')).toHaveTextContent('"pathname":"/content"'))
+      expect(screen.getByTestId('navigation')).toHaveTextContent('"navigationType":"REPLACE"')
+      expect(screen.getByTestId('navigation')).toHaveTextContent('"contentDeleted":true')
+      expect(db.deleteBuilder.delete).toHaveBeenCalledTimes(1)
+      expect(db.invoke).not.toHaveBeenCalled()
+      expect(db.rpc).not.toHaveBeenCalled()
+    } finally { confirm.mockRestore() }
+  })
+
+  it('locks synchronous repeated interaction and pending submission', async () => {
+    const db = createClient(post)
+    let finishDelete!: (value: { data: { id: string }[]; error: null }) => void
+    db.deleteBuilder.select.mockReturnValue(new Promise((resolve) => { finishDelete = resolve }))
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
+    try {
+      const button = await ready(db)
+      act(() => { fireEvent.click(button); fireEvent.click(button) })
+      await waitFor(() => expect(db.deleteBuilder.delete).toHaveBeenCalledTimes(1))
+      expect(confirm).toHaveBeenCalledTimes(1)
+      expect(screen.getByRole('button', { name: '삭제 중' })).toBeDisabled()
+      fireEvent.click(screen.getByRole('button', { name: '삭제 중' }))
+      expect(db.deleteBuilder.delete).toHaveBeenCalledTimes(1)
+      await act(async () => { finishDelete({ data: [{ id: post.id }], error: null }) })
+    } finally { confirm.mockRestore() }
+  })
+
+  it('preserves detail after failure and releases the lock for an explicit retry', async () => {
+    const db = createClient(post)
+    db.deleteBuilder.select.mockResolvedValue({ data: null, error: { code: '23503', message: 'wordpress_publication_attempts_post_owner_fkey' } })
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
+    try {
+      await userEvent.click(await ready(db))
+      expect(await screen.findByRole('alert')).toHaveTextContent('이력 보존')
+      expect(screen.getByRole('heading', { name: post.title })).toBeVisible()
+      expect(screen.getByTestId('navigation')).toHaveTextContent('"pathname":"/content/post-1"')
+      expect(db.deleteBuilder.delete).toHaveBeenCalledTimes(1)
+      await waitFor(() => expect(screen.getByRole('button', { name: '삭제' })).toBeEnabled())
+      db.deleteBuilder.select.mockResolvedValue({ data: [{ id: post.id }], error: null })
+      await userEvent.click(screen.getByRole('button', { name: '삭제' }))
+      await waitFor(() => expect(db.deleteBuilder.delete).toHaveBeenCalledTimes(2))
+      expect(db.invoke).not.toHaveBeenCalled()
+    } finally { confirm.mockRestore() }
   })
 })

@@ -10,6 +10,7 @@ import restoreExecutePageSource from '../pages/BackupRestoreExecutePage.tsx?raw'
 import restoreJobDetailPageSource from '../pages/BackupRestoreJobDetailPage.tsx?raw'
 import restoreJobsPageSource from '../pages/BackupRestoreJobsPage.tsx?raw'
 import restorePageSource from '../pages/BackupRestorePage.tsx?raw'
+import contentDetailPageSource from '../pages/ContentDetailPage.tsx?raw'
 import authProviderSource from '../features/auth/AuthProvider.tsx?raw'
 import backupLoaderSource from '../features/backups/backupGeneration.loader.ts?raw'
 import restoreExecutionLoaderSource from '../features/backups/restoreExecution.loader.ts?raw'
@@ -18,6 +19,8 @@ import restoreValidationLoaderSource from '../features/backups/restoreValidation
 import chatGptPasteWorkflowSource from '../features/imports/ChatGptPasteWorkflow.tsx?raw'
 import importLoaderSource from '../features/imports/importAnalysis.loader.ts?raw'
 import importAnalysisModuleSource from '../features/imports/importAnalysis.module.ts?raw'
+import contentDeleteDeferredSource from '../features/posts/ContentDeleteDeferred.tsx?raw'
+import postDeleteQueriesSource from '../features/posts/posts.delete.queries.ts?raw'
 
 describe('feature module boundaries', () => {
   it('keeps heavy Backup, Restore, and Import engines out of page static imports', () => {
@@ -47,6 +50,17 @@ describe('feature module boundaries', () => {
   it('keeps the ChatGPT paste parser in its workflow boundary', () => {
     expect(importAnalysisModuleSource).not.toMatch(/(?:from\s+|import\()\s*['"]\.\/parseChatGptPaste['"]/)
     expect(chatGptPasteWorkflowSource).toMatch(/from\s+['"]\.\/parseChatGptPaste['"]/)
+  })
+
+  it('keeps permanent content deletion behind its deferred feature leaf', () => {
+    expect(contentDetailPageSource).toContain("import('../features/posts/ContentDeleteDeferred')")
+    expect(contentDetailPageSource).not.toMatch(/from\s+['"]\.\.\/features\/posts\/posts\.delete\.(?:queries|repository)['"]/)
+    expect(contentDetailPageSource).not.toContain('usePostDeleteEligibilityQuery')
+    expect(contentDetailPageSource).not.toContain('useDeletePostMutation')
+    expect(contentDetailPageSource).not.toContain('inspectPostDeleteEligibility')
+    expect(contentDetailPageSource).not.toContain('deletePost')
+    expect(contentDeleteDeferredSource).toContain("from './posts.delete.queries'")
+    expect(postDeleteQueriesSource).toContain("from './posts.delete.repository'")
   })
 
   it('keeps job list and detail pages independent from analysis and plan engines', () => {

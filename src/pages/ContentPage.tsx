@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 
 import { useActiveCategoriesQuery } from '../features/categories/categories.queries'
 import { ContentList } from '../features/posts/ContentList'
@@ -35,6 +35,31 @@ export function ContentPageContent({
   client = supabase,
   userId,
 }: ContentPageContentProps) {
+  const location = useLocation()
+  const navigate = useNavigate()
+  const state: unknown = location.state
+  const hasDeleteSignal = typeof state === 'object' && state !== null &&
+    'contentDeleted' in state && state.contentDeleted === true
+  const [deleteFeedback, setDeleteFeedback] = useState({
+    key: location.key, visible: hasDeleteSignal, consuming: hasDeleteSignal,
+  })
+  if (deleteFeedback.key !== location.key) {
+    setDeleteFeedback({
+      key: location.key,
+      visible: hasDeleteSignal || deleteFeedback.consuming,
+      consuming: hasDeleteSignal,
+    })
+  }
+  useEffect(() => {
+    if (typeof state !== 'object' || state === null || !('contentDeleted' in state) || state.contentDeleted !== true) return
+    // Consume the history signal; local feedback lasts only for this list visit.
+    const nextState = { ...state }
+    Reflect.deleteProperty(nextState, 'contentDeleted')
+    void navigate(location.pathname + location.search + location.hash, {
+      replace: true,
+      state: Object.keys(nextState).length ? nextState : null,
+    })
+  }, [state, location.pathname, location.search, location.hash, navigate])
   const [categoryId, setCategoryId] = useState('')
   const [status, setStatus] = useState<ContentStatus | ''>('')
   const [search, setSearch] = useState('')
@@ -50,6 +75,7 @@ export function ContentPageContent({
 
   return (
     <section className="content-page" aria-labelledby="content-page-title">
+      {deleteFeedback.visible ? <p className="form-success" role="status">콘텐츠를 삭제했습니다.</p> : null}
       <div className="content-page__heading">
         <div>
           <p className="dashboard__eyebrow">콘텐츠 관리</p>

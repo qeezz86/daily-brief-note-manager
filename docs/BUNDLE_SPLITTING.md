@@ -155,6 +155,12 @@ Backup page의 설명·profile·예상 개수 query는 즉시 유지하고 생�
 
 기능 module loading은 route fallback과 별도로 action 영역의 `aria-busy`, `role="status"` 문구와 비활성 버튼으로 표시한다. 작업 중 입력 변경과 중복 클릭을 막고 기존 stale 무효화 정책을 유지한다. 비동기 import·repository 결과는 unmount된 component에 반영하지 않는다. 오류는 `BACKUP_MODULE_LOAD_FAILED`, `RESTORE_MODULE_LOAD_FAILED`, `IMPORT_MODULE_LOAD_FAILED`와 재시도 안내만 표시하며 raw message, stack과 chunk URL을 노출하거나 자동 reload하지 않는다.
 
+### Content delete deferred leaf
+
+Content detail route는 삭제 전용 query, repository, 확인·실행 UI를 `ContentDeleteDeferred` feature leaf로 분리하고 정적 literal dynamic import로만 연결한다. 따라서 초기 content-detail 정적 closure에는 삭제 전용 코드가 포함되지 않는다. 모듈 로딩 및 로드 실패 상태는 삭제 버튼을 비활성화한 채 fail closed하며 자동 import 재시도나 자동 reload를 수행하지 않는다.
+
+삭제 leaf는 네트워크 의존 기능이다. eligibility 조회와 삭제 mutation은 네트워크/API 성공으로만 권한을 확정하고, 파괴적 mutation을 오프라인 큐에 넣거나 재연결 뒤 지연 실행하지 않는다. 생성된 `assets/ContentDeleteDeferred-*.js` chunk는 이 특성에 맞춰 PWA precache에서만 좁게 제외하며, 이미 브라우저 cache에 있더라도 eligibility와 mutation 검사를 우회하지 않는다. Bundle baseline, route accounting 및 예산 정책은 변경하지 않는다.
+
 ## Production build 결과
 
 동일한 `npm run build` 기준 결과다. entry 파일 감소는 vendor 파일로 이동한 효과이므로 아래 정적 closure 합계와 함께 판단한다.
