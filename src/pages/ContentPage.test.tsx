@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, useLocation, useNavigate } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
 
 import type { Category } from '../features/categories/categories.types'
@@ -309,5 +309,50 @@ describe('ContentPage', () => {
     expect(
       within(card as HTMLElement).queryByText('SHOULD-NOT-BE-DISPLAYED'),
     ).not.toBeInTheDocument()
+  })
+})
+
+function ListNavigationProbe() {
+  const location = useLocation()
+  const navigate = useNavigate()
+  return <>
+    <div data-testid="list-state">{JSON.stringify(location.state)}</div>
+    <button onClick={() => void navigate('/content?visit=unrelated')}>다른 목록 방문</button>
+    <button onClick={() => void navigate(-1)}>이전 방문</button>
+  </>
+}
+
+function renderDeleteFeedback(state: unknown = null) {
+  const { client } = createMockClient()
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  return render(<QueryClientProvider client={queryClient}>
+    <MemoryRouter initialEntries={[{ pathname: '/content', state }]}>
+      <ListNavigationProbe />
+      <ContentPageContent client={client} userId="owner-a" />
+    </MemoryRouter>
+  </QueryClientProvider>)
+}
+
+describe('content delete list feedback', () => {
+  it('shows success and consumes only the narrow delete signal', async () => {
+    renderDeleteFeedback({ contentDeleted: true, unrelated: 'preserved' })
+    expect(await screen.findByText('콘텐츠를 삭제했습니다.')).toHaveAttribute('role', 'status')
+    expect(screen.getByTestId('list-state')).toHaveTextContent('{"unrelated":"preserved"}')
+    expect(screen.getByTestId('list-state')).not.toHaveTextContent('contentDeleted')
+  })
+
+  it.each([null, {}, { contentDeleted: false }, { contentDeleted: 'true' }])('does not show false success %#', async (state) => {
+    renderDeleteFeedback(state)
+    await screen.findByRole('heading', { name: '기준금리 전망 정리' })
+    expect(screen.queryByText('콘텐츠를 삭제했습니다.')).not.toBeInTheDocument()
+  })
+
+  it('does not replay consumed feedback on an unrelated visit or back navigation', async () => {
+    renderDeleteFeedback({ contentDeleted: true })
+    expect(await screen.findByText('콘텐츠를 삭제했습니다.')).toBeVisible()
+    await userEvent.click(screen.getByRole('button', { name: '다른 목록 방문' }))
+    expect(screen.queryByText('콘텐츠를 삭제했습니다.')).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: '이전 방문' }))
+    expect(screen.queryByText('콘텐츠를 삭제했습니다.')).not.toBeInTheDocument()
   })
 })

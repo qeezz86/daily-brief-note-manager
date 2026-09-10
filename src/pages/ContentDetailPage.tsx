@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { useState, type ComponentType } from 'react'
+import { useEffect, useRef, useState, type ComponentType } from 'react'
 import { Link, useParams } from 'react-router-dom'
 
 import { useAuth } from '../features/auth/useAuth'
@@ -28,14 +28,18 @@ import type { WordPressPostStatusAttempt } from '../features/wordpress/WordPress
 
 type WordPressPostStatusDeferredModule = typeof import('../features/wordpress/WordPressPostStatusDeferred')
 type WordPressPostStatusDeferredLoader = () => Promise<WordPressPostStatusDeferredModule>
+type ContentDeleteDeferredModule = typeof import('../features/posts/ContentDeleteDeferred')
+type ContentDeleteDeferredLoader = () => Promise<ContentDeleteDeferredModule>
 
 const loadWordPressPostStatusDeferred = () => import('../features/wordpress/WordPressPostStatusDeferred')
+const loadContentDeleteDeferred = () => import('../features/posts/ContentDeleteDeferred')
 
 interface ContentDetailPageContentProps {
   client?: DatabaseClient | null
   userId: string
   postId: string
   loadWordPressPostStatusDeferred?: WordPressPostStatusDeferredLoader
+  loadContentDeleteDeferred?: ContentDeleteDeferredLoader
 }
 
 function useWordPressPostStatusAttemptsQuery(client: DatabaseClient | null, userId: string, contentId: string) {
@@ -59,15 +63,26 @@ export function ContentDetailPageContent({
   userId,
   postId,
   loadWordPressPostStatusDeferred: loadDeferredFeature = loadWordPressPostStatusDeferred,
+  loadContentDeleteDeferred: loadDeleteFeature = loadContentDeleteDeferred,
 }: ContentDetailPageContentProps) {
   const [actionMessage, setActionMessage] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
+  const deleteModulePromise = useRef<Promise<ContentDeleteDeferredModule> | null>(null)
   const [postStatusLoadState, setPostStatusLoadState] = useState<'idle' | 'loading-module' | 'executing-existing-flow' | 'module-load-error'>('idle')
   const [postStatusLoadError, setPostStatusLoadError] = useState<string | null>(null)
   const [WordPressPostStatusDeferred, setWordPressPostStatusDeferred] = useState<ComponentType<{
     client: DatabaseClient | null
     contentId: string
     attempts: WordPressPostStatusAttempt[]
+  }> | null>(null)
+  const [deleteModuleLoadState, setDeleteModuleLoadState] = useState<'loading-module' | 'module-load-error'>('loading-module')
+  const [ContentDeleteDeferred, setContentDeleteDeferred] = useState<ComponentType<{
+    client: DatabaseClient | null
+    userId: string
+    postId: string
+    postTitle: string
+    hasWordPressUrl: boolean
+    wordpressAttemptsReadState: 'CHECKING' | 'READY' | 'CHECK_FAILED'
   }> | null>(null)
   const postQuery = usePostQuery(client, userId, postId)
   const categoriesQuery = useActiveCategoriesQuery(client)
@@ -86,6 +101,11 @@ export function ContentDetailPageContent({
   const newsUpdatesQuery = usePostNewsUpdatesQuery(isNewsPost ? client : null, userId, postId)
   const reorderMutation = useReorderNewsUpdatesMutation(client, userId, postId)
   const wordpressAttemptsQuery = useWordPressPostStatusAttemptsQuery(client, userId, postId)
+  const wordpressAttemptsReadState: 'CHECKING' | 'READY' | 'CHECK_FAILED' = wordpressAttemptsQuery.isError
+    ? 'CHECK_FAILED'
+    : wordpressAttemptsQuery.isPending || wordpressAttemptsQuery.isFetching
+      ? 'CHECKING'
+      : Array.isArray(wordpressAttemptsQuery.data) ? 'READY' : 'CHECK_FAILED'
   const wordpressStatusAttempt = (wordpressAttemptsQuery.data ?? []).find(
     (item) => item.operation === 'create_draft'
       && item.status === 'succeeded'
@@ -111,6 +131,22 @@ export function ContentDetailPageContent({
     if (value === 'advanced') return '고급'
     return value?.trim() || '미등록'
   }
+
+  useEffect(() => {
+    if (!post) return
+    deleteModulePromise.current ??= loadDeleteFeature()
+    let active = true
+    void deleteModulePromise.current
+      .then((module) => {
+        if (!active) return
+        setContentDeleteDeferred(() => module.ContentDeleteDeferred)
+      })
+      .catch(() => {
+        if (!active) return
+        setDeleteModuleLoadState('module-load-error')
+    })
+    return () => { active = false }
+  }, [post, loadDeleteFeature])
 
   async function handleArchive() {
     if (!post || post.content_status === 'archived') return
@@ -413,6 +449,30 @@ export function ContentDetailPageContent({
             {archiveMutation.isPending ? '보관 처리 중' : '보관 처리'}
           </button>
         ) : null}
+        {ContentDeleteDeferred ? (
+          <ContentDeleteDeferred
+            client={client}
+            userId={userId}
+            postId={post.id}
+            postTitle={post.title}
+            hasWordPressUrl={Boolean(post.wordpress_url)}
+            wordpressAttemptsReadState={wordpressAttemptsReadState}
+          />
+        ) : deleteModuleLoadState === 'module-load-error' ? (
+          <>
+            <p id="content-delete-module-error" className="form-alert" role="alert">
+              삭제 기능을 불러오지 못했습니다. 네트워크 연결을 확인해 주세요.
+            </p>
+            <button className="danger-button" type="button" aria-describedby="content-delete-module-error" disabled>삭제</button>
+          </>
+        ) : (
+          <>
+            <p id="content-delete-module-loading" className="field-help" role="status" aria-live="polite">
+              삭제 기능을 불러오는 중입니다.
+            </p>
+            <button className="danger-button" type="button" aria-describedby="content-delete-module-loading" disabled>삭제</button>
+          </>
+        )}
       </div>
     </article>
   )

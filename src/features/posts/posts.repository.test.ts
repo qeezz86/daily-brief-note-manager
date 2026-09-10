@@ -10,6 +10,7 @@ import {
   updatePost,
   updatePostImageMetadata,
 } from './posts.repository'
+import { deletePost, inspectPostDeleteEligibility } from './posts.delete.repository'
 import type { PostDetail } from './posts.types'
 
 const aiCategory: Category = {
@@ -436,5 +437,89 @@ describe('posts repository mutations', () => {
 
     expect(builder.update).toHaveBeenCalledWith({ content_status: 'archived' })
     expect(from).toHaveBeenCalledWith('posts')
+  })
+})
+
+describe('restrict-preserving content deletion', () => {
+  function setup(importData: { id: string }[] | null = [], wordpressData: { id: string }[] | null = []) {
+    const history = (data: { id: string }[] | null) => {
+      const builder = { select: vi.fn(), eq: vi.fn(), limit: vi.fn().mockResolvedValue({ data, error: null }) }
+      builder.select.mockReturnValue(builder)
+      builder.eq.mockReturnValue(builder)
+      return builder
+    }
+    const imports = history(importData)
+    const wordpress = history(wordpressData)
+    const posts = { delete: vi.fn(), eq: vi.fn(), select: vi.fn().mockResolvedValue({ data: [{ id: 'post-1' }], error: null }) }
+    posts.delete.mockReturnValue(posts)
+    posts.eq.mockReturnValue(posts)
+    const from = vi.fn((table: string) => {
+      if (table === 'import_job_items') return imports
+      if (table === 'wordpress_publication_attempts') return wordpress
+      if (table === 'posts') return posts
+      throw new Error(`Unexpected table: ${table}`)
+    })
+    return { client: { from } as unknown as DatabaseClient, from, posts, imports, wordpress }
+  }
+
+  it.each([
+    [[], [], 'DELETABLE'],
+    [[{ id: 'import' }], [], 'BLOCKED_IMPORT_HISTORY'],
+    [[], [{ id: 'attempt' }], 'BLOCKED_WORDPRESS_HISTORY'],
+    [[{ id: 'import' }], [{ id: 'attempt' }], 'BLOCKED_MULTIPLE_HISTORY'],
+    [null, [], 'CHECK_FAILED'],
+    [[], null, 'CHECK_FAILED'],
+  ] as const)('classifies protected references %#', async (imports, wordpress, expected) => {
+    const db = setup(imports === null ? null : [...imports], wordpress === null ? null : [...wordpress])
+    await expect(inspectPostDeleteEligibility(db.client, 'owner-a', 'post-1')).resolves.toBe(expected)
+    expect(db.imports.eq.mock.calls).toEqual([['owner_id', 'owner-a'], ['post_id', 'post-1']])
+    expect(db.wordpress.eq.mock.calls).toEqual([['owner_id', 'owner-a'], ['content_id', 'post-1']])
+    expect(db.wordpress.limit).toHaveBeenCalledWith(1)
+    expect(db.posts.delete).not.toHaveBeenCalled()
+  })
+
+  it.each(['imports', 'wordpress'] as const)('fails closed on %s query errors and rejects DELETE', async (table) => {
+    const db = setup()
+    db[table].limit.mockResolvedValue({ data: [], error: { message: 'private query failure' } })
+    await expect(inspectPostDeleteEligibility(db.client, 'owner-a', 'post-1')).resolves.toBe('CHECK_FAILED')
+    await expect(deletePost(db.client, 'owner-a', 'post-1')).rejects.toThrow('삭제 가능 여부')
+    expect(db.posts.delete).not.toHaveBeenCalled()
+    db[table].limit.mockRejectedValue(new Error('offline'))
+    await expect(inspectPostDeleteEligibility(db.client, 'owner-a', 'post-1')).resolves.toBe('CHECK_FAILED')
+  })
+
+  it('uses exactly one parent DELETE with both identity filters and no child/shared mutations', async () => {
+    const db = setup()
+    await deletePost(db.client, 'owner-a', 'post-1')
+    expect(db.posts.delete).toHaveBeenCalledTimes(1)
+    expect(db.posts.eq.mock.calls).toEqual([['id', 'post-1'], ['owner_id', 'owner-a']])
+    expect(db.posts.select).toHaveBeenCalledWith('id')
+    expect(db.from.mock.calls).toEqual([['import_job_items'], ['wordpress_publication_attempts'], ['posts']])
+  })
+
+  it.each([[[]], [null], [[{ id: 'other' }]], [[{ id: 'post-1' }, { id: 'other' }]]])('rejects unconfirmed row evidence %#', async (data) => {
+    const db = setup()
+    db.posts.select.mockResolvedValue({ data, error: null })
+    await expect(deletePost(db.client, 'owner-a', 'post-1')).rejects.toThrow('삭제 결과를 확인하지 못했습니다')
+    expect(db.posts.delete).toHaveBeenCalledTimes(1)
+  })
+
+  it.each(['import_job_items_post_id_owner_id_fkey', 'wordpress_publication_attempts_post_owner_fkey'])('preserves FK rejection for %s without retry', async (constraint) => {
+    const db = setup()
+    db.posts.select.mockResolvedValue({ data: null, error: { code: '23503', message: `violates ${constraint}` } })
+    await expect(deletePost(db.client, 'owner-a', 'post-1')).rejects.toThrow('이력 보존')
+    expect(db.posts.delete).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not classify an unknown FK as protected history', async () => {
+    const db = setup()
+    db.posts.select.mockResolvedValue({ data: null, error: { code: '23503', message: 'unrelated private detail' } })
+    await expect(deletePost(db.client, 'owner-a', 'post-1')).rejects.toThrow('콘텐츠를 삭제하지 못했습니다.')
+  })
+
+  it('rechecks new history before issuing a DELETE', async () => {
+    const db = setup([{ id: 'late-import' }])
+    await expect(deletePost(db.client, 'owner-a', 'post-1')).rejects.toThrow('이력 보존')
+    expect(db.posts.delete).not.toHaveBeenCalled()
   })
 })
