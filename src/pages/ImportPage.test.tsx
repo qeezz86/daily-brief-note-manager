@@ -307,6 +307,8 @@ describe('ImportPageContent', () => {
     renderPage()
     expect(screen.queryByLabelText('WordPress HTML 원문')).not.toBeInTheDocument()
     await userEvent.click(screen.getByRole('radio', { name: 'WordPress HTML 붙여넣기' }))
+    // Let the lazy import and Suspense render settle before the DOM query's timeout starts.
+    await act(async () => { await vi.dynamicImportSettled() })
     expect(await screen.findByRole('heading', { name: 'WordPress HTML 붙여넣기' })).toBeInTheDocument()
     expect(screen.getByLabelText('WordPress HTML 원문')).toBeInTheDocument()
     expect(prepareImportJobMock).not.toHaveBeenCalled()

@@ -151,6 +151,8 @@ test('generates and preserves a recent-count 10 prompt run', async ({ page }) =>
   })
 
   await page.goto('/briefing-prompts')
+  // A cold CI dev server must finish loading the lazy route before form assertions.
+  await page.getByRole('heading', { name: '브리핑 프롬프트', exact: true }).waitFor({ state: 'visible' })
   const referenceDate = page.getByLabel('작성 기준일')
   await expect(referenceDate).toBeVisible()
   await referenceDate.fill(REFERENCE_DATE)
