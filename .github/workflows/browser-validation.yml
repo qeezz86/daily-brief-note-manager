@@ -1,0 +1,45 @@
+name: Browser validation
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  browser-validation:
+    name: browser-validation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      CI: 'true'
+      PLAYWRIGHT_HTML_OPEN: never
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Install Chromium and WebKit with system dependencies
+        run: npx --no-install playwright install --with-deps chromium webkit
+      # Playwright starts Vite with placeholder config; tests intercept backend requests.
+      - name: Run full Chromium and iPhone suites
+        run: npm run test:e2e -- --project=chromium --project=iphone --workers=2 --retries=0 --reporter=list,html --trace=retain-on-failure
+      - name: Upload browser reports and failure traces
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-validation-report
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: warn
+          retention-days: 7

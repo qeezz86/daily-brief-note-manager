@@ -83,12 +83,21 @@ Bundle budget CI는 Supabase module을 포함한 production graph를 일정하�
 
 ## Repository CI
 
-모든 Pull Request와 `main` push에서 다음 두 workflow를 secret 없이 실행합니다.
+모든 Pull Request와 `main` push에서 다음 세 workflow를 secret 없이 실행합니다.
 
 - `bundle-budget`: production build와 bundle budget을 검증하고 report artifact를 보존합니다.
 - `offline-validation`: lint, 전체 Vitest suite, Supabase fresh baseline checker, WordPress production readiness checker와 manifest-driven database runtime evidence를 실행합니다.
+- [`browser-validation`](.github/workflows/browser-validation.yml): Ubuntu 24.04·Node 22에서 Chromium과 WebKit을 설치한 뒤 `chromium`·`iphone` 전체 E2E suite를 worker 2개, 재시도 0회로 실행합니다. HTML report와 실패 trace를 7일간 artifact로 보존합니다.
 
 `offline-validation`의 database evidence 단계는 GitHub-hosted 임시 로컬 Supabase를 한 번만 시작하고 DB lint, manifest에 등록된 `chatgpt_paste_post` 40개·`wordpress_manual_post` 30개 pgTAP suite, generated database types의 RPC contract를 phase-neutral하게 검증합니다. 개발자 workstation DB lifecycle, 원격·linked Supabase와 production DB는 사용하지 않습니다. E2E와 WordPress smoke는 이 workflow 범위 밖이며 Vercel status도 repository validation과 별도입니다.
+
+`browser-validation`은 Playwright가 관리하는 로컬 Vite 서버와 가짜 Supabase 인증·API 응답을 사용합니다. 운영 credential이나 실행 중인 Supabase DB가 필요하지 않습니다. 기존 브라우저별 skip은 유지하며 테스트 실패는 workflow 실패로 처리합니다. 이 검증은 실제 iPhone 기기, 운영 WordPress·Supabase 또는 C3 runtime 검증을 대신하지 않습니다. 병합 필수 검사로 강제하려면 저장소 ruleset/branch protection에 `browser-validation` check를 별도로 등록해야 합니다.
+
+동일한 E2E 실행 옵션은 다음과 같습니다. CI에서는 `CI=true`와 `PLAYWRIGHT_HTML_OPEN=never`도 설정합니다.
+
+```bash
+npm run test:e2e -- --project=chromium --project=iphone --workers=2 --retries=0 --reporter=list,html --trace=retain-on-failure
+```
 
 ## WordPress read-only 진단
 

@@ -18,12 +18,20 @@ const labels: Record<string, string> = { IN_SYNC: '현재 원격 상태를 확�
 export function WordPressPostStatusPanel({ client, contentId, attempts, autoStart = false }: Props) {
   const attempt = attempts.find((item) => item.operation === 'create_draft' && item.status === 'succeeded' && typeof item.wordpress_post_id === 'number' && item.wordpress_post_id > 0)
   const mutation = useWordPressPostStatusMutation(client, contentId)
+  const { mutate } = mutation
+  const attemptId = attempt?.id
   const autoStartedAttemptId = useRef<string | null>(null)
   useEffect(() => {
-    if (!autoStart || !attempt || autoStartedAttemptId.current === attempt.id) return
-    autoStartedAttemptId.current = attempt.id
-    mutation.mutate({ contentId, attemptId: attempt.id })
-  }, [attempt, autoStart, contentId, mutation])
+    if (!autoStart || !attemptId || autoStartedAttemptId.current === attemptId) return
+    let active = true
+    // Start after StrictMode's subscription cleanup/replay; discard the cleaned-up effect.
+    queueMicrotask(() => {
+      if (!active) return
+      autoStartedAttemptId.current = attemptId
+      mutate({ contentId, attemptId })
+    })
+    return () => { active = false }
+  }, [attemptId, autoStart, contentId, mutate])
   if (!attempt) return null
   const result = mutation.data
   return <section className="content-detail__section" aria-labelledby="wordpress-post-status-title">
