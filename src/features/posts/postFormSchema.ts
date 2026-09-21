@@ -12,6 +12,7 @@ import {
   tagComparisonKey,
 } from './publicationFields'
 import { findSeoTagComparisons } from './seoTagComparison'
+import { isPublicationTimestamp, sourceTimeZone } from './publicationDates'
 
 const slugPattern = /^(?!-)(?!.*--)[a-z0-9]+(?:-[a-z0-9]+)*$/
 const difficultyValues = ['beginner', 'intermediate', 'advanced'] as const
@@ -78,6 +79,14 @@ export const postFormSchema = z
     referenceDate: z.string().default(''),
   })
   .superRefine((values, context) => {
+    values.sources.forEach((source, index) => {
+      if (source.sourcePublishedAt && !isPublicationTimestamp(source.sourcePublishedAt, sourceTimeZone(source.sourceUrl))) {
+        context.addIssue({ code: 'custom', message: '올바른 게시·업데이트 일시를 입력해 주세요.', path: ['sources', index, 'sourcePublishedAt'] })
+      }
+    })
+    if (values.originalPublishedAt.trim() && !isPublicationTimestamp(values.originalPublishedAt, 'Asia/Shanghai')) {
+      context.addIssue({ code: 'custom', message: '올바른 원문 게시·업데이트 시각을 입력해 주세요.', path: ['originalPublishedAt'] })
+    }
     if (values.contentStatus === 'published' && !values.publishedOn) {
       context.addIssue({
         code: 'custom',
@@ -162,9 +171,6 @@ export const postFormSchema = z
         } else if (!isHttpUrl(source.sourceUrl)) {
           context.addIssue({ code: 'custom', message: '출처 URL은 절대 HTTP 또는 HTTPS URL이어야 합니다.', path: ['sources', sourcePath, 'sourceUrl'] })
         }
-        if (source.sourcePublishedAt && Number.isNaN(Date.parse(source.sourcePublishedAt))) {
-          context.addIssue({ code: 'custom', message: '올바른 게시·업데이트 일시를 입력해 주세요.', path: ['sources', sourcePath, 'sourcePublishedAt'] })
-        }
       })
       const sourceKeys = nonEmptySources.filter((source) => isHttpUrl(source.sourceUrl)).map((source) => normalizeSourceUrl(source.sourceUrl))
       if (new Set(sourceKeys).size !== sourceKeys.length) {
@@ -172,9 +178,6 @@ export const postFormSchema = z
       }
       if (values.contentGroup === 'chinese' && values.originalUrl.trim() && !isHttpUrl(values.originalUrl)) {
         context.addIssue({ code: 'custom', message: '원문 URL은 절대 HTTP 또는 HTTPS URL이어야 합니다.', path: ['originalUrl'] })
-      }
-      if (values.contentGroup === 'chinese' && values.originalPublishedAt.trim() && Number.isNaN(Date.parse(values.originalPublishedAt))) {
-        context.addIssue({ code: 'custom', message: '올바른 원문 게시·업데이트 시각을 입력해 주세요.', path: ['originalPublishedAt'] })
       }
     }
 
@@ -221,8 +224,6 @@ export const postFormSchema = z
       }
       if (!values.originalPublishedAt.trim()) {
         context.addIssue({ code: 'custom', message: '원문 게시·업데이트 시각을 입력해 주세요.', path: ['originalPublishedAt'] })
-      } else if (Number.isNaN(Date.parse(values.originalPublishedAt))) {
-        context.addIssue({ code: 'custom', message: '올바른 원문 게시·업데이트 시각을 입력해 주세요.', path: ['originalPublishedAt'] })
       }
       if (!values.episodeListIncluded) context.addIssue({ code: 'custom', message: '본편 목록 포함 여부를 명시적으로 선택해 주세요.', path: ['episodeListIncluded'] })
       if (!values.verifiedCoreFact.trim()) context.addIssue({ code: 'custom', message: '확인한 핵심 사실을 입력해 주세요.', path: ['verifiedCoreFact'] })

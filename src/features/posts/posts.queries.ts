@@ -10,7 +10,6 @@ import {
   getInfoDbMetadataByPostId,
   getPostSources,
   getPostTags,
-  getPosts,
   getSeoDataByPostId,
   updatePost,
   updatePostImageMetadata,
@@ -86,23 +85,6 @@ export function useSeoDataQuery(
     },
     enabled: client !== null && userId !== '' && postId !== '',
     retry: false,
-  })
-}
-
-export function usePostsQuery(
-  client: DatabaseClient | null,
-  userId: string,
-) {
-  return useQuery({
-    queryKey: postQueryKeys.list(userId),
-    queryFn: () => {
-      if (!client) {
-        throw new Error('Supabase 연결이 설정되지 않았습니다.')
-      }
-
-      return getPosts(client)
-    },
-    enabled: client !== null && userId !== '',
   })
 }
 

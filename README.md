@@ -2,9 +2,11 @@
 
 Daily Brief Note의 콘텐츠, SEO 정보, 출처, 뉴스 추적 이력과 생성 프롬프트를 관리하기 위한 비공개 웹앱입니다.
 
+현재 `/imports`는 **기존 JSON Import**, **ChatGPT 구조화 붙여넣기**, **뉴스 일반 응답 붙여넣기**, **비뉴스 일반 응답 붙여넣기**, **WordPress HTML 붙여넣기**의 다섯 입력 모드를 제공합니다. JSON Import는 영구 작업 이력에서 순차 실행·수동 재시도하며, 붙여넣기 모드는 분석·미리보기·검증과 명시적 저장 확인을 거칩니다.
+
 현재 저장소의 canonical migration inventory는 28개입니다. 앞 22개가 적용된 기존 환경에는 publication-attempt retention, news prompt recent-count, article image prompt·ALT 전용 저장 RPC, operational dashboard overview RPC, structured ChatGPT paste 저장 RPC, manual WordPress HTML 저장 RPC migration을 순서대로 적용하는 incremental plan을 사용합니다. Machine-readable whitelist와 offline checker는 [`config/supabase-fresh-project-baseline.json`](config/supabase-fresh-project-baseline.json), 전체 승인·검증 정책은 [`docs/SUPABASE_FRESH_PROJECT_BASELINE.md`](docs/SUPABASE_FRESH_PROJECT_BASELINE.md)를 따릅니다. 추적 database types의 Phase 5H RPC declaration은 compilation용 provisional 상태이며 canonical generated-types freshness와 database runtime은 required CI evidence가 확정합니다.
 
-Phase 5G의 `/imports`에는 기존 JSON Import와 격리된 **ChatGPT 구조화 붙여넣기** mode가 있습니다. 브라우저의 결정적 로컬 parser가 지원 section을 미리보기로 만들고 차단 오류·무시 필드·저장하지 않는 `NEWS_TRACKING_JSON`을 표시합니다. 경고는 명시적으로 확인해야 하며, 유효한 미리보기도 사용자가 한 건 저장을 확인하기 전에는 DB 요청을 보내지 않습니다. raw paste는 RPC payload, 로그, telemetry 또는 백업에 포함하지 않고, 저장 실패는 원문 DB 오류를 숨긴 채 미리보기를 유지하여 수동 재시도만 허용합니다.
+Phase 5G의 `/imports`에는 기존 JSON Import와 격리된 **ChatGPT 구조화 붙여넣기** mode가 있습니다. 브라우저의 결정적 로컬 parser가 지원 section을 미리보기로 만들고 차단 오류·무시 필드·저장하지 않는 `NEWS_TRACKING_JSON`을 표시합니다. 경고는 명시적으로 확인해야 하며, 유효한 미리보기도 사용자가 한 건 저장을 확인하기 전에는 DB 쓰기 요청을 보내지 않습니다. raw paste는 RPC payload, 로그, telemetry 또는 백업에 포함하지 않고, 저장 실패는 원문 DB 오류를 숨긴 채 미리보기를 유지하여 수동 재시도만 허용합니다.
 
 Phase 5H는 같은 `/imports`에 lazy-loaded **WordPress HTML 붙여넣기** mode를 추가합니다. 최대 20 MiB 원문을 WordPress fetch 없이 브라우저 `DOMParser`로만 분석하고, 원문 문자열은 재직렬화하지 않은 채 editable textarea와 구조 필드 미리보기로 유지합니다. runtime category wrapper로 분류하고 모호한 후보를 사용자가 보완한 뒤 legacy-default canonical validation과 exact duplicate 검사를 수행합니다. 저장 직전 duplicate를 다시 확인하고 명시적 confirmation 뒤에만 `save_wordpress_manual_post(jsonb)`를 한 번 호출합니다. 서버는 새 post의 provenance를 `wordpress_manual`로 원자적으로 고정하며 뉴스 issue/change-log/watch-points는 Phase 5H에서 preview-only이고 tracking row로 저장하지 않습니다.
 
@@ -120,7 +122,7 @@ npm run smoke:wordpress-runtime
 
 `WORDPRESS_LOCAL_MODE=true`는 정확한 `host.docker.internal` 또는 localhost root URL을 로컬 mock 용도로만 허용합니다. 원격 배포에서는 절대 활성화하지 않습니다.
 
-Phase 5B의 `/settings/wordpress`는 기존 WordPress category/tag catalog를 GET-only로 읽어 로컬 category·tag와 명시적으로 매핑합니다. 콘텐츠 상세의 `WordPress Dry Run`은 source-of-truth DB 데이터를 다시 읽어 taxonomy 해석, 전체 공개 상태 범위의 duplicate slug, blockers/warnings, draft payload와 결정적 SHA-256 fingerprint를 표시합니다. WordPress 게시·draft 생성·taxonomy 생성 버튼과 WordPress write request는 없습니다. 계약은 `docs/WORDPRESS_PUBLICATION_PLAN.md`를 따르며 격리 smoke는 `npm run smoke:wordpress-preview`로 실행합니다.
+Phase 5B의 `/settings/wordpress`는 기존 WordPress category/tag catalog를 GET-only로 읽어 로컬 category·tag와 명시적으로 매핑합니다. 콘텐츠 상세의 `WordPress Dry Run`은 source-of-truth DB 데이터를 다시 읽어 taxonomy 해석, 전체 공개 상태 범위의 duplicate slug, blockers/warnings, draft payload와 결정적 SHA-256 fingerprint를 표시합니다. 이 Dry Run 자체는 WordPress에 쓰지 않으며, 실제 초안 생성은 별도 확인을 거치는 Phase 5C 동작입니다. WordPress publish와 taxonomy 생성은 지원하지 않습니다. 계약은 `docs/WORDPRESS_PUBLICATION_PLAN.md`를 따르며 격리 smoke는 `npm run smoke:wordpress-preview`로 실행합니다.
 
 Phase 5B-R1은 위 흐름을 Playwright의 결정적 Supabase/Edge Function interception으로 Chromium과 iPhone 13에서 검증합니다. 테스트는 인증된 콘텐츠 상세 → preview 이동, loading/ready/blocked/warning, payload 복사, taxonomy 매핑 저장·제거 확인과 mobile overflow를 검사하며 실제 WordPress나 원격 Supabase에 접속하지 않습니다. SEO 태그 원문은 보존하고 NFC·공백 축소 후 공백/하이픈/en dash/em dash/중점/underscore 제거와 locale-independent lowercase를 비교에만 적용합니다. 비교 결과가 같으면 `SEO_TAG_DUPLICATE_NORMALIZED` blocker, 제한적인 포함 관계이면 `SEO_TAG_POSSIBLE_NEAR_DUPLICATE` warning이며 태그를 자동 삭제하거나 병합하지 않습니다. frontend와 Edge Function은 `fixtures/seo-tag-normalization.json` 전체를 각각 실행해 규칙 동등성을 고정합니다.
 
@@ -163,7 +165,13 @@ npm run db:stop
 npx supabase gen types typescript --local > src/shared/supabase/database.types.ts
 ```
 
-로그인 후 `/content`에서 활성 카테고리와 현재 사용자의 콘텐츠를 조회하고 카테고리·상태·제목·slug로 필터링할 수 있습니다. `/content/new`에서 기본 정보를 생성하고, `/content/:postId`와 `/content/:postId/edit`에서 상세 조회와 수정을 할 수 있습니다. 삭제 대신 상태를 `archived`로 바꾸는 논리적 보관을 사용합니다.
+## 콘텐츠 관리
+
+로그인 후 `/content`에서 현재 사용자의 콘텐츠를 조회하고 활성 카테고리·상태·제목·slug로 필터링할 수 있습니다. 조건은 서버에서 적용하며 수정일 내림차순, 같은 수정일이면 내부 ID 내림차순으로 20개씩 조회합니다. 전체 또는 검색 결과의 정확한 개수와 표시 범위를 보여 주고 이전·다음 페이지 이동을 지원하므로, 1,000건 이후 콘텐츠도 검색 대상에 포함됩니다. 필터·검색 조건을 변경하면 첫 페이지로 이동합니다. `/content/new`에서 기본 정보를 생성하고, `/content/:postId`와 `/content/:postId/edit`에서 상세 조회와 수정을 할 수 있습니다.
+
+**보관과 영구 삭제는 별도 동작입니다.** 보관은 상태를 `archived`로 바꾸며, 영구 삭제는 콘텐츠 상세에서 제목이 포함된 확인창을 거쳐 Content Manager의 로컬 콘텐츠와 기존 DB 규칙에 따른 하위 데이터를 삭제합니다. 삭제한 콘텐츠는 복구할 수 없습니다. Import 이력이나 WordPress 발행 시도 이력이 연결되어 있으면 삭제할 수 없으며, 이력 조회 중이거나 조회에 실패한 경우에도 삭제를 차단합니다. 보관된 콘텐츠도 같은 조건을 충족하면 삭제할 수 있습니다. WordPress 원격 게시물, 과거 백업, 생성된 프롬프트와 스냅샷은 삭제하지 않습니다. 목록에서의 삭제와 일괄 삭제는 제공하지 않습니다. 상세 정책은 [제품 명세](docs/PRODUCT_SPEC.md)의 ‘Phase 5O-A 콘텐츠 영구 삭제’를 참고합니다.
+
+출처 게시·업데이트 일시는 일반 URL이면 `Asia/Seoul`, 공식 CCTV 개별 원문 URL이면 `Asia/Shanghai` 기준으로 표시·입력합니다. 중국어 원문 일시는 상하이 기준이며 입력란에 시간대를 안내합니다. 저장 시 브라우저 시간대에 의존하지 않고, 시각을 수정하지 않으면 기존 초·소수초 정밀도를 보존합니다. 날짜만 있는 발행일을 임의 시각으로 변환하거나 과거에 잘못 저장된 시각을 일괄 보정하지 않습니다.
 
 `/news-topics`에서는 뉴스 카테고리의 주제를 카테고리·상태·대표 제목·주제 키로 필터링할 수 있습니다. 주제 키는 영문 소문자·숫자·하이픈으로 만들며 생성 후 변경하지 않습니다. 주제 상태는 `active`, `monitoring`, `closed`, `reopened`이고 전용 RPC가 상태·종료 사유·상태 이력을 한 트랜잭션으로 저장합니다. 재개 시 마지막 종료 사유는 보존하고 재개 사유는 상태 이력에 기록합니다. 뉴스 주제의 물리 삭제 UI는 제공하지 않습니다.
 
@@ -183,7 +191,9 @@ Phase 5I의 보호 경로 `/non-news-contexts`는 AI 칼럼 20개, 정보DB 30�
 
 Phase 3B-4 검증 결과는 `valid`, `warning`, `invalid`를 구분합니다. 오류가 있거나 설정 변경으로 미리보기가 stale이면 프롬프트 저장과 복사를 차단하며 JSON 복사는 디버깅 목적으로 유지합니다. 데이터 부재, 간단 모드의 정상적인 상세 생략, exact headline 중복, 과도한 길이 같은 경고는 확인 후 저장·복사를 허용합니다. 새 snapshot에는 `promptValidationVersion`과 오류 없는 validation summary만 선택적으로 저장합니다. 과거 이력은 현재 규칙으로 재검증하지 않으며 저장 당시 summary가 없으면 이전 이력으로 표시합니다. AI 의미 유사도, 외부 기사 비교와 실제 뉴스 사실 검증은 수행하지 않습니다.
 
-`/imports`는 UTF-8 `.json` 파일과 직접 붙여넣은 JSON 중 마지막으로 선택한 한 입력만 사용합니다. 파일 제한은 20 MB, 게시물 제한은 2,000개이며 BOM, 과도한 중첩·문자열, prototype pollution 키를 차단합니다. DB exact duplicate 후보는 100개씩 RLS 범위에서 순차 확인하고 조회 상태가 `complete`일 때만 job을 만들 수 있습니다. source와 item fingerprint는 canonical JSON의 SHA-256이며 파일명은 동일 bundle 판정에 포함하지 않습니다. snapshot은 100개씩 idempotent하게 등록되고 finalize 이후 직접 수정할 수 없습니다. 동일 사용자·동일 fingerprint는 새 job 대신 기존 상세로 연결됩니다. 브라우저가 닫힌 동안 자동 실행하지 않고 자동 retry도 수행하지 않으며, 사용자가 작업 상세에서 명시적으로 계속 실행하거나 실패 단계를 재시도합니다. 전체 백업의 `data` schema 또는 backup format은 이 화면에서 받지 않습니다.
+`/imports`의 **기존 JSON Import** mode는 UTF-8 `.json` 파일과 직접 붙여넣은 JSON 중 마지막으로 선택한 한 입력만 사용합니다. 파일 제한은 20 MB, 게시물 제한은 2,000개입니다. 선두 UTF-8 BOM은 제거하고 과도한 중첩·문자열, prototype pollution 키를 차단합니다. DB exact duplicate 후보는 100개씩 RLS 범위에서 순차 확인하고 조회 상태가 `complete`일 때만 job을 만들 수 있습니다. source와 item fingerprint는 canonical JSON의 SHA-256이며 파일명은 동일 bundle 판정에 포함하지 않습니다. snapshot은 100개씩 idempotent하게 등록되고 finalize 이후 직접 수정할 수 없습니다. 동일 사용자·동일 fingerprint는 새 job 대신 기존 상세로 연결됩니다. 브라우저가 닫힌 동안 자동 실행하지 않고 자동 retry도 수행하지 않으며, 사용자가 작업 상세에서 명시적으로 계속 실행하거나 실패 단계를 재시도합니다. 전체 백업의 `data` schema 또는 backup format은 이 화면에서 받지 않습니다.
+
+**뉴스 일반 응답 붙여넣기**는 사람용 10-section 응답을 뉴스 초안 후보로 분석합니다. 사용자가 활성 뉴스 카테고리와 브리핑 날짜를 지정하고 미리보기·검증·중복 확인을 거쳐 한 건의 초안을 명시적으로 저장합니다. 뉴스 추적 데이터는 이 저장에 포함하지 않습니다. 저장 후 콘텐츠 상세에서는 연결된 뉴스 항목 수에 따라 추적 ‘미기록’ 또는 ‘기록됨’을 표시하고, 기존 주제 선택·새 주제 생성·뉴스 항목 추가로 수동 연결할 수 있습니다. 조회 중이거나 조회에 실패한 상태를 ‘미기록’으로 단정하지 않으며 기사 내용에서 추적 정보를 자동 추론하지 않습니다.
 
 `/backups`와 `/backups/new`는 공식 `daily-brief-note-backup` schema version 1 JSON을 브라우저에서 생성합니다. DB 함수는 `auth.uid()` 범위의 행만 한 SQL snapshot에서 읽고 `owner_id`를 내보내지 않습니다. Phase 5B snapshot은 credential 없는 `wordpressTaxonomyMappings` optional section을 포함하며 해당 section이 없는 기존 version 1 파일도 계속 검증·복원합니다. 생성기는 관계 무결성과 민감정보 패턴을 검사하고, checksum 필드를 제외한 canonical payload의 SHA-256을 계산한 뒤 즉시 재검증합니다. 20 MB 이상은 경고하고 100 MB를 초과하면 생성을 중단합니다. 다운로드 파일명은 `daily-brief-note-backup-{profile}-{Asia/Seoul 시각}.json`입니다.
 

@@ -43,6 +43,8 @@ const targetKeys = [
   ['news-updates', 'post', owner, post], ['news-updates', 'sources', owner, post, 'update-1'],
 ]
 const affectedKeys = [
+  [...postQueryKeys.list(owner), { page: 2, categoryId: '', status: '', search: '' }],
+  [...postQueryKeys.list(owner), { page: 1, categoryId: 'economy', status: 'draft', search: '검색' }],
   postQueryKeys.list(owner), ['news-updates', 'topic', owner, 'topic-1'],
   ['news-updates', 'detail', owner, 'update-1'], ['news-updates', 'previous', owner, 'topic-1'],
   ['news-topics', 'detail', owner, 'topic-1'], ['news-followups', 'list', owner],

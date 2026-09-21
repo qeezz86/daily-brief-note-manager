@@ -1,4 +1,5 @@
 import type { PostFormValues } from './postFormSchema'
+import { publicationTimestamp, sourceTimeZone } from './publicationDates'
 
 function emptyToNull(value: string) {
   return value.trim() || null
@@ -25,7 +26,7 @@ export function toNullablePostFormValues(values: PostFormValues) {
     programName: emptyToNull(values.programName),
     originalTitle: emptyToNull(values.originalTitle),
     originalUrl: emptyToNull(values.originalUrl),
-    originalPublishedAt: emptyToNull(values.originalPublishedAt),
+    originalPublishedAt: publicationTimestamp(values.originalPublishedAt, 'Asia/Shanghai'),
     episodeListIncluded: values.episodeListIncluded === ''
       ? null
       : values.episodeListIncluded === 'true',
@@ -43,7 +44,7 @@ export function toNullablePostFormValues(values: PostFormValues) {
         sourceName: source.sourceName.trim(),
         sourceTitle: source.sourceTitle.trim(),
         sourceUrl: source.sourceUrl.trim(),
-        sourcePublishedAt: source.sourcePublishedAt.trim(),
+        sourcePublishedAt: publicationTimestamp(source.sourcePublishedAt, sourceTimeZone(source.sourceUrl)) ?? '',
         checkedPoint: source.checkedPoint.trim(),
       })),
   }

@@ -294,6 +294,7 @@ describe('ImportPageContent', () => {
     renderPage()
     expect(screen.queryByLabelText('비뉴스 canonical 10-section 응답 plain text')).not.toBeInTheDocument()
     await userEvent.click(screen.getByRole('radio', { name: '비뉴스 일반 응답 붙여넣기' }))
+    await act(async () => { await vi.dynamicImportSettled() })
     expect(await screen.findByRole('heading', { name: '비뉴스 일반 응답 붙여넣기' })).toBeInTheDocument()
     expect(screen.getByLabelText('카테고리')).toBeInTheDocument()
     expect(screen.getByLabelText('시리즈 번호')).toBeInTheDocument()
