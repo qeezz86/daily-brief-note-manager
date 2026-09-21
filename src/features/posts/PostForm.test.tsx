@@ -81,6 +81,31 @@ function renderCreateForm(onSubmit = vi.fn().mockResolvedValue(undefined)) {
 }
 
 describe('PostForm', () => {
+  it('displays source times in their zones and preserves precision on an unrelated edit', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn().mockResolvedValue(undefined)
+    const timestamp = '2026-09-15T16:30:45.123456+00:00'
+    render(<PostForm mode="edit" categories={categories} post={post}
+      postSources={[
+        { id: 'source-1', source_name: '일반 출처', source_title: '원문', source_url: 'https://example.com/a', source_published_at: timestamp, checked_point: '확인', sort_order: 0 },
+        { id: 'source-2', source_name: 'CCTV', source_title: '원문', source_url: 'https://news.cctv.com/a/1', source_published_at: timestamp, checked_point: '확인', sort_order: 1 },
+      ]} isSaving={false} submitError={null} onSubmit={onSubmit} />)
+    const times = screen.getAllByLabelText('게시·업데이트 일시')
+    expect(times[0]).toHaveValue('2026-09-16T01:30:45.123')
+    expect(times[1]).toHaveValue('2026-09-16T00:30:45.123')
+    expect(times[0]).toHaveAccessibleDescription('한국 표준시(Asia/Seoul) 기준입니다.')
+    expect(times[1]).toHaveAccessibleDescription('중국 표준시(Asia/Shanghai) 기준입니다.')
+    await user.type(screen.getByLabelText('제목', { exact: true }), ' 수정')
+    await user.click(screen.getByRole('button', { name: '변경 사항 저장' }))
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
+      briefingDate: '2026-07-10',
+      sources: [
+        expect.objectContaining({ sourcePublishedAt: timestamp }),
+        expect.objectContaining({ sourcePublishedAt: timestamp }),
+      ],
+    })))
+  })
+
   it('shows AI and information-DB metadata only for their content groups', () => {
     render(<PostForm mode="edit" categories={categories} post={{ ...post, category_id: 'ai-column', display_id: 'AI-001', series_no: 1, briefing_date: null }} isSaving={false} submitError={null} onSubmit={vi.fn().mockResolvedValue(undefined)} />)
     expect(screen.getByRole('group', { name: 'AI 칼럼 정보' })).toBeInTheDocument()

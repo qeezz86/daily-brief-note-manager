@@ -30,6 +30,7 @@ import {
   type SeoData,
 } from './posts.types'
 import type { PostImageMetadata } from './posts.repository'
+import { publicationDateTimeInput, preservePublicationTimestamp, sourceTimeZone } from './publicationDates'
 
 function toMetadataDifficulty(value: string | null | undefined): '' | 'beginner' | 'intermediate' | 'advanced' {
   return value === 'beginner' || value === 'intermediate' || value === 'advanced' ? value : ''
@@ -119,18 +120,14 @@ export function PostForm({
         sourceName: source.source_name,
         sourceTitle: source.source_title,
         sourceUrl: source.source_url,
-        sourcePublishedAt: source.source_published_at
-          ? source.source_published_at.slice(0, 16)
-          : '',
+        sourcePublishedAt: publicationDateTimeInput(source.source_published_at, sourceTimeZone(source.source_url)),
         checkedPoint: source.checked_point,
       })),
       learningTopic: chineseMetadata?.learning_topic ?? '',
       programName: chineseMetadata?.program_name ?? '',
       originalTitle: chineseMetadata?.original_title ?? '',
       originalUrl: chineseMetadata?.original_url ?? '',
-      originalPublishedAt: chineseMetadata?.original_published_at
-        ? chineseMetadata.original_published_at.slice(0, 16)
-        : '',
+      originalPublishedAt: publicationDateTimeInput(chineseMetadata?.original_published_at, 'Asia/Shanghai'),
       episodeListIncluded: chineseMetadata?.episode_list_included === null || chineseMetadata?.episode_list_included === undefined
         ? ''
         : String(chineseMetadata.episode_list_included) as 'true' | 'false',
@@ -213,7 +210,18 @@ export function PostForm({
       }
     }
 
-    await onSubmit(values)
+    await onSubmit({
+      ...values,
+      originalPublishedAt: preservePublicationTimestamp(values.originalPublishedAt, chineseMetadata?.original_published_at, 'Asia/Shanghai'),
+      sources: values.sources.map((source) => ({
+        ...source,
+        sourcePublishedAt: preservePublicationTimestamp(
+          source.sourcePublishedAt,
+          postSources.find((original) => original.source_url === source.sourceUrl)?.source_published_at,
+          sourceTimeZone(source.sourceUrl),
+        ),
+      })),
+    })
   }
 
   async function handleImageMetadataSubmit() {
@@ -669,7 +677,8 @@ export function PostForm({
               </div>
               <div className="post-form__field">
                 <label htmlFor="chinese-original-published-at">원문 게시·업데이트 시각</label>
-                <input id="chinese-original-published-at" type="datetime-local" aria-invalid={Boolean(errors.originalPublishedAt)} {...register('originalPublishedAt')} />
+                <input id="chinese-original-published-at" type="datetime-local" step="any" aria-describedby="chinese-original-timezone" aria-invalid={Boolean(errors.originalPublishedAt)} {...register('originalPublishedAt')} />
+                <p id="chinese-original-timezone" className="field-help">중국 표준시(Asia/Shanghai) 기준입니다.</p>
                 {errors.originalPublishedAt ? <p className="field-error">{errors.originalPublishedAt.message}</p> : <p className="field-help">확인한 실제 시각만 입력하며 날짜만으로 임의 시각을 만들지 않습니다.</p>}
               </div>
               <div className="post-form__field">
@@ -754,7 +763,7 @@ export function PostForm({
                     <div className="post-form__field"><label htmlFor={`source-name-${index}`}>출처명</label><input id={`source-name-${index}`} {...register(`sources.${index}.sourceName`)} /></div>
                     <div className="post-form__field"><label htmlFor={`source-title-${index}`}>원문 제목</label><input id={`source-title-${index}`} {...register(`sources.${index}.sourceTitle`)} /></div>
                     <div className="post-form__field post-form__field--wide"><label htmlFor={`source-url-${index}`}>개별 원문 URL</label><input id={`source-url-${index}`} type="url" {...register(`sources.${index}.sourceUrl`)} />{warning ? <p className="field-warning">{warning}</p> : null}</div>
-                    <div className="post-form__field"><label htmlFor={`source-published-${index}`}>게시·업데이트 일시</label><input id={`source-published-${index}`} type="datetime-local" {...register(`sources.${index}.sourcePublishedAt`)} /></div>
+                    <div className="post-form__field"><label htmlFor={`source-published-${index}`}>게시·업데이트 일시</label><input id={`source-published-${index}`} type="datetime-local" step="any" aria-describedby={`source-timezone-${index}`} {...register(`sources.${index}.sourcePublishedAt`)} /><p id={`source-timezone-${index}`} className="field-help">{sourceTimeZone(sources[index]?.sourceUrl ?? '') === 'Asia/Shanghai' ? '중국 표준시(Asia/Shanghai)' : '한국 표준시(Asia/Seoul)'} 기준입니다.</p></div>
                     <div className="post-form__field post-form__field--wide"><label htmlFor={`source-checked-${index}`}>확인한 핵심 내용</label><textarea id={`source-checked-${index}`} rows={3} {...register(`sources.${index}.checkedPoint`)} /></div>
                   </div>
                   {sourceError ? <p className="field-error">{sourceError.message ?? sourceError.sourceUrl?.message ?? sourceError.sourcePublishedAt?.message}</p> : null}

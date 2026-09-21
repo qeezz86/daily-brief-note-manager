@@ -1,11 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 
 import { useActiveCategoriesQuery } from '../features/categories/categories.queries'
 import { ContentList } from '../features/posts/ContentList'
-import { filterPosts } from '../features/posts/filterPosts'
 import { getStatusLabel } from '../features/posts/postFormatters'
-import { usePostsQuery } from '../features/posts/posts.queries'
+import { POST_PAGE_SIZE, usePostsQuery } from '../features/posts/posts.list'
 import {
   contentStatuses,
   type ContentStatus,
@@ -63,15 +62,17 @@ export function ContentPageContent({
   const [categoryId, setCategoryId] = useState('')
   const [status, setStatus] = useState<ContentStatus | ''>('')
   const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
   const categoriesQuery = useActiveCategoriesQuery(client)
-  const postsQuery = usePostsQuery(client, userId)
+  const postsQuery = usePostsQuery(client, userId, { categoryId, status, search, page })
   const categories = categoriesQuery.data ?? emptyCategories
-  const posts = postsQuery.data ?? emptyPosts
-  const filteredPosts = useMemo(
-    () => filterPosts(posts, { categoryId, status, search }),
-    [categoryId, posts, search, status],
-  )
+  const posts = postsQuery.data?.posts ?? emptyPosts
+  const count = postsQuery.data?.count
+  const currentPage = postsQuery.data?.page ?? page
+  if (postsQuery.isSuccess && currentPage !== page) setPage(currentPage)
+  const pageCount = Math.max(1, Math.ceil((count ?? 0) / POST_PAGE_SIZE))
   const hasActiveFilters = Boolean(categoryId || status || search.trim())
+  const countLabel = hasActiveFilters ? '검색 결과' : '전체 글'
 
   return (
     <section className="content-page" aria-labelledby="content-page-title">
@@ -85,9 +86,9 @@ export function ContentPageContent({
           <Link className="primary-link primary-link--inline" to="/content/new">
             새 콘텐츠
           </Link>
-          <div className="content-count" aria-label={`전체 글 ${posts.length}개`}>
-            <strong>{posts.length}</strong>
-            <span>전체 글</span>
+          <div className="content-count" aria-label={count === undefined ? '개수 확인 중' : `${countLabel} ${count}개`}>
+            <strong>{count ?? '—'}</strong>
+            <span>{countLabel}</span>
           </div>
         </div>
       </div>
@@ -98,7 +99,7 @@ export function ContentPageContent({
           <select
             id="content-category"
             value={categoryId}
-            onChange={(event) => setCategoryId(event.target.value)}
+            onChange={(event) => { setCategoryId(event.target.value); setPage(1) }}
           >
             <option value="">전체</option>
             {categories.map((category) => (
@@ -114,9 +115,10 @@ export function ContentPageContent({
           <select
             id="content-status"
             value={status}
-            onChange={(event) =>
+            onChange={(event) => {
               setStatus(event.target.value as ContentStatus | '')
-            }
+              setPage(1)
+            }}
           >
             <option value="">전체</option>
             {statusOptions.map((option) => (
@@ -134,7 +136,7 @@ export function ContentPageContent({
             type="search"
             value={search}
             placeholder="검색어를 입력하세요"
-            onChange={(event) => setSearch(event.target.value)}
+            onChange={(event) => { setSearch(event.target.value); setPage(1) }}
           />
         </div>
 
@@ -142,7 +144,7 @@ export function ContentPageContent({
           className="secondary-button content-filters__reset"
           type="button"
           disabled={!search}
-          onClick={() => setSearch('')}
+          onClick={() => { setSearch(''); setPage(1) }}
         >
           검색 초기화
         </button>
@@ -173,28 +175,38 @@ export function ContentPageContent({
         <>
           <p className="content-results" aria-live="polite">
             {hasActiveFilters
-              ? `검색 결과 ${filteredPosts.length}개`
-              : `전체 ${posts.length}개`}
+              ? `검색 결과 ${count}개`
+              : `전체 ${count}개`}
+            {posts.length > 0 ? ` · ${(currentPage - 1) * POST_PAGE_SIZE + 1}–${(currentPage - 1) * POST_PAGE_SIZE + posts.length}번째` : ''}
           </p>
-          {filteredPosts.length > 0 ? (
-            <ContentList categories={categories} posts={filteredPosts} />
+          {posts.length > 0 ? (
+            <ContentList categories={categories} posts={posts} />
           ) : (
             <div className="empty-state" role="status">
               <span className="empty-state__indicator" aria-hidden="true" />
               <div>
                 <h2>
-                  {posts.length === 0
+                  {!hasActiveFilters
                     ? '등록된 콘텐츠가 없습니다'
                     : '조건에 맞는 콘텐츠가 없습니다'}
                 </h2>
                 <p>
-                  {posts.length === 0
+                  {!hasActiveFilters
                     ? '콘텐츠가 등록되면 이곳에서 확인할 수 있습니다.'
                     : '필터나 검색어를 변경해 보세요.'}
                 </p>
               </div>
             </div>
           )}
+          {count !== undefined && count > 0 ? (
+            <nav className="content-pagination" aria-label="콘텐츠 페이지 이동">
+              <button className="secondary-button" type="button" disabled={currentPage === 1 || postsQuery.isFetching}
+                onClick={() => setPage(currentPage - 1)}>이전 페이지</button>
+              <span aria-live="polite">{currentPage} / {pageCount} 페이지</span>
+              <button className="secondary-button" type="button" disabled={currentPage >= pageCount || postsQuery.isFetching}
+                onClick={() => setPage(currentPage + 1)}>다음 페이지</button>
+            </nav>
+          ) : null}
         </>
       ) : null}
     </section>
