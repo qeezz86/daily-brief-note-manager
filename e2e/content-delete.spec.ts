@@ -62,7 +62,8 @@ async function setup(page: Page, baseURL: string | undefined, options: Options =
       await route.continue()
       return
     }
-    const json = (body: unknown, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) })
+    const json = (body: unknown, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body),
+      headers: Array.isArray(body) ? { 'access-control-expose-headers': 'content-range', 'content-range': body.length ? `0-${body.length - 1}/${body.length}` : '*/0' } : undefined })
     if (url.origin !== SUPABASE_ORIGIN) {
       if (request.method() !== 'GET') forbiddenWrites.push(request.url())
       await route.abort('blockedbyclient')

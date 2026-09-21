@@ -950,6 +950,20 @@ a {
   list-style: none;
 }
 
+.content-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 24px;
+  font-size: 0.8125rem;
+}
+
+.content-pagination button {
+  min-height: 44px;
+}
+
 .content-card {
   padding: 20px;
   border: 1px solid #d9dfdc;

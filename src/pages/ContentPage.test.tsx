@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation, useNavigate } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
@@ -111,7 +111,27 @@ function createMockClient({
   postResult?: MockResult<PostListItem[]>
 } = {}) {
   const categoryBuilder = createQueryBuilder(categoryResult)
-  const postBuilder = createQueryBuilder(postResult)
+  let rows = postResult.data ?? []
+  let start = 0
+  let end = 19
+  const postBuilder = {
+    select: vi.fn(() => { rows = postResult.data ?? []; return postBuilder }),
+    eq: vi.fn((column: keyof PostListItem, value: string) => {
+      rows = rows.filter((post) => post[column] === value)
+      return postBuilder
+    }),
+    or: vi.fn((filter: string) => {
+      const quoted = filter.slice('title.imatch.'.length).split(',slug.imatch.')[0]
+      const regex = new RegExp(JSON.parse(quoted) as string, 'i')
+      rows = rows.filter((post) => regex.test(post.title) || regex.test(post.slug))
+      return postBuilder
+    }),
+    order: vi.fn(() => postBuilder),
+    range: vi.fn((from: number, to: number) => { start = from; end = to; return postBuilder }),
+    abortSignal: vi.fn(() => postBuilder),
+    then: (resolve: (result: MockResult<PostListItem[]> & { count: number }) => unknown) =>
+      Promise.resolve({ data: rows.slice(start, end + 1), count: rows.length, error: postResult.error }).then(resolve),
+  }
   const from = vi.fn((table: string) =>
     table === 'categories' ? categoryBuilder : postBuilder,
   )
@@ -131,13 +151,14 @@ function renderContent(client: DatabaseClient) {
     },
   })
 
-  return render(
+  const view = render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter>
         <ContentPageContent client={client} userId="owner-a" />
       </MemoryRouter>
     </QueryClientProvider>,
   )
+  return { ...view, queryClient }
 }
 
 describe('ContentPage', () => {
@@ -201,6 +222,7 @@ describe('ContentPage', () => {
     expect(screen.getByLabelText('전체 글 3개')).toBeInTheDocument()
     expect(postBuilder.select).toHaveBeenCalledWith(
       expect.not.stringContaining('html_body'),
+      { count: 'exact' },
     )
     expect(postBuilder.order).toHaveBeenCalledWith('updated_at', {
       ascending: false,
@@ -219,7 +241,7 @@ describe('ContentPage', () => {
     )
 
     expect(
-      screen.getByRole('heading', { name: '반도체 기술 브리핑' }),
+      await screen.findByRole('heading', { name: '반도체 기술 브리핑' }),
     ).toBeInTheDocument()
     expect(
       screen.queryByRole('heading', { name: '기준금리 전망 정리' }),
@@ -235,7 +257,7 @@ describe('ContentPage', () => {
     await browserUser.selectOptions(screen.getByLabelText('상태'), 'published')
 
     expect(
-      screen.getByRole('heading', { name: '반도체 기술 브리핑' }),
+      await screen.findByRole('heading', { name: '반도체 기술 브리핑' }),
     ).toBeInTheDocument()
     expect(
       screen.queryByRole('heading', { name: '기준금리 전망 정리' }),
@@ -251,7 +273,7 @@ describe('ContentPage', () => {
     await browserUser.type(screen.getByLabelText('제목·slug 검색'), '  CCTV  ')
 
     expect(
-      screen.getByRole('heading', { name: 'CCTV 뉴스로 배우는 중국어 #12' }),
+      await screen.findByRole('heading', { name: 'CCTV 뉴스로 배우는 중국어 #12' }),
     ).toBeInTheDocument()
     expect(
       screen.queryByRole('heading', { name: '기준금리 전망 정리' }),
@@ -270,7 +292,7 @@ describe('ContentPage', () => {
     )
 
     expect(
-      screen.getByRole('heading', { name: '반도체 기술 브리핑' }),
+      await screen.findByRole('heading', { name: '반도체 기술 브리핑' }),
     ).toBeInTheDocument()
     expect(
       screen.queryByRole('heading', { name: '기준금리 전망 정리' }),
@@ -288,7 +310,7 @@ describe('ContentPage', () => {
 
     expect(screen.getByLabelText('제목·slug 검색')).toHaveValue('')
     expect(
-      screen.getByRole('heading', { name: '기준금리 전망 정리' }),
+      await screen.findByRole('heading', { name: '기준금리 전망 정리' }),
     ).toBeInTheDocument()
     expect(
       screen.getByRole('heading', { name: '반도체 기술 브리핑' }),
@@ -309,6 +331,73 @@ describe('ContentPage', () => {
     expect(
       within(card as HTMLElement).queryByText('SHOULD-NOT-BE-DISPLAYED'),
     ).not.toBeInTheDocument()
+  })
+
+  it('pages through results and resets each filter to the first page', async () => {
+    const user = userEvent.setup()
+    const many = Array.from({ length: 41 }, (_, i) => ({ ...posts[0], id: `post-${i}`, title: `글 ${i + 1}` }))
+    const { client, postBuilder } = createMockClient({ postResult: { data: many, error: null } })
+    renderContent(client)
+    await screen.findByRole('heading', { name: '글 1' })
+    expect(screen.getByLabelText('전체 글 41개')).toBeVisible()
+    expect(screen.getByRole('button', { name: '이전 페이지' })).toBeDisabled()
+    expect(within(screen.getByRole('list', { name: '콘텐츠 목록' })).getAllByRole('listitem')).toHaveLength(20)
+    for (const change of [
+      () => user.selectOptions(screen.getByLabelText('카테고리'), 'economy'),
+      () => user.selectOptions(screen.getByLabelText('상태'), 'draft'),
+      () => user.type(screen.getByLabelText('제목·slug 검색'), '글'),
+      () => user.click(screen.getByRole('button', { name: '검색 초기화' })),
+    ]) {
+      await user.click(screen.getByRole('button', { name: '다음 페이지' }))
+      await screen.findByText('2 / 3 페이지')
+      expect(postBuilder.range).toHaveBeenLastCalledWith(20, 39)
+      await change()
+      await screen.findByText('1 / 3 페이지')
+      await waitFor(() => expect(screen.getByRole('button', { name: '다음 페이지' })).toBeEnabled())
+    }
+    await user.click(screen.getByRole('button', { name: '다음 페이지' }))
+    await screen.findByText('2 / 3 페이지')
+    await user.click(screen.getByRole('button', { name: '다음 페이지' }))
+    await screen.findByText('3 / 3 페이지')
+    expect(screen.getByRole('button', { name: '다음 페이지' })).toBeDisabled()
+    expect(within(screen.getByRole('list', { name: '콘텐츠 목록' })).getAllByRole('listitem')).toHaveLength(1)
+    await user.click(screen.getByRole('button', { name: '이전 페이지' }))
+    await screen.findByText('2 / 3 페이지')
+  })
+
+  it('searches records beyond the old 1,000-row limit and reports filtered totals', async () => {
+    const many = Array.from({ length: 1001 }, (_, i) => ({ ...posts[0], id: `post-${i}`, title: i === 1000 ? '마지막 특수 %_* 글' : `글 ${i}` }))
+    const { client } = createMockClient({ postResult: { data: many, error: null } })
+    renderContent(client)
+    await screen.findByLabelText('전체 글 1001개')
+    await userEvent.type(screen.getByLabelText('제목·slug 검색'), '%_*')
+    await screen.findByRole('heading', { name: '마지막 특수 %_* 글' })
+    expect(screen.getByLabelText('검색 결과 1개')).toBeVisible()
+    await userEvent.type(screen.getByLabelText('제목·slug 검색'), '없음')
+    await screen.findByRole('heading', { name: '조건에 맞는 콘텐츠가 없습니다' })
+    expect(screen.queryByRole('navigation', { name: '콘텐츠 페이지 이동' })).not.toBeInTheDocument()
+  })
+
+  it('returns to the first page when deletions remove the current page', async () => {
+    const result = { data: Array.from({ length: 21 }, (_, i) => ({ ...posts[0], id: `post-${i}`, title: `글 ${i + 1}` })), error: null }
+    const { client } = createMockClient({ postResult: result })
+    const { queryClient } = renderContent(client)
+    await screen.findByText('1 / 2 페이지')
+    await userEvent.click(screen.getByRole('button', { name: '다음 페이지' }))
+    await screen.findByText('2 / 2 페이지')
+    result.data = result.data.slice(0, 20)
+    await act(async () => { await queryClient.invalidateQueries({ queryKey: ['posts', 'list'] }) })
+    await screen.findByText('1 / 1 페이지')
+    expect(screen.getByLabelText('전체 글 20개')).toBeVisible()
+    expect(screen.getByRole('button', { name: '이전 페이지' })).toBeDisabled()
+  })
+
+  it('shows a list error without claiming a zero total', async () => {
+    const { client } = createMockClient({ postResult: { data: null, error: { message: 'private detail' } } })
+    renderContent(client)
+    await screen.findByRole('heading', { name: '콘텐츠 목록을 불러오지 못했습니다' })
+    expect(screen.queryByLabelText('전체 글 0개')).not.toBeInTheDocument()
+    expect(screen.queryByText('private detail')).not.toBeInTheDocument()
   })
 })
 
