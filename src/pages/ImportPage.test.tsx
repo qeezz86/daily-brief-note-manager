@@ -263,6 +263,7 @@ describe('ImportPageContent', () => {
     renderPage()
     expect(screen.queryByLabelText('뉴스 canonical 10-section 응답 plain text')).not.toBeInTheDocument()
     await userEvent.click(screen.getByRole('radio', { name: '뉴스 일반 응답 붙여넣기' }))
+    await act(async () => { await vi.dynamicImportSettled() })
     expect(await screen.findByRole('heading', { name: '뉴스 일반 응답 붙여넣기' })).toBeInTheDocument()
     expect(screen.getByLabelText('뉴스 카테고리')).toBeInTheDocument()
     expect(screen.getByLabelText('브리핑 날짜')).toHaveAttribute('type', 'date')
@@ -285,6 +286,7 @@ describe('ImportPageContent', () => {
   it('붙여넣기 mode 전환만으로 persistence를 호출하지 않는다', async () => {
     renderPage()
     await userEvent.click(screen.getByRole('radio', { name: 'ChatGPT 구조화 붙여넣기' }))
+    await act(async () => { await vi.dynamicImportSettled() })
     expect(await screen.findByRole('heading', { name: 'ChatGPT 구조화 응답 붙여넣기' })).toBeInTheDocument()
     expect(prepareImportJobMock).not.toHaveBeenCalled()
     expect(saveChatGptPastePostMock).not.toHaveBeenCalled()
