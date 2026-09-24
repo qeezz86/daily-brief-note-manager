@@ -379,7 +379,7 @@ rg -n "WORDPRESS_APPLICATION_PASSWORD|SUPABASE_SERVICE_ROLE_KEY|sb_secret_|VITE_
 
 이 절차가 끝날 때까지 WordPress write는 0건이어야 한다.
 
-1. `/wp-json/` discovery와 `wp/v2` namespace를 확인한다.
+1. 인증 헤더 없이 `/wp-json/` discovery와 `wp/v2` namespace를 확인한다.
 2. Application Password authentication endpoint 광고를 확인한다.
 3. authenticated `users/me`가 전용 사용자와 일치하는지 확인한다.
 4. `edit_posts`가 true인지 확인한다.

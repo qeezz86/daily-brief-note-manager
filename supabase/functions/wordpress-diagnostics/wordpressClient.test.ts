@@ -24,15 +24,21 @@ async function expectError(promise: Promise<unknown>, code: string) {
 }
 
 describe('createWordPressClient', () => {
-  it('uses only fixed GET paths, Basic Auth in the server request, manual redirects, and a User-Agent', async () => {
+  it('reads public discovery without credentials, with a fixed GET path and manual redirects', async () => {
     const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse({ namespaces: [] }))
     await client(fetchImpl).get('discovery')
     const [url, init] = fetchImpl.mock.calls[0]
     expect(String(url)).toBe('https://wordpress.example.com/wp-json/')
     expect(init?.method).toBe('GET')
     expect(init?.redirect).toBe('manual')
-    expect(new Headers(init?.headers).get('authorization')).toBe(`Basic ${btoa('api-user:abcdefgh')}`)
+    expect(new Headers(init?.headers).has('authorization')).toBe(false)
     expect(new Headers(init?.headers).get('user-agent')).toBe('Daily-Brief-Note-WordPress-Diagnostics/1.0')
+  })
+
+  it('sends Basic Auth only for protected WordPress requests', async () => {
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse({ id: 1 }))
+    await client(fetchImpl).get('user')
+    expect(new Headers(fetchImpl.mock.calls[0][1]?.headers).get('authorization')).toBe(`Basic ${btoa('api-user:abcdefgh')}`)
   })
 
   it('encodes a non-ASCII WordPress username as UTF-8 Basic Auth', async () => {
@@ -43,7 +49,7 @@ describe('createWordPressClient', () => {
       applicationPassword: 'abcd',
       fetchImpl,
     })
-    await unicodeClient.get('discovery')
+    await unicodeClient.get('user')
     const authorization = new Headers(fetchImpl.mock.calls[0][1]?.headers).get('authorization') ?? ''
     const encoded = authorization.replace('Basic ', '')
     const bytes = Uint8Array.from(atob(encoded), (character) => character.charCodeAt(0))

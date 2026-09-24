@@ -367,7 +367,9 @@ export function createWordPressClient(
             signal: controller.signal,
             headers: {
               Accept: 'application/json',
-              Authorization: authorization,
+              ...(endpoint === 'discovery'
+                ? {}
+                : { Authorization: authorization }),
               'User-Agent':
                 'Daily-Brief-Note-WordPress-Diagnostics/1.0',
             },
