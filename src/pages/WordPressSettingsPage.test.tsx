@@ -54,4 +54,19 @@ describe('WordPressSettingsPage', () => {
     expect(await screen.findByRole('heading', { name: '연결 준비됨' })).toBeInTheDocument()
     expect(invoke).toHaveBeenCalledTimes(2)
   })
+
+  it('shows the safe WordPress failure stage and status', async () => {
+    invoke.mockReset()
+    const body = { schemaVersion: 1, ok: false, error: { code: 'WORDPRESS_HTTP_ERROR', message: 'WordPress가 진단 요청을 처리하지 못했습니다.', retryable: true, diagnostics: { endpoint: 'discovery', failure_phase: 'upstream_status', upstream_status: 503, content_type: 'application/json', content_length: 25, bytes_received: 25, response_over_limit: false } } }
+    invoke.mockResolvedValue({ data: null, error: { context: new Response(JSON.stringify(body), { status: 502 }) } })
+    const user = userEvent.setup()
+    renderPage()
+    await user.click(screen.getByRole('button', { name: '연결 진단' }))
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('WordPress가 진단 요청을 처리하지 못했습니다.')
+    expect(alert).toHaveTextContent('WORDPRESS_HTTP_ERROR')
+    expect(alert).toHaveTextContent('확인 지점: 기본 정보 · WordPress 응답 HTTP 503')
+    expect(alert).not.toHaveTextContent('content_length')
+  })
+
 })

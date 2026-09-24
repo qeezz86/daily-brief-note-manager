@@ -2,15 +2,22 @@ import { useAuth } from '../features/auth/useAuth'
 import { useActiveCategoriesQuery } from '../features/categories/categories.queries'
 import { WordPressDiagnosticsPanel } from '../features/wordpress/WordPressDiagnosticsPanel'
 import { useWordPressDiagnosticsMutation } from '../features/wordpress/wordpressDiagnostics.query'
+import { WordPressDiagnosticsServiceError } from '../features/wordpress/wordpressDiagnostics.service'
 import { WordPressTaxonomyMappingPanel } from '../features/wordpress/WordPressTaxonomyMappingPanel'
 import { useTaxonomyCatalogMutation } from '../features/wordpress/wordpressPublicationPreview.queries'
 import { supabase } from '../shared/supabase/client'
+
+const diagnosticEndpointLabels = {
+  discovery: '기본 정보', user: '사용자 인증', types: '게시물 유형', statuses: '게시물 상태',
+  categories: '카테고리', tags: '태그', posts: '게시물 목록',
+}
 
 export function WordPressSettingsPage() {
   const { user } = useAuth()
   const diagnostics = useWordPressDiagnosticsMutation(supabase)
   const catalog = useTaxonomyCatalogMutation(supabase)
   const categories = useActiveCategoriesQuery(supabase)
+  const diagnosticError = diagnostics.error instanceof WordPressDiagnosticsServiceError ? diagnostics.error : null
 
   return (
     <section className="wordpress-page" aria-labelledby="wordpress-page-title" aria-busy={diagnostics.isPending || catalog.isPending}>
@@ -34,6 +41,8 @@ export function WordPressSettingsPage() {
         <div className="content-state content-state--error" role="alert">
           <h2>연결 진단 실패</h2>
           <p>{diagnostics.error.message}</p>
+          {diagnosticError && diagnosticError.code !== 'UNKNOWN' ? <p>오류 코드: <code>{diagnosticError.code}</code></p> : null}
+          {diagnosticError?.diagnostics ? <p>확인 지점: {diagnosticEndpointLabels[diagnosticError.diagnostics.endpoint]}{diagnosticError.diagnostics.upstream_status > 0 ? ` · WordPress 응답 HTTP ${diagnosticError.diagnostics.upstream_status}` : ''}</p> : null}
           <button className="secondary-button" type="button" onClick={() => diagnostics.mutate()} disabled={diagnostics.isPending}>재시도</button>
         </div>
       ) : null}

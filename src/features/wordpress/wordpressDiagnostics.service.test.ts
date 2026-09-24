@@ -29,6 +29,20 @@ describe('diagnoseWordPress', () => {
     await expect(diagnoseWordPress(client({ data: null, error }))).rejects.toMatchObject({ code, message })
   })
 
+  it('rejects unexpected raw fields in upstream failure details', async () => {
+    const diagnostics = { endpoint: 'discovery', failure_phase: 'upstream_status', upstream_status: 503, content_type: 'application/json', content_length: 25, bytes_received: 25, response_over_limit: false, raw: 'private response' }
+    const body = { schemaVersion: 1, ok: false, error: { code: 'WORDPRESS_HTTP_ERROR', message: 'safe', retryable: true, diagnostics } }
+    const error = { context: new Response(JSON.stringify(body), { status: 502 }) }
+    await expect(diagnoseWordPress(client({ data: null, error }))).rejects.toMatchObject({ code: 'UNKNOWN' })
+  })
+
+  it('keeps allowlisted upstream failure details without exposing a raw response', async () => {
+    const diagnostics = { endpoint: 'discovery', failure_phase: 'upstream_status', upstream_status: 503, content_type: 'application/json', content_length: 25, bytes_received: 25, response_over_limit: false }
+    const body = { schemaVersion: 1, ok: false, error: { code: 'WORDPRESS_HTTP_ERROR', message: 'WordPress가 진단 요청을 처리하지 못했습니다.', retryable: true, diagnostics } }
+    const error = { context: new Response(JSON.stringify(body), { status: 502, headers: { 'content-type': 'application/json' } }) }
+    await expect(diagnoseWordPress(client({ data: null, error }))).rejects.toMatchObject({ code: 'WORDPRESS_HTTP_ERROR', diagnostics })
+  })
+
   it('uses a bounded message for unknown invoke failures', async () => {
     await expect(diagnoseWordPress(client({ data: null, error: new Error('raw credential detail') }))).rejects.toMatchObject({ code: 'UNKNOWN' })
     try {

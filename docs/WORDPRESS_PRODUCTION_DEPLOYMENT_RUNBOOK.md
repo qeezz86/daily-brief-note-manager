@@ -389,6 +389,8 @@ rg -n "WORDPRESS_APPLICATION_PASSWORD|SUPABASE_SERVICE_ROLE_KEY|sb_secret_|VITE_
 
 앱의 `/settings/wordpress`에서 diagnostics를 한 번 실행한다. 기대 상태는 `ready`; 비허용 Supabase user, 비허용 origin과 무인증 요청은 차단되어야 한다. `OPTIONS`와 authenticated `POST` response에서 exact `Access-Control-Allow-Origin`과 `Vary: Origin`을 확인한다. 브라우저 preflight의 `Access-Control-Allow-Headers`에는 Supabase JS가 전송하는 `authorization`, `apikey`, `content-type`, `x-client-info`가 모두 포함되어야 한다. wildcard, localhost, 예상하지 않은 Vercel preview origin은 허용하지 않는다.
 
+진단이 실패하면 화면에 표시되는 안전한 오류 코드, 확인 지점과 WordPress HTTP 상태만 기록한다. 서버 응답 본문, 인증 헤더와 Application Password는 기록하지 않는다. 원인이 해소되기 전에는 다음 Function 배포로 진행하지 않는다.
+
 Gateway가 만든 header와 Function이 만든 CORS header를 구분해 기록한다. 비허용 origin은 403이어야 한다. Vercel preview가 필요하면 wildcard 대신 별도 Supabase project 또는 명시적인 고정 HTTPS preview origin을 검토한다.
 
 ## 14. taxonomy mapping
