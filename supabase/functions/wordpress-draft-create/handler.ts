@@ -176,7 +176,7 @@ export function createWordPressDraftHandler(dependencies: Dependencies) {
       if (source.updatedAt !== parsed.expectedSourceUpdatedAt) await block(database, attempt.id, 'SOURCE_CHANGED')
 
       const draftClient: DraftWordPressClient = createWordPressDraftClient({
-        baseUrl: config.siteUrl, username: config.username, applicationPassword: config.applicationPassword,
+        baseUrl: config.siteUrl, localMode: config.localMode, username: config.username, applicationPassword: config.applicationPassword,
         fetchImpl: dependencies.fetchImpl,
       })
       let capable = false

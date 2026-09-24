@@ -4,6 +4,7 @@ import type { DraftWordPressClient, WordPressDraftResult } from './schemas.ts'
 
 interface Options {
   baseUrl: URL
+  localMode?: boolean
   username: string
   applicationPassword: string
   fetchImpl?: typeof fetch
@@ -44,7 +45,7 @@ function record(value: unknown): Record<string, unknown> {
   return value as Record<string, unknown>
 }
 
-function parseResult(value: unknown, expectedSlug: string, expectedOrigin: string): WordPressDraftResult {
+function parseResult(value: unknown, expectedSlug: string, baseUrl: URL, localMode: boolean): WordPressDraftResult {
   const item = record(value)
   if (!Number.isSafeInteger(item.id) || Number(item.id) <= 0
     || item.status !== 'draft' || item.slug !== expectedSlug || typeof item.link !== 'string') {
@@ -52,7 +53,9 @@ function parseResult(value: unknown, expectedSlug: string, expectedOrigin: strin
   }
   let link: URL
   try { link = new URL(item.link) } catch { throw new DraftError('WORDPRESS_DRAFT_RESPONSE_INVALID', 502) }
-  if (link.protocol !== 'https:' || link.username || link.password || link.origin !== expectedOrigin) {
+  const localHost = ['localhost', '127.0.0.1', '[::1]', 'host.docker.internal'].includes(baseUrl.hostname)
+  const allowedProtocol = link.protocol === 'https:' || (localMode && localHost && link.protocol === 'http:')
+  if (!allowedProtocol || link.username || link.password || link.origin !== baseUrl.origin) {
     throw new DraftError('WORDPRESS_DRAFT_RESPONSE_INVALID', 502)
   }
   return { postId: Number(item.id), status: 'draft', slug: expectedSlug, link: link.href }
@@ -119,7 +122,7 @@ export function createWordPressDraftClient(options: Options): DraftWordPressClie
         if ([400, 401, 403, 404, 409].includes(response.status)) throw new DraftError('WORDPRESS_DRAFT_REJECTED', 424)
         throw new DraftError('WORDPRESS_DRAFT_RESULT_UNCERTAIN', response.status === 504 ? 504 : 502)
       }
-      try { return parseResult(data, payload.slug, options.baseUrl.origin) }
+      try { return parseResult(data, payload.slug, options.baseUrl, options.localMode ?? false) }
       catch { throw new DraftError('WORDPRESS_DRAFT_RESPONSE_INVALID', 502) }
     },
   }
