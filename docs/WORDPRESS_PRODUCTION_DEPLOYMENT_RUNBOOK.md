@@ -385,7 +385,7 @@ rg -n "WORDPRESS_APPLICATION_PASSWORD|SUPABASE_SERVICE_ROLE_KEY|sb_secret_|VITE_
 6. categories와 tags 전체 catalog를 GET-only로 확인한다.
 7. posts read와 duplicate slug query를 확인한다.
 
-앱의 `/settings/wordpress`에서 diagnostics를 한 번 실행한다. 기대 상태는 `ready`; 비허용 Supabase user, 비허용 origin과 무인증 요청은 차단되어야 한다. `OPTIONS`와 authenticated `POST` response에서 exact `Access-Control-Allow-Origin`과 `Vary: Origin`을 확인한다. wildcard, localhost, 예상하지 않은 Vercel preview origin은 허용하지 않는다.
+앱의 `/settings/wordpress`에서 diagnostics를 한 번 실행한다. 기대 상태는 `ready`; 비허용 Supabase user, 비허용 origin과 무인증 요청은 차단되어야 한다. `OPTIONS`와 authenticated `POST` response에서 exact `Access-Control-Allow-Origin`과 `Vary: Origin`을 확인한다. 브라우저 preflight의 `Access-Control-Allow-Headers`에는 Supabase JS가 전송하는 `authorization`, `apikey`, `content-type`, `x-client-info`가 모두 포함되어야 한다. wildcard, localhost, 예상하지 않은 Vercel preview origin은 허용하지 않는다.
 
 Gateway가 만든 header와 Function이 만든 CORS header를 구분해 기록한다. 비허용 origin은 403이어야 한다. Vercel preview가 필요하면 wildcard 대신 별도 Supabase project 또는 명시적인 고정 HTTPS preview origin을 검토한다.
 
