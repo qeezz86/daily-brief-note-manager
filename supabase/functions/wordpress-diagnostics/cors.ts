@@ -1,6 +1,6 @@
 import { DiagnosticError } from './errors.ts'
 
-const allowedHeaders = 'authorization, apikey, content-type'
+const allowedHeaders = 'authorization, apikey, content-type, x-client-info'
 
 export function corsHeaders(origin: string, allowedOrigins: ReadonlySet<string>): Headers {
   if (!origin || !allowedOrigins.has(origin)) {

@@ -10,9 +10,7 @@ describe('corsHeaders', () => {
     const headers = corsHeaders('https://app.example.com', origins)
     expect(headers.get('Access-Control-Allow-Origin')).toBe('https://app.example.com')
     expect(headers.get('Access-Control-Allow-Origin')).not.toBe('*')
-    expect(headers.get('Access-Control-Allow-Headers')).toContain('authorization')
-    expect(headers.get('Access-Control-Allow-Headers')).toContain('apikey')
-    expect(headers.get('Access-Control-Allow-Headers')).toContain('content-type')
+    expect(headers.get('Access-Control-Allow-Headers')).toBe('authorization, apikey, content-type, x-client-info')
     expect(headers.get('Vary')).toBe('Origin')
   })
 

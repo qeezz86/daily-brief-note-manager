@@ -38,9 +38,24 @@ describe('WordPress draft write client', () => {
     ['wrong slug', { ...success, slug: 'other' }, 'WORDPRESS_DRAFT_RESPONSE_INVALID'],
     ['javascript link', { ...success, link: 'javascript:alert(1)' }, 'WORDPRESS_DRAFT_RESPONSE_INVALID'],
     ['cross-origin link', { ...success, link: 'https://other.example.com/?p=91' }, 'WORDPRESS_DRAFT_RESPONSE_INVALID'],
+    ['insecure link', { ...success, link: 'http://wordpress.example.com/?p=91' }, 'WORDPRESS_DRAFT_RESPONSE_INVALID'],
   ])('rejects %s success response', async (_name, response, expected) => {
     const client = createWordPressDraftClient({ baseUrl: new URL('https://wordpress.example.com'), username: 'user', applicationPassword: 'pass', fetchImpl: vi.fn(async () => json(response, 201)) })
     await expect(client.createDraft(payload)).rejects.toMatchObject({ code: expected })
+  })
+
+  it('accepts matching HTTP links only for an explicit local mock', async () => {
+    const localLink = 'http://host.docker.internal:8080/?p=91'
+    const fetchMock = vi.fn(async () => json({ ...success, link: localLink }, 201))
+    const baseUrl = new URL('http://host.docker.internal:8080')
+    const local = createWordPressDraftClient({ baseUrl, localMode: true, username: 'user', applicationPassword: 'pass', fetchImpl: fetchMock })
+    await expect(local.createDraft(payload)).resolves.toMatchObject({ link: localLink })
+    const production = createWordPressDraftClient({ baseUrl, username: 'user', applicationPassword: 'pass', fetchImpl: fetchMock })
+    await expect(production.createDraft(payload)).rejects.toMatchObject({ code: 'WORDPRESS_DRAFT_RESPONSE_INVALID' })
+    const wrongPort = createWordPressDraftClient({ baseUrl: new URL('http://host.docker.internal:8081'), localMode: true, username: 'user', applicationPassword: 'pass', fetchImpl: fetchMock })
+    await expect(wrongPort.createDraft(payload)).rejects.toMatchObject({ code: 'WORDPRESS_DRAFT_RESPONSE_INVALID' })
+    const otherHost = createWordPressDraftClient({ baseUrl: new URL('http://wordpress.example.com:8080'), localMode: true, username: 'user', applicationPassword: 'pass', fetchImpl: fetchMock })
+    await expect(otherHost.createDraft(payload)).rejects.toMatchObject({ code: 'WORDPRESS_DRAFT_RESPONSE_INVALID' })
   })
 
   it.each([400, 401, 403, 404, 409])('classifies explicit HTTP %s rejection as failed-safe', async (status) => {

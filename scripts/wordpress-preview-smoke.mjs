@@ -94,11 +94,14 @@ async function createUser(admin, local, secrets, cleanup, label) {
 
 async function seedFixture(user) {
   const postId = randomUUID(); const names = ['Macro', 'Policy', 'Markets', 'Inflation', 'Rates']
-  const html = '<div class="daily-brief-note news-briefing economy"><h1>경제 대표 제목</h1><a href="#sources">출처</a></div>'
+  const sourceUrl = 'https://source.example.test/economy'
+  const html = `<div class="daily-brief-note news-briefing economy"><h1>경제 대표 제목</h1><a href="#sources">출처</a><section id="sources"><h2>출처</h2><a href="${sourceUrl}">Source</a></section></div>`
   const post = await user.client.from('posts').insert({ id: postId, owner_id: user.id, category_id: 'economy', briefing_date: '2026-07-18', published_on: '2026-07-18', title: '경제 대표 제목', summary: '요약', html_body: html, slug: 'economy-briefing-2026-07-18', content_status: 'ready', source_import_type: 'manual_entry' })
   if (post.error) throw new SmokeError('DB_FIXTURE_FAILED', 'post fixture')
   const seo = await user.client.from('seo_data').insert({ post_id: postId, owner_id: user.id, representative_title: '경제 대표 제목', alternative_titles: ['대안1', '대안2', '대안3', '대안4'], meta_description: '가'.repeat(130), focus_keyword: '경제 동향' })
   if (seo.error) throw new SmokeError('DB_FIXTURE_FAILED', 'SEO fixture')
+  const source = await user.client.from('sources').insert({ owner_id: user.id, post_id: postId, source_name: 'Example', source_title: 'Economy source', source_url: sourceUrl, checked_point: '테스트 출처 확인', sort_order: 0 })
+  if (source.error) throw new SmokeError('DB_FIXTURE_FAILED', 'source fixture')
   const tags = await user.client.from('tags').insert(names.map((name) => ({ owner_id: user.id, name, normalized_name: name.toLowerCase() }))).select('id,name,normalized_name')
   if (tags.error || !tags.data) throw new SmokeError('DB_FIXTURE_FAILED', 'tag fixture')
   const links = await user.client.from('post_tags').insert(tags.data.map((tag) => ({ owner_id: user.id, post_id: postId, tag_id: tag.id })))

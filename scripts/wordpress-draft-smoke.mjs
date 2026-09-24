@@ -52,6 +52,7 @@ async function readJsonBody(request) {
 async function startMockWordPress(username, password) {
   const expectedAuthorization = `Basic ${Buffer.from(`${username}:${password}`).toString('base64')}`
   const audit = []
+  let listeningPort = 0
   const server = http.createServer(async (request, response) => {
     const url = new URL(request.url ?? '/', 'http://mock.invalid')
     const authorization = request.headers.authorization ?? ''
@@ -73,13 +74,14 @@ async function startMockWordPress(username, password) {
       if (!valid) { entry.responseStatus = 400; return sendJson(response, 400, { code: 'mock_invalid_payload' }) }
       if (body.slug.endsWith('2026-07-22')) { entry.responseStatus = 0; request.socket.destroy(); return }
       entry.responseStatus = 201
-      return sendJson(response, 201, { id: 901, status: 'draft', slug: body.slug, link: `https://wordpress.example.test/?p=901`, modified_gmt: '2026-07-19T00:00:00' })
+      return sendJson(response, 201, { id: 901, status: 'draft', slug: body.slug, link: `http://host.docker.internal:${listeningPort}/?p=901`, modified_gmt: '2026-07-19T00:00:00' })
     }
     entry.responseStatus = request.method === 'GET' ? 404 : 405
     return sendJson(response, entry.responseStatus, { code: 'mock_not_allowed' })
   })
   await new Promise((done, reject) => { server.once('error', reject); server.listen(0, '0.0.0.0', done) })
   const address = server.address(); if (!address || typeof address === 'string') throw new Error('MOCK_ADDRESS_FAILED')
+  listeningPort = address.port
   return { audit, port: address.port, close: () => new Promise((done, reject) => { server.closeIdleConnections?.(); server.closeAllConnections?.(); server.close((error) => error ? reject(error) : done()) }) }
 }
 

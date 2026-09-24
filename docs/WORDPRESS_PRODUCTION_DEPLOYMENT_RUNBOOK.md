@@ -295,6 +295,8 @@ Expected:
 | `APP_ALLOWED_ORIGINS` | 4개 | 비밀 아님, server config | 불필요 | 예 | 아니요 | comma-separated exact HTTPS origins; wildcard/localhost 금지 | origin 변경 시 갱신 |
 | `WORDPRESS_LOCAL_MODE` | 4개 공통 parser | 위험한 local flag | 금지 | **설정 금지** | 예 | local mock에서만 `true` | production에서 항상 삭제 |
 
+로컬 초안 생성 smoke는 `WORDPRESS_LOCAL_MODE=true`와 허용된 로컬 호스트에서만 동일 출처의 HTTP 응답 링크를 인정한다. 운영 설정에서는 HTTPS와 동일 출처 검증이 유지된다.
+
 Hosted Edge Functions는 `SUPABASE_URL`, legacy `SUPABASE_ANON_KEY`와 `SUPABASE_SERVICE_ROLE_KEY`를 기본 환경으로 제공한다. 현재 코드는 legacy key 이름을 사용한다. 이 키들은 현재 동작하지만 Supabase가 publishable/secret key로 전환 중이므로 legacy key가 remote에서 활성인지 R2에서 확인하고 2026년 말 deprecation 전에 별도 migration을 계획한다. 현재 RPC의 `auth.role() = service_role` 계약을 새 key로 실제 검증하기 전에는 임의 교체하지 않는다.
 
 ### 10.2 설정
@@ -385,7 +387,7 @@ rg -n "WORDPRESS_APPLICATION_PASSWORD|SUPABASE_SERVICE_ROLE_KEY|sb_secret_|VITE_
 6. categories와 tags 전체 catalog를 GET-only로 확인한다.
 7. posts read와 duplicate slug query를 확인한다.
 
-앱의 `/settings/wordpress`에서 diagnostics를 한 번 실행한다. 기대 상태는 `ready`; 비허용 Supabase user, 비허용 origin과 무인증 요청은 차단되어야 한다. `OPTIONS`와 authenticated `POST` response에서 exact `Access-Control-Allow-Origin`과 `Vary: Origin`을 확인한다. wildcard, localhost, 예상하지 않은 Vercel preview origin은 허용하지 않는다.
+앱의 `/settings/wordpress`에서 diagnostics를 한 번 실행한다. 기대 상태는 `ready`; 비허용 Supabase user, 비허용 origin과 무인증 요청은 차단되어야 한다. `OPTIONS`와 authenticated `POST` response에서 exact `Access-Control-Allow-Origin`과 `Vary: Origin`을 확인한다. 브라우저 preflight의 `Access-Control-Allow-Headers`에는 Supabase JS가 전송하는 `authorization`, `apikey`, `content-type`, `x-client-info`가 모두 포함되어야 한다. wildcard, localhost, 예상하지 않은 Vercel preview origin은 허용하지 않는다.
 
 Gateway가 만든 header와 Function이 만든 CORS header를 구분해 기록한다. 비허용 origin은 403이어야 한다. Vercel preview가 필요하면 wildcard 대신 별도 Supabase project 또는 명시적인 고정 HTTPS preview origin을 검토한다.
 
