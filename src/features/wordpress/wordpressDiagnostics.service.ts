@@ -1,5 +1,5 @@
 import type { DatabaseClient } from '../../shared/supabase/client'
-import { wordpressDiagnosticsErrorSchema, wordpressDiagnosticsSchema } from './wordpressDiagnostics.schema'
+import { wordpressDiagnosticsErrorSchema, wordpressDiagnosticsSchema, type WordPressDiagnosticsErrorMetadata } from './wordpressDiagnostics.schema'
 import type { WordPressDiagnosticsResult } from './wordpressDiagnostics.types'
 
 const knownErrorMessages: Record<string, string> = {
@@ -18,12 +18,14 @@ const knownErrorMessages: Record<string, string> = {
 export class WordPressDiagnosticsServiceError extends Error {
   readonly code: string
   readonly retryable: boolean
+  readonly diagnostics?: WordPressDiagnosticsErrorMetadata
 
-  constructor(code: string, message: string, retryable = false) {
+  constructor(code: string, message: string, retryable = false, diagnostics?: WordPressDiagnosticsErrorMetadata) {
     super(message)
     this.name = 'WordPressDiagnosticsServiceError'
     this.code = code
     this.retryable = retryable
+    this.diagnostics = diagnostics
   }
 }
 
@@ -54,6 +56,7 @@ export async function diagnoseWordPress(client: DatabaseClient | null): Promise<
         detail.code,
         knownErrorMessages[detail.code] ?? detail.message,
         detail.retryable,
+        detail.diagnostics,
       )
     }
     throw new WordPressDiagnosticsServiceError('UNKNOWN', 'WordPress 진단 요청을 완료하지 못했습니다. 잠시 후 다시 시도해 주세요.', true)

@@ -65,6 +65,18 @@ export const wordpressDiagnosticsSchema = z.object({
   warnings: z.array(z.string()),
 }).strict()
 
+const diagnosticMetadataSchema = z.object({
+  endpoint: z.enum(['discovery', 'user', 'types', 'statuses', 'categories', 'tags', 'posts']),
+  failure_phase: z.enum(['content_length_header', 'response_body_limit', 'content_type', 'json_parse', 'upstream_status']),
+  upstream_status: z.number().int().nonnegative(),
+  content_type: z.string(),
+  content_length: z.number().int().nonnegative().nullable(),
+  bytes_received: z.number().int().nonnegative(),
+  response_over_limit: z.boolean(),
+}).strict()
+
+export type WordPressDiagnosticsErrorMetadata = z.infer<typeof diagnosticMetadataSchema>
+
 export const wordpressDiagnosticsErrorSchema = z.object({
   schemaVersion: z.literal(1),
   ok: z.literal(false),
@@ -72,5 +84,6 @@ export const wordpressDiagnosticsErrorSchema = z.object({
     code: z.string(),
     message: z.string(),
     retryable: z.boolean(),
+    diagnostics: diagnosticMetadataSchema.optional(),
   }).strict(),
 }).strict()
