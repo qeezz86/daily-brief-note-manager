@@ -5,7 +5,12 @@ import { registerSW } from 'virtual:pwa-register'
 import { AppProviders } from './app/providers'
 import './styles/global.css'
 
-registerSW({ immediate: true })
+const updateServiceWorker = registerSW({
+  immediate: true,
+  onNeedRefresh() {
+    void updateServiceWorker(true)
+  },
+})
 
 const rootElement = document.getElementById('root')
 
