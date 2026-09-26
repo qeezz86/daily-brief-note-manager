@@ -2,7 +2,7 @@
 
 ## 1. 목적과 범위
 
-이 문서는 Phase 5C-R2 배포 절차를 현재 저장소의 DB·Function 구성에 맞춘 실행 지침이다. 현재 canonical DB 기준은 fresh project의 전체 28개와, 앞 22개가 정확히 적용된 existing project의 마지막 migration 6개다. 수량·순서·seed 정책의 기준은 [`config/supabase-fresh-project-baseline.json`](../config/supabase-fresh-project-baseline.json)의 `migrations`와 `currentApplicationPlans`이며, 상세 검증은 [Supabase baseline 문서](SUPABASE_FRESH_PROJECT_BASELINE.md)를 따른다. 이 문서의 원격 명령과 WordPress 요청은 별도 실행 승인 전에는 실행하지 않는다.
+이 문서는 Phase 5C-R2 배포 절차를 현재 저장소의 DB·Function 구성에 맞춘 실행 지침이다. 현재 canonical DB 기준은 fresh project의 전체 29개와, 앞 22개가 정확히 적용된 existing project의 마지막 migration 7개다. 수량·순서·seed 정책의 기준은 [`config/supabase-fresh-project-baseline.json`](../config/supabase-fresh-project-baseline.json)의 `migrations`와 `currentApplicationPlans`이며, 상세 검증은 [Supabase baseline 문서](SUPABASE_FRESH_PROJECT_BASELINE.md)를 따른다. 이 문서의 원격 명령과 WordPress 요청은 별도 실행 승인 전에는 실행하지 않는다.
 
 목표는 다음 순서를 보장하는 것이다.
 
@@ -20,8 +20,8 @@ Phase 5C의 유일한 WordPress write는 `POST /wp-json/wp/v2/posts`이며 서�
 
 | 단위 | 파일·대상 | 분류 | 비고 |
 |---|---|---|---|
-| DB baseline | `config/supabase-fresh-project-baseline.json`의 28개 migration | fresh remote DB deployment | fresh project에서만 exact order 전체 적용 |
-| DB forward migration | retention hardening, prompt recent-count, image metadata, dashboard overview, ChatGPT paste, WordPress manual HTML RPC migration 6개 | existing remote DB deployment | 앞 22개 history/schema가 정확히 일치할 때만 6C의 순서대로 적용 |
+| DB baseline | `config/supabase-fresh-project-baseline.json`의 29개 migration | fresh remote DB deployment | fresh project에서만 exact order 전체 적용 |
+| DB forward migration | retention hardening, prompt recent-count, image metadata, dashboard overview, ChatGPT paste, WordPress manual HTML, Import detail failed count RPC migration 7개 | existing remote DB deployment | 앞 22개 history/schema가 정확히 일치할 때만 6C의 순서대로 적용 |
 | DB types | `src/shared/supabase/database.types.ts` | repository-only | 컴파일용 생성물이며 원격 배포 단위가 아님 |
 | Function | `wordpress-diagnostics` | remote Function deployment | WordPress read-only 진단 |
 | Function | `wordpress-publication-preview` | remote Function deployment | GET-only taxonomy/duplicate/preview |
@@ -124,14 +124,14 @@ npx supabase functions list --project-ref <PROJECT_REF>
 
 Readiness checker는 원격 조회를 수행하지 않고 sanitized inspection JSON을 입력받아 다음 중 하나로 판정한다.
 
-- `FRESH_PROJECT_BASELINE_REQUIRED`: migration history 0, application table/function 0, canonical migration 28개 전부 pending, unexpected/remote-only object 0.
-- `EXISTING_PROJECT_INCREMENTAL_READY`: 앞 22개 migration과 core schema가 정확히 일치하고 마지막 migration 6개가 순서대로 pending.
-- `MIGRATION_BASELINE_CURRENT`: canonical migration 28개가 모두 applied이고 pending migration이 없음. Migration과 seed 추가 적용 없음.
+- `FRESH_PROJECT_BASELINE_REQUIRED`: migration history 0, application table/function 0, canonical migration 29개 전부 pending, unexpected/remote-only object 0.
+- `EXISTING_PROJECT_INCREMENTAL_READY`: 앞 22개 migration과 core schema가 정확히 일치하고 마지막 migration 7개가 순서대로 pending.
+- `MIGRATION_BASELINE_CURRENT`: canonical migration 29개가 모두 applied이고 pending migration이 없음. Migration과 seed 추가 적용 없음.
 - `PARTIAL_BASELINE_BLOCKED`: migration이나 core object 일부만 존재하여 승인된 두 경로와 일치하지 않음.
 - `HISTORY_MISMATCH_BLOCKED`: schema/history 불일치, remote-only migration, checksum/apply 상태 불명확.
 - `UNEXPECTED_REMOTE_OBJECTS_BLOCKED`: fresh로 예상한 원격에 whitelist 밖 application object가 존재.
 
-2026-07-21의 “당시 baseline 22개 전체 pending” 확인과 Phase 5B·5C의 19+3은 retention hardening 도입 전의 historical/legacy rollout evidence다. 현재 실행 모드를 판정할 때는 위 fresh 28개, existing 22+6 또는 current 28개만 사용한다. 중간 버전의 배포 상태는 현재 승인 경로로 자동 해석하지 않고 6D를 따른다. 실제 원격 write, Function deploy, secret 변경, WordPress 요청은 별도 승인 전까지 0건이어야 한다.
+2026-07-21의 “당시 baseline 22개 전체 pending” 확인과 Phase 5B·5C의 19+3은 retention hardening 도입 전의 historical/legacy rollout evidence다. 현재 실행 모드를 판정할 때는 위 fresh 29개, existing 22+7 또는 current 29개만 사용한다. 중간 버전의 배포 상태는 현재 승인 경로로 자동 해석하지 않고 6D를 따른다. 실제 원격 write, Function deploy, secret 변경, WordPress 요청은 별도 승인 전까지 0건이어야 한다.
 
 ## 6B. Fresh Project Baseline Path
 
@@ -139,14 +139,14 @@ Readiness checker는 원격 조회를 수행하지 않고 sanitized inspection J
 
 1. remote public application table과 function 0을 read-only로 확인한다.
 2. migration history가 없거나 0행인지 확인한다.
-3. pending이 manifest의 28개와 순서까지 정확히 일치하는지 확인한다.
+3. pending이 manifest의 29개와 순서까지 정확히 일치하는지 확인한다.
 4. Supabase와 WordPress backup 상태·보존 기간·담당자를 확인한다.
 5. `npm run check:supabase-fresh-baseline`으로 migration whitelist와 안전성을 검증한다.
 6. `01_categories.sql`만 production seed whitelist인지 확인한다.
-7. 전체 baseline 28개와 category seed 적용에 대한 별도 명시적 승인을 받는다.
-8. 승인된 28개 migration 전체를 manifest 순서로 적용한다.
+7. 전체 baseline 29개와 category seed 적용에 대한 별도 명시적 승인을 받는다.
+8. 승인된 29개 migration 전체를 manifest 순서로 적용한다.
 9. 승인된 category seed를 한 번 적용한다.
-10. migration history가 정확히 28개인지 확인한다.
+10. migration history가 정확히 29개인지 확인한다.
 11. manifest의 core/WordPress table을 확인한다.
 12. 모든 user-owned table의 RLS와 policy inventory를 확인한다.
 13. RPC security type, 빈 `search_path`, execute privilege를 확인한다.
@@ -158,7 +158,7 @@ Fresh에서 일부 migration만 선택 적용하거나 seed를 생략하는 계�
 
 ## 6C. Existing Project Incremental Path
 
-현재 existing 경로는 앞 22개 migration history와 core schema가 정확히 일치하고 다음 migration 6개가 순서대로 pending일 때에만 적용한다. 목록은 manifest의 `currentApplicationPlans.existing.pendingMigrations`와 일치해야 한다.
+현재 existing 경로는 앞 22개 migration history와 core schema가 정확히 일치하고 다음 migration 7개가 순서대로 pending일 때에만 적용한다. 목록은 manifest의 `currentApplicationPlans.existing.pendingMigrations`와 일치해야 한다.
 
 1. `20260724190000_harden_wordpress_publication_attempt_retention.sql`
 2. `20260726190000_expand_news_briefing_prompt_recent_counts.sql`
@@ -166,8 +166,9 @@ Fresh에서 일부 migration만 선택 적용하거나 seed를 생략하는 계�
 4. `20260729150000_get_dashboard_overview.sql`
 5. `20260801120000_save_chatgpt_paste_post.sql`
 6. `20260809120000_save_wordpress_manual_post.sql`
+7. `20260926114000_add_import_job_failed_count.sql`
 
-Phase 5B·5C에서 사용한 앞 19개 applied + WordPress migration 3개 pending 경로는 historical legacy rollout path다. 기록은 보존하지만 현재 실행 계획으로 분류하거나 적용하지 않는다. Existing 22+6 경로에서는 category seed를 재실행하지 않으며, 일부 suffix나 전체 28개를 계획하면 실패다. DB 적용에는 별도 명시적 승인이 필요하다.
+Phase 5B·5C에서 사용한 앞 19개 applied + WordPress migration 3개 pending 경로는 historical legacy rollout path다. 기록은 보존하지만 현재 실행 계획으로 분류하거나 적용하지 않는다. Existing 22+7 경로에서는 category seed를 재실행하지 않으며, 일부 suffix나 전체 29개를 계획하면 실패다. DB 적용에는 별도 명시적 승인이 필요하다.
 
 ## 6D. Partial or History-Mismatch Stop Path
 
@@ -179,11 +180,11 @@ Production seed는 정적 기준 데이터만 허용한다. 현재 whitelist는 
 
 ## 6F. Fresh Baseline Approval Gate
 
-승인 요청에는 exact commit, clean tree, backup, sanitized classification, 28개 manifest, seed whitelist, local reset/lint/pgTAP, Vitest/Deno/smoke/E2E/lint/build/bundle 결과와 예상 원격 객체를 포함한다. 이 승인은 DB baseline과 seed만 허용하며 Function, secret, frontend, WordPress draft를 허용하지 않는다.
+승인 요청에는 exact commit, clean tree, backup, sanitized classification, 29개 manifest, seed whitelist, local reset/lint/pgTAP, Vitest/Deno/smoke/E2E/lint/build/bundle 결과와 예상 원격 객체를 포함한다. 이 승인은 DB baseline과 seed만 허용하며 Function, secret, frontend, WordPress draft를 허용하지 않는다.
 
 ## 6G. Fresh Baseline Post-Deployment Verification
 
-Migration history 28개, expected public table, RLS/policy, RPC security/search path/execute, unique index와 partial execution guard, category 8개, user-owned content 0, WordPress mapping/attempt 0을 read-only SQL로 확인한다. 하나라도 다르면 WordPress 단계로 진행하지 않는다.
+Migration history 29개, expected public table, RLS/policy, RPC security/search path/execute, unique index와 partial execution guard, category 8개, user-owned content 0, WordPress mapping/attempt 0을 read-only SQL로 확인한다. 하나라도 다르면 WordPress 단계로 진행하지 않는다.
 
 ## 6H. Auth User Bootstrap Timing
 
@@ -203,7 +204,7 @@ npx supabase migration list --linked
 npx supabase db push --linked --dry-run
 ```
 
-Dry run의 pending 목록은 먼저 6A의 모드로 분류한다. Fresh이면 manifest의 28개 전체, existing이면 마지막 migration 6개와 순서까지 정확히 일치해야 하며, current이면 pending이 없어야 한다. 과거 19+3을 포함한 그 밖의 일부 migration, 알 수 없는 remote-only version, unexpected object 또는 history mismatch가 보이면 push하지 않는다.
+Dry run의 pending 목록은 먼저 6A의 모드로 분류한다. Fresh이면 manifest의 29개 전체, existing이면 마지막 migration 7개와 순서까지 정확히 일치해야 하며, current이면 pending이 없어야 한다. 과거 19+3을 포함한 그 밖의 일부 migration, 알 수 없는 remote-only version, unexpected object 또는 history mismatch가 보이면 push하지 않는다.
 
 ### 7.2 historical Phase 5B·5C legacy 19+3 안전 검수 기록
 
@@ -241,7 +242,7 @@ npx supabase db push --linked
 npx supabase migration list --linked
 ```
 
-적용 대상은 6C에 나열한 migration 6개 전체이며 manifest의 순서와 정확히 일치해야 한다. 적용 후 history는 canonical 28개와 일치하고 pending은 0개여야 한다. Existing 경로에서는 seed를 재적용하지 않는다.
+적용 대상은 6C에 나열한 migration 7개 전체이며 manifest의 순서와 정확히 일치해야 한다. 적용 후 history는 canonical 29개와 일치하고 pending은 0개여야 한다. Existing 경로에서는 seed를 재적용하지 않는다.
 
 Dashboard SQL Editor에서 read-only catalog query로 다음을 확인한다. 실제 row 내용이나 secret을 출력하지 않는다.
 
@@ -442,7 +443,7 @@ Preview까지 실제 WordPress write는 0건이어야 한다.
 
 실행자가 직접 확인한다.
 
-- 선택된 모드의 migration 적용 완료(fresh 28개 또는 existing ordered suffix 6개; current는 추가 적용 없음)
+- 선택된 모드의 migration 적용 완료(fresh 29개 또는 existing ordered suffix 7개; current는 추가 적용 없음)
 - 기본 Function 세 개 배포와 commit/version 확인; 상태 확인 UI 포함 시 11.1의 C3 조건과 post-status 배포·검증 결과 확인
 - custom secret 다섯 개 설정, `WORDPRESS_LOCAL_MODE` 없음
 - diagnostics ready, owner UUID 일치
@@ -586,7 +587,7 @@ Supabase DB:
 다음이 모두 충족되어야 `READY_FOR_PHASE_5D`로 기록한다.
 
 - 승인 commit과 배포 version 일치
-- 선택된 모드의 remote migration 적용 완료(fresh 28개 또는 existing 22+6; current는 추가 적용 없음), table/RLS/RPC/index/constraint 검증 완료
+- 선택된 모드의 remote migration 적용 완료(fresh 29개 또는 existing 22+7; current는 추가 적용 없음), table/RLS/RPC/index/constraint 검증 완료
 - 배포 대상 Function 전체의 JWT 이중 인증과 exact CORS 검증 완료; post-status 포함 시 11.1의 C3 조건 충족
 - frontend server-only secret 0건
 - read-only preflight 16단계 완료, WordPress write 0건
@@ -602,6 +603,6 @@ Manual prerequisite가 남아 있거나 결과가 uncertain이면 Phase 5D에 �
 
 ## 25. Phase 5C-R2 Draft Hardening Forward Migration (historical)
 
-Phase 5C-R2 retention hardening 도입 당시의 fresh baseline은 migration 23개였고, 앞 22개가 적용된 환경에 `20260724190000_harden_wordpress_publication_attempt_retention.sql` 1개를 추가하는 경로였다. 이 절은 해당 migration의 역사적 설계 기록이다. 현재 실행은 6A~6C의 28개 또는 22+6 기준을 따른다. 이 migration은 `wordpress_publication_attempts`의 content/owner foreign key를 `ON DELETE CASCADE`에서 `ON DELETE RESTRICT`로 교체해 WordPress 외부 side effect 감사와 idempotency 기록이 콘텐츠 삭제로 사라지지 않게 한다.
+Phase 5C-R2 retention hardening 도입 당시의 fresh baseline은 migration 23개였고, 앞 22개가 적용된 환경에 `20260724190000_harden_wordpress_publication_attempt_retention.sql` 1개를 추가하는 경로였다. 이 절은 해당 migration의 역사적 설계 기록이다. 현재 실행은 6A~6C의 29개 또는 22+7 기준을 따른다. 이 migration은 `wordpress_publication_attempts`의 content/owner foreign key를 `ON DELETE CASCADE`에서 `ON DELETE RESTRICT`로 교체해 WordPress 외부 side effect 감사와 idempotency 기록이 콘텐츠 삭제로 사라지지 않게 한다.
 
 당시 개별 적용의 검증 조건은 적용 전 history 22개와 해당 migration 1개 pending, 적용 후 history 23개 및 constraint delete action `RESTRICT`였다. 현재도 기존 RLS·service-role transition RPC·partial execution guard와 retention 제약을 검증하되, 전체 history와 적용 범위는 현행 manifest를 사용한다. migration 역적용, attempt 삭제 또는 콘텐츠 강제 삭제는 자동 rollback에 포함하지 않는다.
