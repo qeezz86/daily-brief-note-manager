@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(27);
+select plan(30);
 
 insert into auth.users(id,email) values
  ('00000000-0000-0000-0000-000000004d01','restore-prep@example.test'),
@@ -23,6 +23,7 @@ select function_privs_are('public','resume_cancelled_restore_job',array['uuid'],
 select table_privs_are('public','restore_jobs','authenticated',array['SELECT'],'8 jobs allow select only');
 select table_privs_are('public','restore_job_records','authenticated',array['SELECT'],'9 records allow select only');
 select table_privs_are('public','restore_job_record_attempts','authenticated',array['SELECT'],'10 attempts allow select only');
+select function_privs_are('public','restore_job_json',array['uuid'],'authenticated',array['EXECUTE'],'11 authenticated can execute the owner-scoped restore job helper');
 
 set local role anon;
 set local "request.jwt.claims"='{"role":"anon"}';
@@ -54,11 +55,13 @@ select throws_ok($$ select public.finalize_restore_job((select (value->>'jobId')
 
 select is((public.append_restore_job_records((select (value->>'jobId')::uuid from prep_job),jsonb_build_array(public.test_restore_prep_record('tags','valid','4d100000-0000-0000-0000-000000000004',1,0,'preserve_id','{"name":"Valid","normalizedName":"valid","createdAt":"2026-07-15T00:00:00Z"}')))->>'appendedCount')::int,1,'23 valid snapshot appended');
 select is((public.finalize_restore_job((select (value->>'jobId')::uuid from prep_job))->>'status'),'ready','24 valid job finalized');
+select lives_ok($$ select public.get_restore_jobs(100) $$,'25 authenticated user can list restore jobs through the helper');
 
 set local "request.jwt.claims"='{"sub":"00000000-0000-0000-0000-000000004d02","role":"authenticated"}';
-select is((select count(*)::int from public.restore_jobs),0,'25 other user cannot read jobs');
-select throws_ok($$ select public.append_restore_job_records((select (value->>'jobId')::uuid from prep_job),jsonb_build_array(public.test_restore_prep_record('tags','foreign','4d100000-0000-0000-0000-000000000005',1,0))) $$,'42501','RESTORE_PERMISSION_DENIED','26 other user cannot access job RPC');
-select throws_ok($$ insert into public.restore_job_records(owner_id,job_id,section,source_id,target_id,action,stage_key,stage_order,sequence_no,payload,payload_fingerprint) values('00000000-0000-0000-0000-000000004d02',(select (value->>'jobId')::uuid from prep_job),'tags','direct',null,'skip','tags',1,0,'{}',repeat('a',64)) $$,'42501',null::text,'27 direct record insert denied');
+select is((select count(*)::int from public.restore_jobs),0,'26 other user cannot read jobs');
+select throws_ok($$ select public.append_restore_job_records((select (value->>'jobId')::uuid from prep_job),jsonb_build_array(public.test_restore_prep_record('tags','foreign','4d100000-0000-0000-0000-000000000005',1,0))) $$,'42501','RESTORE_PERMISSION_DENIED','27 other user cannot access job RPC');
+select throws_ok($$ insert into public.restore_job_records(owner_id,job_id,section,source_id,target_id,action,stage_key,stage_order,sequence_no,payload,payload_fingerprint) values('00000000-0000-0000-0000-000000004d02',(select (value->>'jobId')::uuid from prep_job),'tags','direct',null,'skip','tags',1,0,'{}',repeat('a',64)) $$,'42501',null::text,'28 direct record insert denied');
+select is((public.get_restore_jobs(100)),'[]'::jsonb,'29 helper grant still preserves cross-owner isolation');
 
 select * from finish();
 rollback;
