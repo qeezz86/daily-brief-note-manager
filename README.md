@@ -4,7 +4,7 @@ Daily Brief Note의 콘텐츠, SEO 정보, 출처, 뉴스 추적 이력과 생�
 
 현재 `/imports`는 **기존 JSON Import**, **ChatGPT 구조화 붙여넣기**, **뉴스 일반 응답 붙여넣기**, **비뉴스 일반 응답 붙여넣기**, **WordPress HTML 붙여넣기**의 다섯 입력 모드를 제공합니다. JSON Import는 영구 작업 이력에서 순차 실행·수동 재시도하며, 붙여넣기 모드는 분석·미리보기·검증과 명시적 저장 확인을 거칩니다.
 
-현재 저장소의 canonical migration inventory는 28개입니다. 앞 22개가 적용된 기존 환경에는 publication-attempt retention, news prompt recent-count, article image prompt·ALT 전용 저장 RPC, operational dashboard overview RPC, structured ChatGPT paste 저장 RPC, manual WordPress HTML 저장 RPC migration을 순서대로 적용하는 incremental plan을 사용합니다. Machine-readable whitelist와 offline checker는 [`config/supabase-fresh-project-baseline.json`](config/supabase-fresh-project-baseline.json), 전체 승인·검증 정책은 [`docs/SUPABASE_FRESH_PROJECT_BASELINE.md`](docs/SUPABASE_FRESH_PROJECT_BASELINE.md)를 따릅니다. 추적 database types의 Phase 5H RPC declaration은 compilation용 provisional 상태이며 canonical generated-types freshness와 database runtime은 required CI evidence가 확정합니다.
+현재 저장소의 canonical migration inventory는 29개입니다. 앞 22개가 적용된 기존 환경에는 publication-attempt retention부터 Import 작업 상세의 실패 건수 응답 보완까지 migration 7개를 순서대로 적용하는 incremental plan을 사용합니다. Machine-readable whitelist와 offline checker는 [`config/supabase-fresh-project-baseline.json`](config/supabase-fresh-project-baseline.json), 전체 승인·검증 정책은 [`docs/SUPABASE_FRESH_PROJECT_BASELINE.md`](docs/SUPABASE_FRESH_PROJECT_BASELINE.md)를 따릅니다. 추적 database types의 Phase 5H RPC declaration은 compilation용 provisional 상태이며 canonical generated-types freshness와 database runtime은 required CI evidence가 확정합니다.
 
 Phase 5G의 `/imports`에는 기존 JSON Import와 격리된 **ChatGPT 구조화 붙여넣기** mode가 있습니다. 브라우저의 결정적 로컬 parser가 지원 section을 미리보기로 만들고 차단 오류·무시 필드·저장하지 않는 `NEWS_TRACKING_JSON`을 표시합니다. 경고는 명시적으로 확인해야 하며, 유효한 미리보기도 사용자가 한 건 저장을 확인하기 전에는 DB 쓰기 요청을 보내지 않습니다. raw paste는 RPC payload, 로그, telemetry 또는 백업에 포함하지 않고, 저장 실패는 원문 DB 오류를 숨긴 채 미리보기를 유지하여 수동 재시도만 허용합니다.
 
@@ -79,7 +79,7 @@ npm run bundle:check
 
 `npm run build:budget`은 production build와 budget 검사를 연속 실행합니다. 의도된 bundle 변화의 원인을 검토한 뒤에만 `npm run bundle:baseline`으로 기존 `dist`의 승인 baseline을 갱신하고, 생성된 `config/bundle-baseline.json` diff를 코드 리뷰에 포함합니다.
 
-`npm run check:supabase-fresh-baseline`은 canonical migration inventory 28개와 category seed whitelist, fresh 28개·existing 22+6 적용 계획, 금지 SQL·literal, runbook deployment mode와 sanitized fixture를 로컬 파일만으로 검증합니다. Protected env를 읽거나 network, linked Supabase CLI 또는 원격 명령을 실행하지 않습니다.
+`npm run check:supabase-fresh-baseline`은 canonical migration inventory 29개와 category seed whitelist, fresh 29개·existing 22+7 적용 계획, 금지 SQL·literal, runbook deployment mode와 sanitized fixture를 로컬 파일만으로 검증합니다. Protected env를 읽거나 network, linked Supabase CLI 또는 원격 명령을 실행하지 않습니다.
 
 Bundle budget CI는 Supabase module을 포함한 production graph를 일정하게 만들기 위해 로컬 주소와 비밀정보가 아닌 공개 placeholder key를 build-time 환경변수로 사용합니다. CI는 앱을 실행하거나 원격 Supabase에 연결하지 않으며 실제 credential이나 GitHub secret을 저장하지 않습니다. Raw 최대 chunk와 gzip 최대 chunk는 서로 다른 asset일 수 있으므로 각각 독립적으로 측정합니다.
 

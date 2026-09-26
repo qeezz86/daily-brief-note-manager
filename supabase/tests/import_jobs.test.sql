@@ -1,7 +1,7 @@
 begin;
 
 create extension if not exists pgtap with schema extensions;
-select plan(78);
+select plan(79);
 
 insert into auth.users (id, email) values
   ('00000000-0000-0000-0000-0000000004a4', 'job-owner@example.test'),
@@ -99,6 +99,7 @@ select is((select count(*)::int from public.news_updates where post_id=(select p
 select lives_ok($$ select public.run_import_job_item_content((select id from public.import_job_items where external_key='job-two')) $$,'42 second content succeeds');
 select is((select status from public.import_jobs where id=(select (value->>'jobId')::uuid from job_one)),'completed','43 all terminal stages complete job');
 select is((public.get_import_job((select (value->>'jobId')::uuid from job_one))->>'completedCount')::int,2,'44 DB aggregate completed count exact');
+select is((public.get_import_job((select (value->>'jobId')::uuid from job_one))->>'failedCount')::int,0,'79 detail RPC exposes failed count');
 select is(jsonb_array_length(public.get_import_job_items((select (value->>'jobId')::uuid from job_one))),2,'45 item read RPC returns ordered rows');
 
 create temporary table job_cancel as select public.create_import_job('daily-brief-note-content-import',1,'cancel.json',repeat('c',64),2,'{}') value;
