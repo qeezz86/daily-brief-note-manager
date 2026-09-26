@@ -24,13 +24,13 @@ export const importJobDetailSchema = importJobListItemSchema.extend({
   retryableFailureCount: z.number().int().nonnegative(), nonRetryableFailureCount: z.number().int().nonnegative(),
   contentRetryableFailureCount: z.number().int().nonnegative(), trackingRetryableFailureCount: z.number().int().nonnegative(),
   cancelledAt: nullableTimestamp,
-}).strict()
+}).strip()
 
 const attemptSchema = z.object({
   id: z.string().uuid(), stage: z.enum(['content', 'tracking']), attemptNo: z.number().int().positive(),
   status: z.enum(['running', 'imported', 'failed']), safeErrorCode: z.string().nullable(), safeErrorMessage: z.string().nullable(),
   retryable: z.boolean(), startedAt: z.string(), completedAt: nullableTimestamp,
-}).strict()
+}).strip()
 
 export const importJobItemSchema = z.object({
   id: z.string().uuid(), itemIndex: z.number().int().nonnegative(), externalKey: z.string(),
@@ -47,7 +47,7 @@ export const importJobItemSchema = z.object({
   followupCount: z.number().int().nonnegative().nullable(), sourceLinkCount: z.number().int().nonnegative().nullable(),
   contentStartedAt: nullableTimestamp, contentCompletedAt: nullableTimestamp,
   trackingStartedAt: nullableTimestamp, trackingCompletedAt: nullableTimestamp, attempts: z.array(attemptSchema),
-}).strict()
+}).strip()
 
 export const importJobStageResultSchema = z.object({
   itemId: z.string().uuid(), success: z.boolean(), idempotent: z.boolean(),
