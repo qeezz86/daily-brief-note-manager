@@ -15,6 +15,11 @@ import { newsUpdateQueryKeys } from '../features/newsUpdates/newsUpdates.queries
 import { postQueryKeys } from '../features/posts/posts.queries'
 import { supabase, type DatabaseClient } from '../shared/supabase/client'
 
+function safeQueryErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message.trim()) return error.message.trim()
+  return '상세 조회 응답을 확인할 수 없습니다.'
+}
+
 export function ImportJobDetailPageContent({ client = supabase, userId = '', jobId }: { client?: DatabaseClient | null; userId?: string; jobId: string }) {
   const queryClient = useQueryClient()
   const jobQuery = useImportJobQuery(client, userId, jobId)
@@ -66,7 +71,13 @@ export function ImportJobDetailPageContent({ client = supabase, userId = '', job
   }
 
   if (jobQuery.isPending || itemsQuery.isPending) return <div className="content-state" role="status">Import 작업을 불러오고 있습니다.</div>
-  if (jobQuery.isError || itemsQuery.isError) return <div className="content-state content-state--error" role="alert">Import 작업을 불러오지 못했습니다.</div>
+  if (jobQuery.isError || itemsQuery.isError) {
+    const error = jobQuery.error ?? itemsQuery.error
+    return <div className="content-state content-state--error" role="alert">
+      <p>Import 작업을 불러오지 못했습니다.</p>
+      <p>상세: {safeQueryErrorMessage(error)}</p>
+    </div>
+  }
   if (!jobQuery.data) return <div className="content-state"><h1>Import 작업을 찾을 수 없습니다</h1><Link to="/imports/history">작업 이력으로</Link></div>
   const job = jobQuery.data
   return <section className="content-page" aria-labelledby="import-job-detail-title">
